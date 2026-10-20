@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { Signal, StateSetter } from "behavon";
 import { inspectSnapshotChannelForTests } from "../../src/internal/snapshot-channels";
-import { uniqueChannel, waitFor } from "../helpers";
+import { uniqueChannel, waitFor, signalOf } from "../helpers";
 
 async function captureScheduledFailure(action: () => void): Promise<unknown> {
   let surfaced: unknown;
@@ -38,16 +38,16 @@ describe("self render-phase updates", () => {
       const callbacks: Array<() => string> = [];
 
       function Model(): undefined {
-        const [attempt, setAttempt] = Behave.useState(0);
+        const [attempt, setAttempt] = Behavon.useState(0);
         const dependency = retryCase.dependencies[attempt] as number;
-        const memo = Behave.useMemo(() => {
+        const memo = Behavon.useMemo(() => {
           // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe counts retry-local memo factory execution
           factoryRuns += 1;
           return { dependency, attempt } as const;
         // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only retry cache probe intentionally keys the value only by the selected dependency
         }, [dependency]);
         // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only retry cache probe intentionally keys the closure only by the selected dependency
-        const callback = Behave.useCallback(() => `${dependency}:${attempt}`, [dependency]);
+        const callback = Behavon.useCallback(() => `${dependency}:${attempt}`, [dependency]);
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records retry-local identity progression
         memoValues.push(memo);
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records retry-local identity progression
@@ -56,7 +56,7 @@ describe("self render-phase updates", () => {
         return undefined;
       }
 
-      const root = Behave.createModel(Model, undefined);
+      const root = Behavon.createModel(Model, undefined);
       expect(factoryRuns, retryCase.name).toBe(retryCase.factoryRuns);
       expect(callbacks.at(-1)?.(), retryCase.name).toBe(retryCase.finalClosure);
       if (retryCase.name === "A to A") {
@@ -91,18 +91,18 @@ describe("self render-phase updates", () => {
       const callbacks: Array<() => string> = [];
 
       function Model(): undefined {
-        const [attempt, setAttempt] = Behave.useState(-1);
+        const [attempt, setAttempt] = Behavon.useState(-1);
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe exposes a setter for an active retry transaction
         start = setAttempt;
         const dependency = attempt < 0 ? 0 : retryCase.dependencies[attempt] as number;
-        const memo = Behave.useMemo(() => {
+        const memo = Behavon.useMemo(() => {
           // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe counts retry-local memo factory execution
           factoryRuns += 1;
           return { dependency, attempt } as const;
         // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only retry cache probe intentionally keys the value only by the selected dependency
         }, [dependency]);
         // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only retry cache probe intentionally keys the closure only by the selected dependency
-        const callback = Behave.useCallback(() => `${dependency}:${attempt}`, [dependency]);
+        const callback = Behavon.useCallback(() => `${dependency}:${attempt}`, [dependency]);
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records retry-local identity progression
         memoValues.push(memo);
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records retry-local identity progression
@@ -111,7 +111,7 @@ describe("self render-phase updates", () => {
         return undefined;
       }
 
-      const root = Behave.createModel(Model, undefined);
+      const root = Behavon.createModel(Model, undefined);
       const committedMemo = memoValues[0];
       const committedCallback = callbacks[0];
       start?.(0);
@@ -144,17 +144,17 @@ describe("self render-phase updates", () => {
     const leakProbeCallbacks: Array<() => string> = [];
 
     function LeakProbe(): undefined {
-      const [, setTick] = Behave.useState(0);
+      const [, setTick] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe exposes a setter for independent transactions
       update = setTick;
-      const memo = Behave.useMemo(() => {
+      const memo = Behavon.useMemo(() => {
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe counts candidate memo factories
         leakProbeFactoryRuns += 1;
         return { phase };
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only candidate cache probe uses an outer phase changed before an independently scheduled evaluation
       }, [phase]);
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only candidate cache probe uses an outer phase changed before an independently scheduled evaluation
-      const callback = Behave.useCallback(() => phase, [phase]);
+      const callback = Behavon.useCallback(() => phase, [phase]);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records candidate memo identity
       leakProbeMemos.push(memo);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records candidate callback identity
@@ -162,7 +162,7 @@ describe("self render-phase updates", () => {
       return undefined;
     }
 
-    const leakProbeRoot = Behave.createModel(LeakProbe, undefined);
+    const leakProbeRoot = Behavon.createModel(LeakProbe, undefined);
     const committedMemo = leakProbeMemos[0];
     const committedCallback = leakProbeCallbacks[0];
     phase = "B";
@@ -184,7 +184,7 @@ describe("self render-phase updates", () => {
     const updaterOrder: string[] = [];
 
     function Model(): undefined {
-      const [value, setValue] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations.push(value);
       if (value === 0) {
@@ -200,7 +200,7 @@ describe("self render-phase updates", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(evaluations).toEqual([0, 1, 2]);
     expect(updaterOrder).toEqual(["prefix", "suffix"]);
     root.dispose();
@@ -217,7 +217,7 @@ describe("self render-phase updates", () => {
     let externalUpdaterCalls = 0;
 
     function Model(): undefined {
-      const [value, setValue] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations.push(value);
       if (value === 1) setValue((previous) => previous + 1);
@@ -225,24 +225,24 @@ describe("self render-phase updates", () => {
         setValue((previous) => previous + 1);
         throw failure;
       }
-      const start = Behave.useCallback(() => setValue((previous) => {
+      const start = Behavon.useCallback(() => setValue((previous) => {
         externalUpdaterCalls += 1;
         return previous + 1;
       }), [setValue]);
-      Behave.useSignal("start", start);
-      Behave.useEffect(() => {
+      Behavon.useSignal("start", start);
+      Behavon.useEffect(() => {
         setups.push(value);
       }, [value]);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(await captureScheduledFailure(() => root.start())).toBe(failure);
+    const root = Behavon.createModel(Model, undefined);
+    expect(await captureScheduledFailure(() => signalOf(root, "start")())).toBe(failure);
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(evaluations).toEqual([0, 1, 2]);
     expect(setups).toEqual([0]);
     expect(externalUpdaterCalls).toBe(1);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("does not reclassify a post-commit Effect update as an evaluation suffix before terminal teardown", async () => {
@@ -254,23 +254,23 @@ describe("self render-phase updates", () => {
     const evaluations: Array<readonly [number, number]> = [];
 
     function Model(): undefined {
-      const [value, setValue] = Behave.useState(0);
-      const [phase, setPhase] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
+      const [phase, setPhase] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations.push([value, phase]);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         if (phase === 1) {
           setValue(5);
           throw failure;
         }
       }, [phase]);
-      const advance = Behave.useCallback(() => setPhase(1), [setPhase]);
-      Behave.useSignal("advance", advance);
+      const advance = Behavon.useCallback(() => setPhase(1), [setPhase]);
+      Behavon.useSignal("advance", advance);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(await captureScheduledFailure(() => root.advance())).toBe(failure);
+    const root = Behavon.createModel(Model, undefined);
+    expect(await captureScheduledFailure(() => signalOf(root, "advance")())).toBe(failure);
     await Promise.resolve();
     expect(evaluations).toEqual([[0, 0], [0, 1]]);
     expect(() => root.advance()).toThrow(/disposed/);
@@ -292,20 +292,20 @@ describe("self render-phase updates", () => {
     });
 
     function Model(): undefined {
-      const [phase, setPhase] = Behave.useState(0);
+      const [phase, setPhase] = Behavon.useState(0);
       if (phase === 1) setPhase(2);
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         subscribeFunctions[phase] as (listener: () => void) => () => void,
         () => phase,
       );
-      const advance = Behave.useCallback(() => setPhase(1), [setPhase]);
-      Behave.useSignal("advance", advance);
+      const advance = Behavon.useCallback(() => setPhase(1), [setPhase]);
+      Behavon.useSignal("advance", advance);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(subscriptions).toEqual([1, 0, 0]);
-    root.advance();
+    signalOf(root, "advance")();
     await waitFor(() => subscriptions[2] === 1);
     expect(subscriptions).toEqual([1, 0, 1]);
     expect(unsubscriptions).toEqual([1, 0, 0]);
@@ -320,14 +320,14 @@ describe("self render-phase updates", () => {
     function Loop(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
-      const [, setValue] = Behave.useState(0);
-      Behave.useSnapshot(channel);
+      const [, setValue] = Behavon.useState(0);
+      Behavon.useSnapshot(channel);
       setValue(0);
       return undefined;
     }
 
-    expect(() => Behave.createModel(Loop, undefined)).toThrow(
-      /Behave Model#\d+ exceeded 25 render-phase evaluation attempts/,
+    expect(() => Behavon.createModel(Loop, undefined)).toThrow(
+      /Behavon Model#\d+ exceeded 25 render-phase evaluation attempts/,
     );
     expect(evaluations).toBe(25);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
@@ -342,62 +342,62 @@ describe("self render-phase updates", () => {
     function Model(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
-      const [enabled, setEnabled] = Behave.useState(false);
+      const [enabled, setEnabled] = Behavon.useState(false);
       if (enabled) setEnabled(true);
-      const enableLoop = Behave.useCallback(() => setEnabled(true), [setEnabled]);
-      Behave.useSignal("enableLoop", enableLoop);
+      const enableLoop = Behavon.useCallback(() => setEnabled(true), [setEnabled]);
+      Behavon.useSignal("enableLoop", enableLoop);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(await captureScheduledFailure(() => root.enableLoop())).toMatchObject({
-      message: expect.stringMatching(/Behave Model#\d+ exceeded 25 render-phase evaluation attempts/),
+    const root = Behavon.createModel(Model, undefined);
+    expect(await captureScheduledFailure(() => signalOf(root, "enableLoop")())).toMatchObject({
+      message: expect.stringMatching(/Behavon Model#\d+ exceeded 25 render-phase evaluation attempts/),
     });
     expect(evaluations).toBe(26);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("keeps hook count enforcement across construction retries", () => {
     function Broken(): undefined {
-      const [value, setValue] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
       if (value === 0) setValue(1);
       // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only runtime hook-count probe intentionally discards a conditional memo with incomplete dependencies
-      if (value === 1) Behave.useMemo(() => value, []);
+      if (value === 1) Behavon.useMemo(() => value, []);
       return undefined;
     }
 
-    expect(() => Behave.createModel(Broken, undefined)).toThrow(
-      /Behave hook count changed in Model#\d+: expected 1, received 2/,
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow(
+      /Behavon hook count changed in Model#\d+: expected 1, received 2/,
     );
   });
 
   it("keeps hook order and dependency shape enforcement across construction retries", () => {
     function WrongOrder(): undefined {
-      const [value, setValue] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
       if (value === 0) {
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only runtime hook-order probe intentionally discards a memo with incomplete dependencies
-        Behave.useMemo(() => value, []);
+        Behavon.useMemo(() => value, []);
         setValue(1);
       } else {
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only runtime hook-order probe intentionally discards a callback with incomplete dependencies
-        Behave.useCallback(() => value, []);
+        Behavon.useCallback(() => value, []);
       }
       return undefined;
     }
 
     function WrongDependencies(): undefined {
-      const [value, setValue] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only dependency-shape probe needs a dynamic list and incomplete branch
-      Behave.useMemo(() => value, value === 0 ? [] : [value]);
+      Behavon.useMemo(() => value, value === 0 ? [] : [value]);
       if (value === 0) setValue(1);
       return undefined;
     }
 
-    expect(() => Behave.createModel(WrongOrder, undefined)).toThrow(
-      /Behave hook order changed in Model#\d+: expected memo, received callback/,
+    expect(() => Behavon.createModel(WrongOrder, undefined)).toThrow(
+      /Behavon hook order changed in Model#\d+: expected memo, received callback/,
     );
-    expect(() => Behave.createModel(WrongDependencies, undefined)).toThrow(
-      /Behave\.useMemo dependency shape changed in Model#\d+ at hook index 1: expected array\(length 0\), received array\(length 1\)/,
+    expect(() => Behavon.createModel(WrongDependencies, undefined)).toThrow(
+      /Behavon\.useMemo dependency shape changed in Model#\d+ at hook index 1: expected array\(length 0\), received array\(length 1\)/,
     );
   });
 });

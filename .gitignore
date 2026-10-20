@@ -11,3 +11,5 @@ tests/types/package-consumer/.generated/
 /demo-server.sqlite
 /demo-server.sqlite-shm
 /demo-server.sqlite-wal
+/internal/
+tests/docs/.generated/

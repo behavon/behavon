@@ -1,4 +1,4 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { Signal, SnapshotId, SnapshotRootId } from "behavon";
 
 interface Port {
@@ -6,44 +6,44 @@ interface Port {
 }
 
 const declaration = {
-  fire: Behave.SignalType<[]>(),
-  extra: Behave.SignalType<[]>(),
+  fire: Behavon.SignalType<[]>(),
+  extra: Behavon.SignalType<[]>(),
 };
-const fire = Behave.SignalType<[]>();
+const fire = Behavon.SignalType<[]>();
 const key = "fire" as const;
 
-Behave.createPort<Port>({ ...declaration });
-Behave.createPort<Port>({ [key]: Behave.SignalType() });
-Behave.createPort<Port>({ fire });
+Behavon.createPort<Port>({ ...declaration });
+Behavon.createPort<Port>({ [key]: Behavon.SignalType() });
+Behavon.createPort<Port>({ fire });
 // @ts-expect-error Method syntax does not satisfy the Signal marker type.
-Behave.createPort<Port>({ fire() { return Behave.SignalType(); } });
-Behave.createPort<Port>({ get fire() { return Behave.SignalType<[]>(); } });
+Behavon.createPort<Port>({ fire() { return Behavon.SignalType(); } });
+Behavon.createPort<Port>({ get fire() { return Behavon.SignalType<[]>(); } });
 
-const nestedDeclaration = { child: Behave.SnapshotType<number>() };
-Behave.createPort<{ app: SnapshotRootId<number> & { child: SnapshotId<number> } }>({
-  app: { $: Behave.SnapshotType(), ...nestedDeclaration },
+const nestedDeclaration = { child: Behavon.SnapshotType<number>() };
+Behavon.createPort<{ app: SnapshotRootId<number> & { child: SnapshotId<number> } }>({
+  app: { $: Behavon.SnapshotType(), ...nestedDeclaration },
 });
 
-const signalMarker = Behave.SignalType<[]>();
-Behave.createPort<Port>({ fire: signalMarker });
+const signalMarker = Behavon.SignalType<[]>();
+Behavon.createPort<Port>({ fire: signalMarker });
 
 const widenedNested = {
-  $: Behave.SnapshotType<number>(),
-  child: Behave.SnapshotType<number>(),
-  extra: Behave.SnapshotType<number>(),
+  $: Behavon.SnapshotType<number>(),
+  child: Behavon.SnapshotType<number>(),
+  extra: Behavon.SnapshotType<number>(),
 };
-Behave.createPort<{ app: SnapshotRootId<number> & { child: SnapshotId<number> } }>({
+Behavon.createPort<{ app: SnapshotRootId<number> & { child: SnapshotId<number> } }>({
   app: widenedNested,
 });
 
 // @ts-expect-error Empty Port names are intentionally invalid authoring.
-Behave.createPort<{ "": Signal }>({ "": Behave.SignalType() });
-Behave.createPort<{
+Behavon.createPort<{ "": Signal }>({ "": Behavon.SignalType() });
+Behavon.createPort<{
   app: SnapshotRootId<number> & { child: SnapshotId<number> };
 }>({
   app: {
-    $: Behave.SnapshotType(),
+    $: Behavon.SnapshotType(),
     // @ts-expect-error Recursive __proto__ is intentionally invalid authoring.
-    __proto__: Behave.SnapshotType(),
+    __proto__: Behavon.SnapshotType(),
   },
 });

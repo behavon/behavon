@@ -31,7 +31,7 @@ export interface SnapshotFamilyRecord {
 const families = new Map<object, SnapshotFamilyRecord>();
 
 function staleFamilyError(path: string): Error {
-  return new Error(`Behave snapshot identity '${path}' has no live owner`);
+  return new Error(`Behavon snapshot identity '${path}' has no live owner`);
 }
 
 function createNode(family: SnapshotFamilyRecord, token: object, path: string): SnapshotNodeRecord {
@@ -112,7 +112,7 @@ export function acquireSnapshotFamily(root: object): SnapshotFamilyRecord {
 
 export function assertSnapshotOwnerCommittable(family: SnapshotFamilyRecord): void {
   if (family.closed || family.provisionalOwnerCount === 0) {
-    throw new Error(`Behave snapshot family '${family.label}' has no provisional owner to commit`);
+    throw new Error(`Behavon snapshot family '${family.label}' has no provisional owner to commit`);
   }
 }
 

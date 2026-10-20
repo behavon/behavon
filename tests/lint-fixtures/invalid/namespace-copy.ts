@@ -1,17 +1,17 @@
-import * as Behave from "behavon";
+import * as Behavon from "behavon";
 
-const B = Behave;
-const C = Behave as typeof Behave;
-let D: typeof Behave;
-D = Behave as typeof Behave;
-const E = Behave!;
-const F = Behave satisfies typeof Behave;
+const B = Behavon;
+const C = Behavon as typeof Behavon;
+let D: typeof Behavon;
+D = Behavon as typeof Behavon;
+const E = Behavon!;
+const F = Behavon satisfies typeof Behavon;
 function consume(_value: unknown): void {}
-consume(Behave);
-function returnNamespace(): typeof Behave {
-  return Behave;
+consume(Behavon);
+function returnNamespace(): typeof Behavon {
+  return Behavon;
 }
-const stored = { Behave };
+const stored = { Behavon };
 void C;
 void D;
 void E;

@@ -1,7 +1,7 @@
 export { createPort as exportedCreatePort } from "behavon";
 
-const behaveModule = "behavon" as const;
-const behaveTemplate = `behavon`;
+const behavonModule = "behavon" as const;
+const behavonTemplate = `behavon`;
 
 async function loadPortFactories(): Promise<void> {
   const dynamicDefault = (await import("behavon")).default;
@@ -11,8 +11,8 @@ async function loadPortFactories(): Promise<void> {
   const requiredFacade = require("behavon");
   const { createPort: requiredDestructured } = require("behavon");
   const requiredMember = require("behavon").createPort;
-  const aliasedDynamic = await import(behaveModule);
-  const templateDynamic = await import(behaveTemplate);
+  const aliasedDynamic = await import(behavonModule);
+  const templateDynamic = await import(behavonTemplate);
 
   void dynamicDefault;
   void dynamicDestructured;

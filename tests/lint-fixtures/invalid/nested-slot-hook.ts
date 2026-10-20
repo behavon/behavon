@@ -1,6 +1,6 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
 export function NestedSlotHookModel(): undefined {
-  Behave.useSlot("event", Behave.useCallback(() => undefined, []));
+  Behavon.useSlot("event", Behavon.useCallback(() => undefined, []));
   return undefined;
 }

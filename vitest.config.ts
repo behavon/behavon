@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   define: {
-    __BEHAVE_DEVELOPMENT__: "true",
+    __BEHAVON_DEVELOPMENT__: "true",
   },
   resolve: {
     alias: {
@@ -12,7 +12,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     restoreMocks: true,
     clearMocks: true,
   },

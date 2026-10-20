@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { ConnectionMeta, Signal, Slot, UntypedModelRef } from "behavon";
-import { waitFor } from "../helpers";
+import { waitFor, signalOf } from "../helpers";
 
 function captureUnhandledRejection(trigger: () => void): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -64,50 +64,49 @@ function createSlotObservationHarness(mode: "direct" | "connected"): {
   let laterCalls = 0;
 
   function Source(): undefined {
-    const fireBody = Behave.useCallback(() => undefined, []);
+    const fireBody = Behavon.useCallback(() => undefined, []);
     // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-    signal = Behave.useSignal("fire", fireBody);
+    signal = Behavon.useSignal("fire", fireBody);
     return undefined;
   }
 
   function FirstDestination(): undefined {
-    const observedBody = Behave.useCallback((): unknown => nextResult, []);
-    const siblingBody = Behave.useCallback(() => {
+    const observedBody = Behavon.useCallback((): unknown => nextResult, []);
+    const siblingBody = Behavon.useCallback(() => {
       siblingCalls += 1;
     }, []);
     // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-    direct = Behave.useSlot("receive", observedBody);
-    Behave.useSlot("receive", siblingBody);
+    direct = Behavon.useSlot("receive", observedBody);
+    Behavon.useSlot("receive", siblingBody);
     return undefined;
   }
 
   function LaterDestination(): undefined {
-    const receiveBody = Behave.useCallback(() => {
+    const receiveBody = Behavon.useCallback(() => {
       laterCalls += 1;
     }, []);
-    Behave.useSlot("receive", receiveBody);
+    Behavon.useSlot("receive", receiveBody);
     return undefined;
   }
 
-  const source = mode === "connected" ? Behave.createModel(Source, undefined) : undefined;
-  const first = mode === "connected" ? Behave.createModel(FirstDestination, undefined) : undefined;
-  const later = mode === "connected" ? Behave.createModel(LaterDestination, undefined) : undefined;
+  const source = mode === "connected" ? Behavon.createModel(Source, undefined) : undefined;
+  const first = mode === "connected" ? Behavon.createModel(FirstDestination, undefined) : undefined;
+  const later = mode === "connected" ? Behavon.createModel(LaterDestination, undefined) : undefined;
   function ConnectedApp(): undefined {
     if (source === undefined || first === undefined || later === undefined) {
       throw new Error("connected roots must be assembled before the connection owner");
     }
-    const sourceDependency = Behave.usePort(source);
-    const firstDestination = Behave.usePort(first);
-    const laterDestination = Behave.usePort(later);
-    const fire = sourceDependency.fire;
-    Behave.useConnect(fire, firstDestination.receive);
-    Behave.useConnect(fire, laterDestination.receive);
+    const firstDestination = Behavon.usePort(first);
+    const laterDestination = Behavon.usePort(later);
+    const fire = signalOf(source, "fire");
+    Behavon.useConnect(fire, firstDestination.receive);
+    Behavon.useConnect(fire, laterDestination.receive);
     return undefined;
   }
 
   const connectionOwner = mode === "direct"
-    ? Behave.createModel(FirstDestination, undefined)
-    : Behave.createModel(ConnectedApp, undefined);
+    ? Behavon.createModel(FirstDestination, undefined)
+    : Behavon.createModel(ConnectedApp, undefined);
   const endpoint = mode === "direct" ? direct : signal;
   if (endpoint === undefined) throw new Error("slot observation endpoint must be available");
   return {
@@ -142,33 +141,32 @@ function createArbitraryPayloadHarness(): {
   let directSlot: Slot<readonly unknown[]> | undefined;
 
   function Source(): undefined {
-    const fireBody = Behave.useCallback((...args: readonly unknown[]) => {
+    const fireBody = Behavon.useCallback((...args: readonly unknown[]) => {
       signalBodies.push([...args]);
     }, []);
     // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-    signal = Behave.useSignal("fire", fireBody);
+    signal = Behavon.useSignal("fire", fireBody);
     return undefined;
   }
 
   function Destination(): undefined {
-    const receiveBody = Behave.useCallback((...args: readonly unknown[]) => {
+    const receiveBody = Behavon.useCallback((...args: readonly unknown[]) => {
       slotBodies.push([...args]);
     }, []);
     // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-    directSlot = Behave.useSlot("receive", receiveBody);
+    directSlot = Behavon.useSlot("receive", receiveBody);
     return undefined;
   }
 
-  const source = Behave.createModel(Source, undefined);
-  const destination = Behave.createModel(Destination, undefined);
+  const source = Behavon.createModel(Source, undefined);
+  const destination = Behavon.createModel(Destination, undefined);
   function App(): undefined {
-    const producer = Behave.usePort(source);
-    const consumer = Behave.usePort(destination);
-    Behave.useConnect(producer.fire, consumer.receive);
+    const consumer = Behavon.usePort(destination);
+    Behavon.useConnect(signalOf(source, "fire"), consumer.receive);
     return undefined;
   }
 
-  const connectionOwner = Behave.createModel(App, undefined);
+  const connectionOwner = Behavon.createModel(App, undefined);
   if (signal === undefined || directSlot === undefined) throw new Error("payload harness endpoints must be available");
   signal("capture-meta");
   const runtimeMeta = slotBodies[0]?.[1] as ConnectionMeta | undefined;
@@ -201,22 +199,22 @@ describe("named dispatchers and connections", () => {
     let directSlot: Slot<readonly [value: string]> | undefined;
 
     function Model(): undefined {
-      const signalBody = Behave.useCallback(function (this: void, _value: string) {
+      const signalBody = Behavon.useCallback(function (this: void, _value: string) {
         signalReceivers.push(this);
       }, []);
-      const slotBody = Behave.useCallback(function (this: void, _value: string) {
+      const slotBody = Behavon.useCallback(function (this: void, _value: string) {
         slotReceivers.push(this);
       }, []);
-      const fire = Behave.useSignal("fire", signalBody);
+      const fire = Behavon.useSignal("fire", signalBody);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      const receive = directSlot = Behave.useSlot("receive", slotBody);
-      Behave.useConnect(fire, receive);
+      const receive = directSlot = Behavon.useSlot("receive", slotBody);
+      Behavon.useConnect(fire, receive);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     try {
-      root.fire("connected");
+      signalOf(root, "fire")("connected");
       if (directSlot === undefined) throw new Error("direct Slot must be created synchronously");
       directSlot("direct");
 
@@ -233,45 +231,44 @@ describe("named dispatchers and connections", () => {
     let localFirst: ((value: number) => string) | undefined;
 
     function Producer(): undefined {
-      const first = Behave.useCallback((value: number) => {
+      const first = Behavon.useCallback((value: number) => {
         trace.push(`P1:${value}`);
         return "first";
       }, []);
-      const second = Behave.useCallback((value: number) => {
+      const second = Behavon.useCallback((value: number) => {
         trace.push(`P2:${value}`);
         return "second";
       }, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       localFirst = first;
-      Behave.useSignal("fire", first);
-      Behave.useSignal("fire", second);
+      Behavon.useSignal("fire", first);
+      Behavon.useSignal("fire", second);
       return undefined;
     }
 
     function Consumer(): undefined {
-      const first = Behave.useCallback((value: number, meta?: ConnectionMeta) => {
+      const first = Behavon.useCallback((value: number, meta?: ConnectionMeta) => {
         trace.push(`S1:${value}`);
         if (meta !== undefined) metadata.push(meta);
       }, []);
-      const second = Behave.useCallback((value: number) => trace.push(`S2:${value}`), []);
-      Behave.useSlot("receive", first);
-      Behave.useSlot("receive", second);
+      const second = Behavon.useCallback((value: number) => trace.push(`S2:${value}`), []);
+      Behavon.useSlot("receive", first);
+      Behavon.useSlot("receive", second);
       return undefined;
     }
 
-    const producerRef = Behave.createModel(Producer, undefined);
-    const consumerRef = Behave.createModel(Consumer, undefined);
+    const producerRef = Behavon.createModel(Producer, undefined);
+    const consumerRef = Behavon.createModel(Consumer, undefined);
     function App(): undefined {
       const producer = producerRef;
       const consumer = consumerRef;
-      const source = Behave.usePort(producer);
-      const destination = Behave.usePort(consumer);
-      Behave.useConnect(source.fire, destination.receive);
+      const destination = Behavon.usePort(consumer);
+      Behavon.useConnect(signalOf(producer, "fire"), destination.receive);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
-    expect(producerRef?.fire(3)).toBeUndefined();
+    const root = Behavon.createModel(App, undefined);
+    expect(signalOf(producerRef, "fire")(3)).toBeUndefined();
     expect(trace).toEqual(["P1:3", "P2:3", "S1:3", "S2:3"]);
     expect(metadata).toHaveLength(1);
     expect(metadata[0]).toMatchObject({
@@ -296,35 +293,34 @@ describe("named dispatchers and connections", () => {
     const failure = new Error("body failed");
 
     function Producer(): undefined {
-      const first = Behave.useCallback((value: number) => trace.push(`P1:${value}`), []);
-      const second = Behave.useCallback(() => {
+      const first = Behavon.useCallback((value: number) => trace.push(`P1:${value}`), []);
+      const second = Behavon.useCallback(() => {
         trace.push("P2");
         throw failure;
       }, []);
-      Behave.useSignal("fire", first);
-      Behave.useSignal("fire", second);
+      Behavon.useSignal("fire", first);
+      Behavon.useSignal("fire", second);
       return undefined;
     }
 
     function Consumer(): undefined {
-      const receive = Behave.useCallback(() => trace.push("S"), []);
-      Behave.useSlot("receive", receive);
+      const receive = Behavon.useCallback(() => trace.push("S"), []);
+      Behavon.useSlot("receive", receive);
       return undefined;
     }
 
-    const producerRef = Behave.createModel(Producer, undefined);
-    const consumerRef = Behave.createModel(Consumer, undefined);
+    const producerRef = Behavon.createModel(Producer, undefined);
+    const consumerRef = Behavon.createModel(Consumer, undefined);
     function App(): undefined {
       const producer = producerRef;
       const consumer = consumerRef;
-      const producerDependency = Behave.usePort(producer);
-      const consumerDependency = Behave.usePort(consumer);
-      Behave.useConnect(producerDependency.fire, consumerDependency.receive);
+      const consumerDependency = Behavon.usePort(consumer);
+      Behavon.useConnect(signalOf(producer, "fire"), consumerDependency.receive);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
-    expect(() => producerRef?.fire(1)).toThrow(failure);
+    const root = Behavon.createModel(App, undefined);
+    expect(() => signalOf(producerRef, "fire")(1)).toThrow(failure);
     expect(trace).toEqual(["P1:1", "P2"]);
     root.dispose();
     consumerRef.dispose();
@@ -344,47 +340,46 @@ describe("named dispatchers and connections", () => {
     const sinkArguments: unknown[][] = [];
 
     function Source(): undefined {
-      const fireBody = Behave.useCallback((_value: number) => undefined, []);
-      Behave.useSignal("fire", fireBody);
+      const fireBody = Behavon.useCallback((_value: number) => undefined, []);
+      Behavon.useSignal("fire", fireBody);
       return undefined;
     }
 
     function Relay(): undefined {
-      const relaySignalBody = Behave.useCallback((_value: number) => undefined, []);
-      const relaySignal = Behave.useSignal("relay", relaySignalBody);
-      const relay = Behave.useCallback((...args: readonly unknown[]) => {
+      const relaySignalBody = Behavon.useCallback((_value: number) => undefined, []);
+      const relaySignal = Behavon.useSignal("relay", relaySignalBody);
+      const relay = Behavon.useCallback((...args: readonly unknown[]) => {
         relayArguments.push([...args]);
         relaySignal(args[0] as number);
       }, [relaySignal]);
-      Behave.useSlot("relay", relay);
+      Behavon.useSlot("relay", relay);
       return undefined;
     }
 
     function Sink(): undefined {
-      const receive = Behave.useCallback((...args: readonly unknown[]) => {
+      const receive = Behavon.useCallback((...args: readonly unknown[]) => {
         sinkArguments.push([...args]);
       }, []);
-      Behave.useSlot("receive", receive);
+      Behavon.useSlot("receive", receive);
       return undefined;
     }
 
-    const sourceRef = Behave.createModel(Source, undefined);
-    const relayRef = Behave.createModel(Relay, undefined);
-    const sinkRef = Behave.createModel(Sink, undefined);
+    const sourceRef = Behavon.createModel(Source, undefined);
+    const relayRef = Behavon.createModel(Relay, undefined);
+    const sinkRef = Behavon.createModel(Sink, undefined);
     function App(): undefined {
       const source = sourceRef;
       const relay = relayRef;
       const sink = sinkRef;
-      const sourceDependency = Behave.usePort(source);
-      const relayDependency = Behave.usePort(relay);
-      const sinkDependency = Behave.usePort(sink);
-      Behave.useConnect(sourceDependency.fire, relayDependency.relay);
-      Behave.useConnect(relayDependency.relay, sinkDependency.receive);
+      const relayDependency = Behavon.usePort(relay);
+      const sinkDependency = Behavon.usePort(sink);
+      Behavon.useConnect(signalOf(source, "fire"), relayDependency.relay);
+      Behavon.useConnect(signalOf(relay, "relay"), sinkDependency.receive);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
-    sourceRef?.fire(9);
+    const root = Behavon.createModel(App, undefined);
+    signalOf(sourceRef, "fire")(9);
     expect(relayArguments).toHaveLength(1);
     expect(sinkArguments).toHaveLength(1);
     expect(relayArguments[0]).toHaveLength(2);
@@ -570,51 +565,50 @@ describe("named dispatchers and connections", () => {
     let fire: Signal<readonly unknown[]> | undefined;
 
     function Source(): undefined {
-      const fireBody = Behave.useCallback(() => undefined, []);
+      const fireBody = Behavon.useCallback(() => undefined, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      fire = Behave.useSignal("fire", fireBody);
+      fire = Behavon.useSignal("fire", fireBody);
       return undefined;
     }
 
     function Relay(): undefined {
-      const relaySignalBody = Behave.useCallback((...args: readonly unknown[]) => {
+      const relaySignalBody = Behavon.useCallback((...args: readonly unknown[]) => {
         relaySignalBodies.push([...args]);
       }, []);
-      const relaySignal = Behave.useSignal("relay", relaySignalBody);
-      const directSinkBody = Behave.useCallback((...args: readonly unknown[]) => {
+      const relaySignal = Behavon.useSignal("relay", relaySignalBody);
+      const directSinkBody = Behavon.useCallback((...args: readonly unknown[]) => {
         directSinkCalls.push([...args]);
       }, []);
-      const directSink = Behave.useSlot("directSink", directSinkBody);
-      const ingressBody = Behave.useCallback((...args: readonly unknown[]) => {
+      const directSink = Behavon.useSlot("directSink", directSinkBody);
+      const ingressBody = Behavon.useCallback((...args: readonly unknown[]) => {
         ingressCalls.push([...args]);
         relaySignal(...args);
         directSink(...args);
       }, [relaySignal, directSink]);
-      Behave.useSlot("ingress", ingressBody);
+      Behavon.useSlot("ingress", ingressBody);
       return undefined;
     }
 
     function Sink(): undefined {
-      const receiveBody = Behave.useCallback((...args: readonly unknown[]) => {
+      const receiveBody = Behavon.useCallback((...args: readonly unknown[]) => {
         connectedSinkCalls.push([...args]);
       }, []);
-      Behave.useSlot("receive", receiveBody);
+      Behavon.useSlot("receive", receiveBody);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
-    const relay = Behave.createModel(Relay, undefined);
-    const sink = Behave.createModel(Sink, undefined);
+    const source = Behavon.createModel(Source, undefined);
+    const relay = Behavon.createModel(Relay, undefined);
+    const sink = Behavon.createModel(Sink, undefined);
     function App(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const relayDependency = Behave.usePort(relay);
-      const sinkDependency = Behave.usePort(sink);
-      Behave.useConnect(sourceDependency.fire, relayDependency.ingress);
-      Behave.useConnect(relayDependency.relay, sinkDependency.receive);
+      const relayDependency = Behavon.usePort(relay);
+      const sinkDependency = Behavon.usePort(sink);
+      Behavon.useConnect(signalOf(source, "fire"), relayDependency.ingress);
+      Behavon.useConnect(signalOf(relay, "relay"), sinkDependency.receive);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
+    const root = Behavon.createModel(App, undefined);
     fire?.("payload");
     expect(ingressCalls[0]).toHaveLength(2);
     expect(relaySignalBodies[0]).toEqual(ingressCalls[0]);
@@ -643,41 +637,40 @@ describe("named dispatchers and connections", () => {
     let destinationRef: UntypedModelRef | undefined;
 
     function Source(): undefined {
-      const fireBody = Behave.useCallback(() => undefined, []);
+      const fireBody = Behavon.useCallback(() => undefined, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      fire = Behave.useSignal("fire", fireBody);
+      fire = Behavon.useSignal("fire", fireBody);
       return undefined;
     }
 
     function Destination(): undefined {
-      const firstReceiveBody = Behave.useCallback((_value: string, meta?: ConnectionMeta) => {
+      const firstReceiveBody = Behavon.useCallback((_value: string, meta?: ConnectionMeta) => {
         if (meta === undefined) throw new Error("connected metadata is required");
         calls.push({ body: "first", meta });
       }, []);
-      Behave.useSlot("receive", firstReceiveBody);
-      const secondReceiveBody = Behave.useCallback((_value: string, meta?: ConnectionMeta) => {
+      Behavon.useSlot("receive", firstReceiveBody);
+      const secondReceiveBody = Behavon.useCallback((_value: string, meta?: ConnectionMeta) => {
         if (meta === undefined) throw new Error("connected metadata is required");
         calls.push({ body: "second", meta });
       }, []);
-      Behave.useSlot("receive", secondReceiveBody);
+      Behavon.useSlot("receive", secondReceiveBody);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
-    const destination = Behave.createModel(Destination, undefined);
+    const source = Behavon.createModel(Source, undefined);
+    const destination = Behavon.createModel(Destination, undefined);
     sourceRef = source;
     destinationRef = destination;
     function App(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const destinationDependency = Behave.usePort(destination);
-      const sourceEndpoint = sourceDependency.fire;
+      const destinationDependency = Behavon.usePort(destination);
+      const sourceEndpoint = signalOf(source, "fire");
       const destinationEndpoint = destinationDependency.receive;
-      Behave.useConnect(sourceEndpoint, destinationEndpoint);
-      Behave.useConnect(sourceEndpoint, destinationEndpoint);
+      Behavon.useConnect(sourceEndpoint, destinationEndpoint);
+      Behavon.useConnect(sourceEndpoint, destinationEndpoint);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
+    const root = Behavon.createModel(App, undefined);
     fire?.("value");
     expect(calls.map(({ body }) => body)).toEqual(["first", "second", "first", "second"]);
     expect(calls[0]?.meta).toBe(calls[1]?.meta);
@@ -704,34 +697,33 @@ describe("named dispatchers and connections", () => {
     let sourceBodyStarted = false;
 
     function Source(): undefined {
-      const fire = Behave.useCallback(async (_value: number) => {
+      const fire = Behavon.useCallback(async (_value: number) => {
         sourceBodyStarted = true;
         await Promise.resolve();
         return "source-result";
       }, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      localSignal = Behave.useSignal("fire", fire);
+      localSignal = Behavon.useSignal("fire", fire);
       return undefined;
     }
 
     function Destination(): undefined {
-      const receive = Behave.useCallback(() => {
+      const receive = Behavon.useCallback(() => {
         throw failure;
       }, []);
-      Behave.useSlot("receive", receive);
+      Behavon.useSlot("receive", receive);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
-    const destination = Behave.createModel(Destination, undefined);
+    const source = Behavon.createModel(Source, undefined);
+    const destination = Behavon.createModel(Destination, undefined);
     function App(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const destinationDependency = Behave.usePort(destination);
-      Behave.useConnect(sourceDependency.fire, destinationDependency.receive);
+      const destinationDependency = Behavon.usePort(destination);
+      Behavon.useConnect(signalOf(source, "fire"), destinationDependency.receive);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
+    const root = Behavon.createModel(App, undefined);
     expect(() => localSignal?.(1)).toThrow(failure);
     expect(sourceBodyStarted).toBe(true);
     root.dispose();
@@ -744,33 +736,32 @@ describe("named dispatchers and connections", () => {
     let nextReason: unknown;
 
     function Source(): undefined {
-      const fireBody = Behave.useCallback((_value: number) => undefined, []);
-      Behave.useSignal("fire", fireBody);
+      const fireBody = Behavon.useCallback((_value: number) => undefined, []);
+      Behavon.useSignal("fire", fireBody);
       return undefined;
     }
 
     function Destination(): undefined {
-      const receiveBody = Behave.useCallback(() => Promise.reject(nextReason), []);
-      Behave.useSlot("receive", receiveBody);
+      const receiveBody = Behavon.useCallback(() => Promise.reject(nextReason), []);
+      Behavon.useSlot("receive", receiveBody);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
-    const destination = Behave.createModel(Destination, undefined);
+    const source = Behavon.createModel(Source, undefined);
+    const destination = Behavon.createModel(Destination, undefined);
     sourceRef = source;
     function App(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const destinationDependency = Behave.usePort(destination);
-      Behave.useConnect(sourceDependency.fire, destinationDependency.receive);
+      const destinationDependency = Behavon.usePort(destination);
+      Behavon.useConnect(signalOf(source, "fire"), destinationDependency.receive);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
+    const root = Behavon.createModel(App, undefined);
     const failure = new Error("connected async Slot failed");
     nextReason = failure;
-    expect(await captureUnhandledRejection(() => sourceRef?.fire(1))).toBe(failure);
+    expect(await captureUnhandledRejection(() => signalOf(sourceRef, "fire")(1))).toBe(failure);
     nextReason = "connected primitive failure";
-    expect(await captureUnhandledRejection(() => sourceRef?.fire(2))).toBe(nextReason);
+    expect(await captureUnhandledRejection(() => signalOf(sourceRef, "fire")(2))).toBe(nextReason);
     root.dispose();
     destination.dispose();
     source.dispose();
@@ -781,7 +772,7 @@ describe("named dispatchers and connections", () => {
     let nextReason: unknown;
 
     function Destination(): undefined {
-      const receiveBody = Behave.useCallback(
+      const receiveBody = Behavon.useCallback(
         (_value: number) =>
           ({
             then: (_resolve: (value: never) => void, reject: (reason: unknown) => void) => {
@@ -791,11 +782,11 @@ describe("named dispatchers and connections", () => {
         [],
       );
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      direct = Behave.useSlot("receive", receiveBody);
+      direct = Behavon.useSlot("receive", receiveBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Destination, undefined);
+    const root = Behavon.createModel(Destination, undefined);
     const failure = new Error("direct async Slot failed");
     nextReason = failure;
     expect(await captureUnhandledRejection(() => direct?.(1))).toBe(failure);
@@ -976,37 +967,36 @@ describe("named dispatchers and connections", () => {
     let disconnectSecond: (() => void) | undefined;
 
     function Producer(): undefined {
-      const fire = Behave.useCallback((_value: number) => undefined, []);
-      Behave.useSignal("fire", fire);
+      const fire = Behavon.useCallback((_value: number) => undefined, []);
+      Behavon.useSignal("fire", fire);
       return undefined;
     }
 
     function Consumer(): undefined {
-      const receive = Behave.useCallback((value: number) => trace.push(value), []);
-      Behave.useSlot("receive", receive);
+      const receive = Behavon.useCallback((value: number) => trace.push(value), []);
+      Behavon.useSlot("receive", receive);
       return undefined;
     }
 
-    const producer = Behave.createModel(Producer, undefined);
-    const consumer = Behave.createModel(Consumer, undefined);
+    const producer = Behavon.createModel(Producer, undefined);
+    const consumer = Behavon.createModel(Consumer, undefined);
     producerRef = producer;
     function App(): undefined {
-      const producerDependency = Behave.usePort(producer);
-      const consumerDependency = Behave.usePort(consumer);
-      const source = producerDependency.fire;
+      const consumerDependency = Behavon.usePort(consumer);
+      const source = signalOf(producer, "fire");
       const destination = consumerDependency.receive;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      disconnectFirst = Behave.useConnect(source, destination);
+      disconnectFirst = Behavon.useConnect(source, destination);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      disconnectSecond = Behave.useConnect(source, destination);
+      disconnectSecond = Behavon.useConnect(source, destination);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
-    producerRef?.fire(2);
+    const root = Behavon.createModel(App, undefined);
+    signalOf(producerRef, "fire")(2);
     expect(trace).toEqual([2, 2]);
     disconnectFirst?.();
-    producerRef?.fire(3);
+    signalOf(producerRef, "fire")(3);
     expect(trace).toEqual([2, 2, 3]);
     expect(() => disconnectFirst?.()).toThrow();
     disconnectSecond?.();
@@ -1021,43 +1011,42 @@ describe("named dispatchers and connections", () => {
     let lateRef: UntypedModelRef | undefined;
 
     function Producer(): undefined {
-      const fire = Behave.useCallback((_value: number) => undefined, []);
-      Behave.useSignal("fire", fire);
+      const fire = Behavon.useCallback((_value: number) => undefined, []);
+      Behavon.useSignal("fire", fire);
       return undefined;
     }
 
     function Early(): undefined {
-      const receive = Behave.useCallback(() => {
+      const receive = Behavon.useCallback(() => {
         trace.push("early");
         lateRef?.dispose();
       }, []);
-      Behave.useSlot("receive", receive);
+      Behavon.useSlot("receive", receive);
       return undefined;
     }
 
     function Late(): undefined {
-      const receive = Behave.useCallback(() => trace.push("late"), []);
-      Behave.useSlot("receive", receive);
+      const receive = Behavon.useCallback(() => trace.push("late"), []);
+      Behavon.useSlot("receive", receive);
       return undefined;
     }
 
-    const source = Behave.createModel(Producer, undefined);
-    const early = Behave.createModel(Early, undefined);
-    const late = Behave.createModel(Late, undefined);
+    const source = Behavon.createModel(Producer, undefined);
+    const early = Behavon.createModel(Early, undefined);
+    const late = Behavon.createModel(Late, undefined);
     sourceRef = source;
     lateRef = late;
     function App(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const earlyDestination = Behave.usePort(early);
-      const lateDestination = Behave.usePort(late);
-      const signal = sourceDependency.fire;
-      Behave.useConnect(signal, earlyDestination.receive);
-      Behave.useConnect(signal, lateDestination.receive);
+      const earlyDestination = Behavon.usePort(early);
+      const lateDestination = Behavon.usePort(late);
+      const signal = signalOf(source, "fire");
+      Behavon.useConnect(signal, earlyDestination.receive);
+      Behavon.useConnect(signal, lateDestination.receive);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
-    sourceRef?.fire(1);
+    const root = Behavon.createModel(App, undefined);
+    signalOf(sourceRef, "fire")(1);
     expect(trace).toEqual(["early"]);
     expect(() => lateRef?.dispose()).toThrow();
     root.dispose();
@@ -1074,28 +1063,28 @@ describe("named dispatchers and connections", () => {
     let sourceRef: UntypedModelRef | undefined;
 
     function SlotOnly(): undefined {
-      const body = Behave.useCallback((_value: number) => undefined, []);
-      Behave.useSlot("event", body);
+      const body = Behavon.useCallback((_value: number) => undefined, []);
+      Behavon.useSlot("event", body);
       return undefined;
     }
 
     function Destination(): undefined {
-      const body = Behave.useCallback((value: number) => received.push(value), []);
-      Behave.useSlot("event", body);
+      const body = Behavon.useCallback((value: number) => received.push(value), []);
+      Behavon.useSlot("event", body);
       return undefined;
     }
 
-    const source = Behave.createModel(SlotOnly, undefined);
-    const destination = Behave.createModel(Destination, undefined);
+    const source = Behavon.createModel(SlotOnly, undefined);
+    const destination = Behavon.createModel(Destination, undefined);
     sourceRef = source;
     function App(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const destinationDependency = Behave.usePort(destination);
-      Behave.useConnect(sourceDependency.event, destinationDependency.event);
+      const sourceDependency = Behavon.usePort(source);
+      const destinationDependency = Behavon.usePort(destination);
+      Behavon.useConnect(sourceDependency.event, destinationDependency.event);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
+    const root = Behavon.createModel(App, undefined);
     expect(() => sourceRef?.event(5)).toThrow(/no Signal registration/);
     expect(received).toEqual([]);
     expect(warning).toHaveBeenCalled();
@@ -1105,46 +1094,33 @@ describe("named dispatchers and connections", () => {
     warning.mockRestore();
   });
 
-  it("warns for a connection destination with no Slot registration and skips delivery", () => {
-    interface AmbiguousEndpoints {
-      readonly event: Signal<readonly [value: number]> & Slot<readonly [value: number]>;
-    }
-    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  it("rejects an unexported Signal-only destination before connecting", () => {
     const destinationSignalBodies: number[] = [];
-    let sourceRef: UntypedModelRef | undefined;
 
     function Source(): undefined {
-      const eventBody = Behave.useCallback((_value: number) => undefined, []);
-      Behave.useSignal("event", eventBody);
+      const eventBody = Behavon.useCallback((_value: number) => undefined, []);
+      Behavon.useSignal("event", eventBody);
       return undefined;
     }
 
     function SignalOnlyDestination(): undefined {
-      const eventBody = Behave.useCallback((value: number) => destinationSignalBodies.push(value), []);
-      Behave.useSignal("event", eventBody);
+      const eventBody = Behavon.useCallback((value: number) => destinationSignalBodies.push(value), []);
+      Behavon.useSignal("event", eventBody);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
-    const destination = Behave.createModel(SignalOnlyDestination, undefined);
-    sourceRef = source;
+    const source = Behavon.createModel(Source, undefined);
+    const destination = Behavon.createModel(SignalOnlyDestination, undefined);
     function App(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const destinationDependency = Behave.usePort(destination);
-      Behave.useConnect(sourceDependency.event, destinationDependency.event);
+      const destinationDependency = Behavon.usePort(destination);
+      Behavon.useConnect(signalOf(source, "event"), destinationDependency.event);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
-    sourceRef?.event(5);
+    expect(() => Behavon.createModel(App, undefined)).toThrow(/Signal 'event' is not exported/);
     expect(destinationSignalBodies).toEqual([]);
-    expect(warning).toHaveBeenCalledWith(
-      "Behave connection destination 'event' has no Slot registration",
-    );
-    root.dispose();
     destination.dispose();
     source.dispose();
-    warning.mockRestore();
   });
 
   it("separates a shared callback from Signal A, Signal B, and ingress Slot occurrences", () => {
@@ -1167,39 +1143,38 @@ describe("named dispatchers and connections", () => {
     let ingress: Slot<readonly [value: number]> | undefined;
 
     function Source(): undefined {
-      const shared = Behave.useCallback((value: number) => {
+      const shared = Behavon.useCallback((value: number) => {
         bodies.push(value);
       }, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       callback = shared;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      signalA = Behave.useSignal("a", shared);
+      signalA = Behavon.useSignal("a", shared);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      signalB = Behave.useSignal("b", shared);
+      signalB = Behavon.useSignal("b", shared);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      ingress = Behave.useSlot("ingress", shared);
+      ingress = Behavon.useSlot("ingress", shared);
       return undefined;
     }
 
     function Sink(): undefined {
-      const receiveABody = Behave.useCallback((value: number) => receivedA.push(value), []);
-      Behave.useSlot("receiveA", receiveABody);
-      const receiveBBody = Behave.useCallback((value: number) => receivedB.push(value), []);
-      Behave.useSlot("receiveB", receiveBBody);
+      const receiveABody = Behavon.useCallback((value: number) => receivedA.push(value), []);
+      Behavon.useSlot("receiveA", receiveABody);
+      const receiveBBody = Behavon.useCallback((value: number) => receivedB.push(value), []);
+      Behavon.useSlot("receiveB", receiveBBody);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
-    const sink = Behave.createModel(Sink, undefined);
+    const source = Behavon.createModel(Source, undefined);
+    const sink = Behavon.createModel(Sink, undefined);
     function App(): undefined {
-      const sourceEndpoints = Behave.usePort(source);
-      const sinkEndpoints = Behave.usePort(sink);
-      Behave.useConnect(sourceEndpoints.a, sinkEndpoints.receiveA);
-      Behave.useConnect(sourceEndpoints.b, sinkEndpoints.receiveB);
+      const sinkEndpoints = Behavon.usePort(sink);
+      Behavon.useConnect(signalOf(source, "a"), sinkEndpoints.receiveA);
+      Behavon.useConnect(signalOf(source, "b"), sinkEndpoints.receiveB);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
+    const root = Behavon.createModel(App, undefined);
     callback?.(1);
     ingress?.(2);
     expect(bodies).toEqual([1, 2]);
@@ -1224,22 +1199,22 @@ describe("named dispatchers and connections", () => {
     let plainCallback: ((value: number) => string) | undefined;
 
     function Destination(): undefined {
-      const first = Behave.useCallback((value: number, meta?: ConnectionMeta) => {
+      const first = Behavon.useCallback((value: number, meta?: ConnectionMeta) => {
         traces.push({ body: "first", value, meta });
         return "ignored";
       }, []);
-      const second = Behave.useCallback((value: number, meta?: ConnectionMeta) => {
+      const second = Behavon.useCallback((value: number, meta?: ConnectionMeta) => {
         traces.push({ body: "second", value, meta });
       }, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       plainCallback = first as (value: number) => string;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      direct = Behave.useSlot<readonly [value: number], string>("receive", first);
-      Behave.useSlot("receive", second);
+      direct = Behavon.useSlot<readonly [value: number], string>("receive", first);
+      Behavon.useSlot("receive", second);
       return undefined;
     }
 
-    const root = Behave.createModel(Destination, undefined);
+    const root = Behavon.createModel(Destination, undefined);
     expect(plainCallback?.(1)).toBe("ignored");
     expect(traces).toEqual([{ body: "first", value: 1, meta: undefined }]);
     traces.length = 0;
@@ -1271,19 +1246,19 @@ describe("named dispatchers and connections", () => {
     let slot: Slot<readonly [value: number]> | undefined;
 
     function Both(): undefined {
-      const signalBody = Behave.useCallback((value: number) => trace.push(`signal:${value}`), []);
-      const slotBody = Behave.useCallback((value: number) => trace.push(`slot:${value}`), []);
+      const signalBody = Behavon.useCallback((value: number) => trace.push(`signal:${value}`), []);
+      const slotBody = Behavon.useCallback((value: number) => trace.push(`slot:${value}`), []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      signal = Behave.useSignal("shared", signalBody);
+      signal = Behavon.useSignal("shared", signalBody);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      slot = Behave.useSlot("shared", slotBody);
+      slot = Behavon.useSlot("shared", slotBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Both, undefined);
+    const root = Behavon.createModel(Both, undefined);
     expect(signal?.(1)).toBeUndefined();
     expect(slot?.(2)).toBeUndefined();
-    expect(root.shared(3)).toBeUndefined();
+    expect(signalOf(root, "shared")(3)).toBeUndefined();
     expect(trace).toEqual(["signal:1", "slot:2", "signal:3"]);
     root.dispose();
   });
@@ -1294,18 +1269,18 @@ describe("named dispatchers and connections", () => {
     let direct: Slot | undefined;
 
     function Destination(): undefined {
-      const first = Behave.useCallback(() => {
+      const first = Behavon.useCallback(() => {
         trace.push("first");
         throw failure;
       }, []);
-      const second = Behave.useCallback(() => trace.push("second"), []);
+      const second = Behavon.useCallback(() => trace.push("second"), []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      direct = Behave.useSlot("receive", first);
-      Behave.useSlot("receive", second);
+      direct = Behavon.useSlot("receive", first);
+      Behavon.useSlot("receive", second);
       return undefined;
     }
 
-    const root = Behave.createModel(Destination, undefined);
+    const root = Behavon.createModel(Destination, undefined);
     expect(() => direct?.()).toThrow(failure);
     expect(trace).toEqual(["first"]);
     root.dispose();
@@ -1323,33 +1298,33 @@ describe("named dispatchers and connections", () => {
     }
 
     function SignalModel(): undefined {
-      const first = Behave.useCallback(() => {
+      const first = Behavon.useCallback(() => {
         signalTrace.push("first");
         signalRoot?.dispose();
       }, []);
-      const second = Behave.useCallback(() => signalTrace.push("second"), []);
-      Behave.useSignal("fire", first);
-      Behave.useSignal("fire", second);
+      const second = Behavon.useCallback(() => signalTrace.push("second"), []);
+      Behavon.useSignal("fire", first);
+      Behavon.useSignal("fire", second);
       return undefined;
     }
 
-    signalRoot = Behave.createModel(SignalModel, undefined);
-    expect(() => signalRoot?.fire()).toThrow(/disposed during Signal 'fire' dispatch/);
+    signalRoot = Behavon.createModel(SignalModel, undefined);
+    expect(() => signalOf(signalRoot, "fire")()).toThrow(/disposed during Signal 'fire' dispatch/);
     expect(signalTrace).toEqual(["first"]);
 
     function SlotModel(): undefined {
-      const first = Behave.useCallback(() => {
+      const first = Behavon.useCallback(() => {
         slotTrace.push("first");
         slotRoot?.dispose();
       }, []);
-      const second = Behave.useCallback(() => slotTrace.push("second"), []);
+      const second = Behavon.useCallback(() => slotTrace.push("second"), []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      directSlot = Behave.useSlot("receive", first);
-      Behave.useSlot("receive", second);
+      directSlot = Behavon.useSlot("receive", first);
+      Behavon.useSlot("receive", second);
       return undefined;
     }
 
-    slotRoot = Behave.createModel(SlotModel, undefined);
+    slotRoot = Behavon.createModel(SlotModel, undefined);
     expect(() => directSlot?.()).toThrow(/disposed during Slot 'receive' dispatch/);
     expect(slotTrace).toEqual(["first"]);
   });
@@ -1366,34 +1341,33 @@ describe("named dispatchers and connections", () => {
     let destinationRef: UntypedModelRef | undefined;
 
     function Source(): undefined {
-      const fireBody = Behave.useCallback(() => undefined, []);
+      const fireBody = Behavon.useCallback(() => undefined, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      signal = Behave.useSignal("fire", fireBody);
+      signal = Behavon.useSignal("fire", fireBody);
       return undefined;
     }
 
     function Destination(): undefined {
-      const first = Behave.useCallback(() => {
+      const first = Behavon.useCallback(() => {
         trace.push("first");
         destinationRef?.dispose();
       }, []);
-      const second = Behave.useCallback(() => trace.push("second"), []);
-      Behave.useSlot("receive", first);
-      Behave.useSlot("receive", second);
+      const second = Behavon.useCallback(() => trace.push("second"), []);
+      Behavon.useSlot("receive", first);
+      Behavon.useSlot("receive", second);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
-    const destination = Behave.createModel(Destination, undefined);
+    const source = Behavon.createModel(Source, undefined);
+    const destination = Behavon.createModel(Destination, undefined);
     destinationRef = destination;
     function App(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const destinationDependency = Behave.usePort(destination);
-      Behave.useConnect(sourceDependency.fire, destinationDependency.receive);
+      const destinationDependency = Behavon.usePort(destination);
+      Behavon.useConnect(signalOf(source, "fire"), destinationDependency.receive);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
+    const root = Behavon.createModel(App, undefined);
     expect(() => signal?.()).toThrow(/disposed during connection destination 'receive'/);
     expect(trace).toEqual(["first"]);
     root.dispose();
@@ -1412,41 +1386,40 @@ describe("named dispatchers and connections", () => {
     let signal: Signal | undefined;
 
     function Source(): undefined {
-      const fireBody = Behave.useCallback(() => undefined, []);
+      const fireBody = Behavon.useCallback(() => undefined, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      signal = Behave.useSignal("fire", fireBody);
+      signal = Behavon.useSignal("fire", fireBody);
       return undefined;
     }
 
     function Early(): undefined {
-      const receiveBody = Behave.useCallback(() => {
+      const receiveBody = Behavon.useCallback(() => {
         trace.push("early");
         throw failure;
       }, []);
-      Behave.useSlot("receive", receiveBody);
+      Behavon.useSlot("receive", receiveBody);
       return undefined;
     }
 
     function Late(): undefined {
-      const receiveBody = Behave.useCallback(() => trace.push("late"), []);
-      Behave.useSlot("receive", receiveBody);
+      const receiveBody = Behavon.useCallback(() => trace.push("late"), []);
+      Behavon.useSlot("receive", receiveBody);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
-    const early = Behave.createModel(Early, undefined);
-    const late = Behave.createModel(Late, undefined);
+    const source = Behavon.createModel(Source, undefined);
+    const early = Behavon.createModel(Early, undefined);
+    const late = Behavon.createModel(Late, undefined);
     function App(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const earlyDestination = Behave.usePort(early);
-      const lateDestination = Behave.usePort(late);
-      const sourceEndpoint = sourceDependency.fire;
-      Behave.useConnect(sourceEndpoint, earlyDestination.receive);
-      Behave.useConnect(sourceEndpoint, lateDestination.receive);
+      const earlyDestination = Behavon.usePort(early);
+      const lateDestination = Behavon.usePort(late);
+      const sourceEndpoint = signalOf(source, "fire");
+      Behavon.useConnect(sourceEndpoint, earlyDestination.receive);
+      Behavon.useConnect(sourceEndpoint, lateDestination.receive);
       return undefined;
     }
 
-    const root = Behave.createModel(App, undefined);
+    const root = Behavon.createModel(App, undefined);
     expect(() => signal?.()).toThrow(failure);
     expect(trace).toEqual(["early"]);
     root.dispose();
@@ -1461,17 +1434,17 @@ describe("named dispatchers and connections", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     function Allowed(): undefined {
-      const fireBody = Behave.useCallback(() => trace.push("signal"), []);
-      const signal = Behave.useSignal("fire", fireBody);
-      const receiveBody = Behave.useCallback(() => trace.push("slot"), []);
-      const slot = Behave.useSlot("receive", receiveBody);
+      const fireBody = Behavon.useCallback(() => trace.push("signal"), []);
+      const signal = Behavon.useSignal("fire", fireBody);
+      const receiveBody = Behavon.useCallback(() => trace.push("slot"), []);
+      const slot = Behavon.useSlot("receive", receiveBody);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      invoke = Behave.useCallback(() => {
+      invoke = Behavon.useCallback(() => {
         signal();
         slot();
         trace.push("callback-end");
       }, [signal, slot]);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         signal();
         slot();
         trace.push("effect-end");
@@ -1479,7 +1452,7 @@ describe("named dispatchers and connections", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Allowed, undefined);
+    const root = Behavon.createModel(Allowed, undefined);
     expect(trace).toEqual(["signal", "slot", "effect-end"]);
     expect(warning).not.toHaveBeenCalled();
     invoke?.();
@@ -1488,30 +1461,30 @@ describe("named dispatchers and connections", () => {
     root.dispose();
 
     function EvaluationSignal(): undefined {
-      const fireBody = Behave.useCallback(() => trace.push("evaluation-signal"), []);
-      const signal = Behave.useSignal("fire", fireBody);
+      const fireBody = Behavon.useCallback(() => trace.push("evaluation-signal"), []);
+      const signal = Behavon.useSignal("fire", fireBody);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      const immediate = Behave.useCallback(() => signal(), [signal]);
+      const immediate = Behavon.useCallback(() => signal(), [signal]);
       immediate();
       return undefined;
     }
-    const signalRoot = Behave.createModel(EvaluationSignal, undefined);
+    const signalRoot = Behavon.createModel(EvaluationSignal, undefined);
     expect(trace.at(-1)).toBe("evaluation-signal");
     expect(warning).toHaveBeenCalledWith(expect.stringMatching(
-      /Model#\d+ called Signal 'fire' on Model#\d+ while evaluating.*Behave\.useEffect.*managed callback/,
+      /Model#\d+ called Signal 'fire' on Model#\d+ while evaluating.*Behavon\.useEffect.*managed callback/,
     ));
 
     function EvaluationSlot(): undefined {
-      const receiveBody = Behave.useCallback(() => trace.push("evaluation-slot"), []);
-      const slot = Behave.useSlot("receive", receiveBody);
+      const receiveBody = Behavon.useCallback(() => trace.push("evaluation-slot"), []);
+      const slot = Behavon.useSlot("receive", receiveBody);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       slot();
       return undefined;
     }
-    const slotRoot = Behave.createModel(EvaluationSlot, undefined);
+    const slotRoot = Behavon.createModel(EvaluationSlot, undefined);
     expect(trace.at(-1)).toBe("evaluation-slot");
     expect(warning).toHaveBeenCalledWith(expect.stringMatching(
-      /Model#\d+ called Slot 'receive' on Model#\d+ while evaluating.*Behave\.useEffect.*managed callback/,
+      /Model#\d+ called Slot 'receive' on Model#\d+ while evaluating.*Behavon\.useEffect.*managed callback/,
     ));
     signalRoot.dispose();
     slotRoot.dispose();
@@ -1523,32 +1496,31 @@ describe("named dispatchers and connections", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     function Source(): undefined {
-      const [value, setValue] = Behave.useState(0);
-      const advance = Behave.useCallback(() => setValue(1), [setValue]);
-      Behave.useSignal("advance", advance);
-      const fireBody = Behave.useCallback((next: number) => trace.push(`body:${next}:${value}`), [value]);
-      const fire = Behave.useSignal("fire", fireBody);
+      const [value, setValue] = Behavon.useState(0);
+      const advance = Behavon.useCallback(() => setValue(1), [setValue]);
+      Behavon.useSignal("advance", advance);
+      const fireBody = Behavon.useCallback((next: number) => trace.push(`body:${next}:${value}`), [value]);
+      const fire = Behavon.useSignal("fire", fireBody);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       fire(value);
       return undefined;
     }
     function Destination(): undefined {
-      const receive = Behave.useCallback((value: number) => trace.push(`slot:${value}`), []);
-      Behave.useSlot("receive", receive);
+      const receive = Behavon.useCallback((value: number) => trace.push(`slot:${value}`), []);
+      Behavon.useSlot("receive", receive);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
-    const destination = Behave.createModel(Destination, undefined);
+    const source = Behavon.createModel(Source, undefined);
+    const destination = Behavon.createModel(Destination, undefined);
     function Connector(): undefined {
-      const sourceDependency = Behave.usePort(source);
-      const destinationDependency = Behave.usePort(destination);
-      Behave.useConnect(sourceDependency.fire, destinationDependency.receive);
+      const destinationDependency = Behavon.usePort(destination);
+      Behavon.useConnect(signalOf(source, "fire"), destinationDependency.receive);
       return undefined;
     }
-    const connector = Behave.createModel(Connector, undefined);
+    const connector = Behavon.createModel(Connector, undefined);
     trace.length = 0;
-    source.advance();
+    signalOf(source, "advance")();
     await waitFor(() => trace.length === 2);
     expect(trace).toEqual(["body:1:1", "slot:1"]);
     expect(warning).toHaveBeenCalledTimes(1);
@@ -1561,12 +1533,15 @@ describe("named dispatchers and connections", () => {
   it("warns and executes public-ref and dependency-proxy dispatch during evaluation", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const trace: string[] = [];
+    interface TargetPort { fire: Signal<[source: string]> }
+    const targetPort = Behavon.createPort<TargetPort>({ fire: Behavon.SignalType() });
     function Target(): undefined {
-      const fireBody = Behave.useCallback((source: string) => trace.push(source), []);
-      Behave.useSignal("fire", fireBody);
+      const fireBody = Behavon.useCallback((source: string) => trace.push(source), []);
+      Behavon.useSignal(targetPort, "fire", fireBody);
+      Behavon.useExport(targetPort, "fire");
       return undefined;
     }
-    const target = Behave.createModel(Target, undefined);
+    const target = Behavon.createModel(Target, undefined);
 
     function PublicCaller(): undefined {
       // test-only probe -- runtime-known public-ref dispatch is invalid authoring during evaluation
@@ -1574,14 +1549,14 @@ describe("named dispatchers and connections", () => {
       return undefined;
     }
     function DependencyCaller(): undefined {
-      const dependency = Behave.usePort(target);
+      const dependency = Behavon.usePort(target);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       dependency.fire("dependency");
       return undefined;
     }
 
-    const publicCaller = Behave.createModel(PublicCaller, undefined);
-    const dependencyCaller = Behave.createModel(DependencyCaller, undefined);
+    const publicCaller = Behavon.createModel(PublicCaller, undefined);
+    const dependencyCaller = Behavon.createModel(DependencyCaller, undefined);
     expect(trace).toEqual(["public", "dependency"]);
     expect(warning).toHaveBeenCalledTimes(2);
     expect(warning).toHaveBeenNthCalledWith(1, expect.stringMatching(/Signal 'fire' on Model#\d+/));
@@ -1596,33 +1571,33 @@ describe("named dispatchers and connections", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const trace: string[] = [];
     function Retrying(): undefined {
-      const [value, setValue] = Behave.useState(0);
-      const first = Behave.useCallback(() => trace.push(`first:${value}`), [value]);
-      const fire = Behave.useSignal("fire", first);
+      const [value, setValue] = Behavon.useState(0);
+      const first = Behavon.useCallback(() => trace.push(`first:${value}`), [value]);
+      const fire = Behavon.useSignal("fire", first);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       fire();
       if (value === 0) setValue(1);
       return undefined;
     }
-    const retrying = Behave.createModel(Retrying, undefined);
+    const retrying = Behavon.createModel(Retrying, undefined);
     expect(trace).toEqual(["first:0", "first:1"]);
     expect(warning).toHaveBeenCalledTimes(1);
     retrying.dispose();
 
     const failure = new Error("evaluation signal failed");
     function Broken(): never {
-      const first = Behave.useCallback(() => {
+      const first = Behavon.useCallback(() => {
         trace.push("throw");
         throw failure;
       }, []);
-      const second = Behave.useCallback(() => trace.push("later"), []);
-      const fire = Behave.useSignal("fire", first);
-      Behave.useSignal("fire", second);
+      const second = Behavon.useCallback(() => trace.push("later"), []);
+      const fire = Behavon.useSignal("fire", first);
+      Behavon.useSignal("fire", second);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       fire();
       throw new Error("unreachable");
     }
-    expect(() => Behave.createModel(Broken, undefined)).toThrow(failure);
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
     expect(trace.slice(-1)).toEqual(["throw"]);
     warning.mockRestore();
   });
@@ -1631,26 +1606,29 @@ describe("named dispatchers and connections", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const failure = new Error("external evaluation dispatch failed");
     const trace: string[] = [];
+    interface TargetPort { fire: Signal }
+    const targetPort = Behavon.createPort<TargetPort>({ fire: Behavon.SignalType() });
     function Target(): undefined {
-      const first = Behave.useCallback(() => {
+      const first = Behavon.useCallback(() => {
         trace.push("first");
         throw failure;
       }, []);
-      const second = Behave.useCallback(() => trace.push("second"), []);
-      Behave.useSignal("fire", first);
-      Behave.useSignal("fire", second);
+      const second = Behavon.useCallback(() => trace.push("second"), []);
+      Behavon.useSignal(targetPort, "fire", first);
+      Behavon.useSignal(targetPort, "fire", second);
+      Behavon.useExport(targetPort, "fire");
       return undefined;
     }
-    const target = Behave.createModel(Target, undefined);
+    const target = Behavon.createModel(Target, undefined);
     function Caller(): undefined {
-      const dependency = Behave.usePort(target);
+      const dependency = Behavon.usePort(target);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       dependency.fire();
       return undefined;
     }
 
-    expect(() => Behave.createModel(Caller, undefined)).toThrow(failure);
-    expect(() => Behave.getInterface(target)).not.toThrow();
+    expect(() => Behavon.createModel(Caller, undefined)).toThrow(failure);
+    expect(() => Behavon.getInterface(target)).not.toThrow();
     expect(trace).toEqual(["first"]);
     expect(() => target.fire()).toThrow(failure);
     expect(trace).toEqual(["first", "first"]);
@@ -1665,39 +1643,38 @@ describe("named dispatchers and connections", () => {
     let sourceRef: UntypedModelRef | null = null;
 
     function Source(): undefined {
-      const fireBody = Behave.useCallback((_value: number) => undefined, []);
-      Behave.useSignal("fire", fireBody);
+      const fireBody = Behavon.useCallback((_value: number) => undefined, []);
+      Behavon.useSignal("fire", fireBody);
       return undefined;
     }
     function Destination(id: number): undefined {
-      const receiveBody = Behave.useCallback((_value: number) => deliveries.push(id), [id]);
-      Behave.useSlot("receive", receiveBody);
+      const receiveBody = Behavon.useCallback((_value: number) => deliveries.push(id), [id]);
+      Behavon.useSlot("receive", receiveBody);
       return undefined;
     }
-    const source = Behave.createModel(Source, undefined);
-    const first = Behave.createModel(Destination, 1);
-    const second = Behave.createModel(Destination, 2);
+    const source = Behavon.createModel(Source, undefined);
+    const first = Behavon.createModel(Destination, 1);
+    const second = Behavon.createModel(Destination, 2);
     function Parent(): undefined {
-      const [target, setTarget] = Behave.useState(1);
+      const [target, setTarget] = Behavon.useState(1);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       sourceRef = source;
-      const sourceDependency = Behave.usePort(source);
-      const destinationDependency = Behave.usePort(target === 1 ? first : second);
-      const disconnect = Behave.useConnect(sourceDependency.fire, destinationDependency.receive);
+      const destinationDependency = Behavon.usePort(target === 1 ? first : second);
+      const disconnect = Behavon.useConnect(signalOf(source, "fire"), destinationDependency.receive);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       disconnects.push(disconnect);
-      const retarget = Behave.useCallback(() => setTarget(2), [setTarget]);
-      Behave.useSignal("retarget", retarget);
+      const retarget = Behavon.useCallback(() => setTarget(2), [setTarget]);
+      Behavon.useSignal("retarget", retarget);
       return undefined;
     }
 
-    const root = Behave.createModel(Parent, undefined);
-    (sourceRef as UntypedModelRef | null)?.fire(1);
+    const root = Behavon.createModel(Parent, undefined);
+    signalOf(sourceRef!, "fire")(1);
     expect(deliveries).toEqual([1]);
-    root.retarget();
+    signalOf(root, "retarget")();
     await waitFor(() => disconnects.length === 2);
     expect(disconnects[1]).toBe(disconnects[0]);
-    (sourceRef as UntypedModelRef | null)?.fire(2);
+    signalOf(sourceRef!, "fire")(2);
     expect(deliveries).toEqual([1, 2]);
     root.dispose();
     second.dispose();

@@ -51,32 +51,32 @@ export function createStateIdentity(descriptor: unknown): object {
       return token;
     }
     if (typeof node !== "object" || node === null || Array.isArray(node)) {
-      throw new Error(`Behave.createId state descriptor node '${path}' must be StateType() or a plain object`);
+      throw new Error(`Behavon.createId state descriptor node '${path}' must be StateType() or a plain object`);
     }
     const prototype = Object.getPrototypeOf(node);
     if (prototype !== Object.prototype && prototype !== null) {
-      throw new Error(`Behave.createId state descriptor node '${path}' must be a plain object`);
+      throw new Error(`Behavon.createId state descriptor node '${path}' must be a plain object`);
     }
     if (ancestors.has(node)) {
-      throw new Error(`Behave.createId state descriptor contains a cycle at '${path}'`);
+      throw new Error(`Behavon.createId state descriptor contains a cycle at '${path}'`);
     }
     ancestors.add(node);
     const result = Object.create(null) as Record<string, object>;
     const properties = Object.getOwnPropertyDescriptors(node);
     const keys = Reflect.ownKeys(node);
     if (keys.length === 0) {
-      throw new Error(`Behave.createId state descriptor node '${path}' must not be empty`);
+      throw new Error(`Behavon.createId state descriptor node '${path}' must not be empty`);
     }
     for (const key of keys) {
       if (typeof key !== "string") {
-        throw new Error(`Behave.createId state descriptor node '${path}' only accepts JSON string keys`);
+        throw new Error(`Behavon.createId state descriptor node '${path}' only accepts JSON string keys`);
       }
       if (key === "__proto__" || key === "$") {
-        throw new Error(`Behave.createId state descriptor property '${path}.${key}' is reserved`);
+        throw new Error(`Behavon.createId state descriptor property '${path}.${key}' is reserved`);
       }
       const property = properties[key] as PropertyDescriptor;
       if (!property.enumerable || !("value" in property)) {
-        throw new Error(`Behave.createId state descriptor property '${path}.${key}' must be an enumerable data property`);
+        throw new Error(`Behavon.createId state descriptor property '${path}.${key}' must be an enumerable data property`);
       }
       Object.defineProperty(result, key, {
         value: build(property.value, `${path}.${key}`),
@@ -93,7 +93,7 @@ export function createStateIdentity(descriptor: unknown): object {
 
 export function requireStateIdentity(value: unknown, api: string): object {
   if (typeof value !== "object" || value === null || !identities.has(value)) {
-    throw new Error(`Behave.${api} requires a StateId created by Behave.createId`);
+    throw new Error(`Behavon.${api} requires a StateId created by Behavon.createId`);
   }
   return value;
 }
@@ -106,7 +106,7 @@ export function createTransactionIdentity(): object {
 
 export function requireTransactionIdentity(value: unknown, api: string): object {
   if (typeof value !== "object" || value === null || !transactionIds.has(value)) {
-    throw new Error(`Behave.transaction.${api} requires a TransactionId created by Behave.createId()`);
+    throw new Error(`Behavon.transaction.${api} requires a TransactionId created by Behavon.createId()`);
   }
   return value;
 }

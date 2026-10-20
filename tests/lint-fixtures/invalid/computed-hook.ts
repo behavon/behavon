@@ -1,5 +1,5 @@
-import * as Behave from "behavon";
+import * as Behavon from "behavon";
 
 export function ComputedHookModel(): number {
-  return Behave["useState"](0)[0];
+  return Behavon["useState"](0)[0];
 }

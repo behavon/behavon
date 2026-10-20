@@ -1,11 +1,11 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
 function invokeFutureStart(start: (input: number) => Promise<number>): void {
   void start(4);
 }
 
 export function InvalidFutureModel(): undefined {
-  const future = Behave.useFuture(async (input: number) => input, { concurrency: "serial" });
+  const future = Behavon.useFuture(async (input: number) => input, { concurrency: "serial" });
   future.start(1);
   future.abort("stop");
   future.start.call(undefined, 2);

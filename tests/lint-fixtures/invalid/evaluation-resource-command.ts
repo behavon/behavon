@@ -1,6 +1,6 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
-const Resource = Behave.createResource({
+const Resource = Behavon.createResource({
   open: () => ({}),
   close: () => undefined,
   abort: () => undefined,
@@ -8,7 +8,7 @@ const Resource = Behave.createResource({
 });
 
 export function InvalidResourceModel(): undefined {
-  const [, resource] = Behave.useResource(Resource, undefined);
+  const [, resource] = Behavon.useResource(Resource, undefined);
   resource.open();
   resource.ping();
   return undefined;

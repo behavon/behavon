@@ -1,6 +1,6 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
 export function NestedSignalHookModel(): undefined {
-  Behave.useSignal("event", Behave.useCallback(() => undefined, []));
+  Behavon.useSignal("event", Behavon.useCallback(() => undefined, []));
   return undefined;
 }

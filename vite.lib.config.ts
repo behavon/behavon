@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   define: {
-    __BEHAVE_DEVELOPMENT__: "(typeof process === 'undefined' || process.env.NODE_ENV !== 'production')",
+    __BEHAVON_DEVELOPMENT__: "(typeof process === 'undefined' || process.env.NODE_ENV !== 'production')",
     "process.env.NODE_ENV": "process.env.NODE_ENV",
   },
   build: {

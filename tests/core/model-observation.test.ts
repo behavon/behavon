@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { ModelInstance, StateSetter } from "behavon";
 import {
   inspectModelInstanceForTests,
@@ -37,12 +37,12 @@ describe("independently owned Model observation", () => {
       evaluations.push(input);
       return `value:${input}`;
     }
-    const target = Behave.createModel(Target, 1);
+    const target = Behavon.createModel(Target, 1);
     const setters: StateSetter<number>[] = [];
     let latestOutput: string | undefined;
     let consumerEvaluations = 0;
     function Consumer(): undefined {
-      const [output, setInput] = Behave.useModel(target);
+      const [output, setInput] = Behavon.useModel(target);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       if (setters.length === 0) setters.push(setInput);
       expect(setInput).toBe(setters[0]);
@@ -52,7 +52,7 @@ describe("independently owned Model observation", () => {
       consumerEvaluations += 1;
       return undefined;
     }
-    const consumer = Behave.createModel(Consumer, undefined);
+    const consumer = Behavon.createModel(Consumer, undefined);
     expect(latestOutput).toBe("value:1");
     const firstSetter = setters[0];
     if (firstSetter === undefined) throw new Error("Consumer did not receive the target input setter");
@@ -74,15 +74,15 @@ describe("independently owned Model observation", () => {
       evaluations.push(input);
       return input ?? "null";
     }
-    const target = Behave.createModel(Target, null);
+    const target = Behavon.createModel(Target, null);
     let latestOutput: string | undefined;
     let setInput: StateSetter<string | null> | undefined;
     function Consumer(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [latestOutput, setInput] = Behave.useModel(target);
+      [latestOutput, setInput] = Behavon.useModel(target);
       return undefined;
     }
-    const consumer = Behave.createModel(Consumer, undefined);
+    const consumer = Behavon.createModel(Consumer, undefined);
     expect(latestOutput).toBe("null");
     if (setInput === undefined) throw new Error("Consumer did not receive the target input setter");
 
@@ -106,18 +106,18 @@ describe("independently owned Model observation", () => {
       targetEvaluations += 1;
       return input % 2;
     }
-    const target = Behave.createModel(Target, 1);
+    const target = Behavon.createModel(Target, 1);
     let setTargetInput: StateSetter<number> | undefined;
     let consumerEvaluations = 0;
     function Consumer(): undefined {
-      const [, setInput] = Behave.useModel(target);
+      const [, setInput] = Behavon.useModel(target);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setTargetInput = setInput;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       consumerEvaluations += 1;
       return undefined;
     }
-    const consumer = Behave.createModel(Consumer, undefined);
+    const consumer = Behavon.createModel(Consumer, undefined);
 
     setTargetInput?.(1);
     await Promise.resolve();
@@ -136,19 +136,19 @@ describe("independently owned Model observation", () => {
   });
 
   it("tracks multiple consumers and releases each reverse observation lease", async () => {
-    const target = Behave.createModel((input: number) => input, 0);
+    const target = Behavon.createModel((input: number) => input, 0);
     const counts = [0, 0];
     const setters: StateSetter<number>[] = [];
     function createConsumer(index: number): ModelInstance<undefined, undefined> {
       function Consumer(): undefined {
-        const [, setInput] = Behave.useModel(target);
+        const [, setInput] = Behavon.useModel(target);
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
         setters[index] = setInput;
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
         counts[index] += 1;
         return undefined;
       }
-      return Behave.createModel(Consumer, undefined);
+      return Behavon.createModel(Consumer, undefined);
     }
     const first = createConsumer(0);
     const second = createConsumer(1);
@@ -164,14 +164,14 @@ describe("independently owned Model observation", () => {
   });
 
   it("switches targets on commit and leaves the previous observation intact on candidate failure", async () => {
-    const first = Behave.createModel((input: number) => `first:${input}`, 0);
-    const second = Behave.createModel((input: number) => `second:${input}`, 0);
+    const first = Behavon.createModel((input: number) => `first:${input}`, 0);
+    const second = Behavon.createModel((input: number) => `second:${input}`, 0);
     let observed: ModelInstance<number, string> = first;
     let shouldFail = false;
     let setSelection: StateSetter<number> | undefined;
     function Consumer(input: number): string {
-      const [selection, setInput] = Behave.useState(input);
-      const [output] = Behave.useModel(selection === 0 ? first : second);
+      const [selection, setInput] = Behavon.useState(input);
+      const [output] = Behavon.useModel(selection === 0 ? first : second);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setSelection = setInput;
       if (shouldFail) throw new Error("candidate failed");
@@ -179,7 +179,7 @@ describe("independently owned Model observation", () => {
       observed = selection === 0 ? first : second;
       return output;
     }
-    const consumer = Behave.createModel(Consumer, 0);
+    const consumer = Behavon.createModel(Consumer, 0);
     expect(inspectModelInstanceForTests(first).observers.size).toBe(1);
     setSelection?.(1);
     await waitFor(() => observed === second);
@@ -199,15 +199,15 @@ describe("independently owned Model observation", () => {
   });
 
   it("invalidates live consumers when the target terminates and tombstones its retained setter", async () => {
-    const target = Behave.createModel((input: number) => input, 0);
+    const target = Behavon.createModel((input: number) => input, 0);
     let setter: StateSetter<number> | undefined;
     function Consumer(): undefined {
-      const [, setInput] = Behave.useModel(target);
+      const [, setInput] = Behavon.useModel(target);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setter = setInput;
       return undefined;
     }
-    const consumer = Behave.createModel(Consumer, undefined);
+    const consumer = Behavon.createModel(Consumer, undefined);
     const retained = setter as StateSetter<number>;
     target.dispose();
     const failure = await captureScheduledFailure(() => undefined);
@@ -220,14 +220,14 @@ describe("independently owned Model observation", () => {
   });
 
   it("rejects updater failure, self observation, cycles, and ownerless creation during evaluation", async () => {
-    const target = Behave.createModel((input: number) => input, 0);
+    const target = Behavon.createModel((input: number) => input, 0);
     let setter: StateSetter<number> | undefined;
     function Consumer(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, setter] = Behave.useModel(target);
+      [, setter] = Behavon.useModel(target);
       return undefined;
     }
-    const consumer = Behave.createModel(Consumer, undefined);
+    const consumer = Behavon.createModel(Consumer, undefined);
     const originalFailure = new Error("updater failed");
     const updaterFailure = await captureScheduledFailure(() => setter?.(() => {
       throw originalFailure;
@@ -236,39 +236,39 @@ describe("independently owned Model observation", () => {
     expect(inspectModelInstanceForTests(target).status).toBe("disposed");
     expect(inspectModelInstanceForTests(consumer).status).toBe("disposed");
 
-    expect(() => Behave.createModel(() => {
-      Behave.createModel(() => undefined, undefined);
+    expect(() => Behavon.createModel(() => {
+      Behavon.createModel(() => undefined, undefined);
       return undefined;
     }, undefined)).toThrow(/cannot create an ownerless Model while evaluating/);
 
-    const base = Behave.createModel((input: number) => input, 0);
+    const base = Behavon.createModel((input: number) => input, 0);
     function Observer(input: ModelInstance<any, any>): undefined {
       // eslint-disable-next-line behavon-hooks/canonical-api -- self/cycle probe needs the observation edge, not the returned handle
-      Behave.useModel(input);
+      Behavon.useModel(input);
       return undefined;
     }
-    const self = Behave.createModel(Observer, base);
+    const self = Behavon.createModel(Observer, base);
     let setSelfInput: StateSetter<ModelInstance<any, any>> | undefined;
     function Controller(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, setSelfInput] = Behave.useModel(self);
+      [, setSelfInput] = Behavon.useModel(self);
       return undefined;
     }
-    const controller = Behave.createModel(Controller, undefined);
+    const controller = Behavon.createModel(Controller, undefined);
     const selfFailure = await captureScheduledFailure(() => setSelfInput?.(self));
     expect(String(selfFailure)).toMatch(/cannot observe its own Model/);
     expect(inspectModelInstanceForTests(self).status).toBe("disposed");
     expect(inspectModelInstanceForTests(controller).status).toBe("disposed");
 
-    const first = Behave.createModel(Observer, base);
-    const second = Behave.createModel(Observer, first);
+    const first = Behavon.createModel(Observer, base);
+    const second = Behavon.createModel(Observer, first);
     let setFirstInput: StateSetter<ModelInstance<any, any>> | undefined;
     function CycleController(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, setFirstInput] = Behave.useModel(first);
+      [, setFirstInput] = Behavon.useModel(first);
       return undefined;
     }
-    const cycleController = Behave.createModel(CycleController, undefined);
+    const cycleController = Behavon.createModel(CycleController, undefined);
     const cycleFailure = await captureScheduledFailure(() => setFirstInput?.(second));
     expect(String(cycleFailure)).toMatch(/observation cycle detected/);
     expect(inspectModelInstanceForTests(first).status).toBe("disposed");

@@ -1,1 +1,1 @@
-declare const __BEHAVE_DEVELOPMENT__: boolean;
+declare const __BEHAVON_DEVELOPMENT__: boolean;

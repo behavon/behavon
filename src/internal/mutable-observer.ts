@@ -40,7 +40,7 @@ class MutableObserver {
 
   register(subject: MutableStateSubject, owner: object): void {
     if (this.#metadata.has(subject)) {
-      throw new Error("Behave MutableObserver cannot register the same StateCell more than once");
+      throw new Error("Behavon MutableObserver cannot register the same StateCell more than once");
     }
     this.#metadata.set(subject, {
       identity: this.#nextIdentity++,
@@ -56,15 +56,15 @@ class MutableObserver {
   registerLabel(subject: MutableStateSubject, owner: object, label: object): void {
     const metadata = this.#requireLive(subject);
     if (metadata.owner !== owner) {
-      throw new Error("Behave MutableObserver state label owner mismatch");
+      throw new Error("Behavon MutableObserver state label owner mismatch");
     }
     if (metadata.label !== undefined && metadata.label !== label) {
-      throw new Error("Behave.useLabelState cannot change its StateId at a mounted Hook position");
+      throw new Error("Behavon.useLabelState cannot change its StateId at a mounted Hook position");
     }
     const labels = this.#labels.get(owner) ?? new Map<object, MutableStateSubject>();
     const existing = labels.get(label);
     if (existing !== undefined && existing !== subject) {
-      throw new Error("Behave.useLabelState cannot reuse the same StateId in one Model instance");
+      throw new Error("Behavon.useLabelState cannot reuse the same StateId in one Model instance");
     }
     labels.set(label, subject);
     this.#labels.set(owner, labels);
@@ -82,7 +82,7 @@ class MutableObserver {
   lock(subject: MutableStateSubject, root: object): void {
     const metadata = this.#requireLive(subject);
     if (metadata.lockRoot !== undefined && metadata.lockRoot !== root) {
-      throw new Error("Behave transaction cannot lock a StateCell held by another root transaction");
+      throw new Error("Behavon transaction cannot lock a StateCell held by another root transaction");
     }
     metadata.lockRoot = root;
   }
@@ -94,7 +94,7 @@ class MutableObserver {
   stage<Update>(root: object, scope: object, subject: MutableStateSubject, update: Update): void {
     const metadata = this.#requireLive(subject);
     if (metadata.lockRoot !== root) {
-      throw new Error("Behave transaction setter requires its StateId in the active root lock set");
+      throw new Error("Behavon transaction setter requires its StateId in the active root lock set");
     }
     const updates = this.#transactionUpdates.get(root) ?? [];
     updates.push({ scope, subject, update });
@@ -219,7 +219,7 @@ class MutableObserver {
   release(subject: MutableStateSubject): void {
     const metadata = this.#metadata.get(subject);
     if (metadata === undefined) {
-      throw new Error("Behave MutableObserver received an unregistered StateCell");
+      throw new Error("Behavon MutableObserver received an unregistered StateCell");
     }
     metadata.status = "released";
   }
@@ -227,7 +227,7 @@ class MutableObserver {
   inspect(subject: MutableStateSubject): MutableStateInspection {
     const metadata = this.#metadata.get(subject);
     if (metadata === undefined) {
-      throw new Error("Unknown Behave MutableObserver StateCell inspection target");
+      throw new Error("Unknown Behavon MutableObserver StateCell inspection target");
     }
     return Object.freeze({
       identity: metadata.identity,
@@ -243,10 +243,10 @@ class MutableObserver {
   #requireLive(subject: MutableStateSubject): MutableStateMetadata {
     const metadata = this.#metadata.get(subject);
     if (metadata === undefined) {
-      throw new Error("Behave MutableObserver received an unregistered StateCell");
+      throw new Error("Behavon MutableObserver received an unregistered StateCell");
     }
     if (metadata.status !== "live") {
-      throw new Error("Behave MutableObserver received a released StateCell");
+      throw new Error("Behavon MutableObserver received a released StateCell");
     }
     return metadata;
   }

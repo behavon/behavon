@@ -1,8 +1,8 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { ModelInstance } from "behavon";
 
 const moduleLabel = "stable";
-const dependencySnapshot = Behave.createId(Behave.SnapshotType<string>());
+const dependencySnapshot = Behavon.createId(Behavon.SnapshotType<string>());
 
 interface Input {
   readonly step: number;
@@ -15,19 +15,19 @@ function useCustomCommand(): () => void {
 }
 
 export function DependencyCompletenessModel(input: Input): undefined {
-  const [count, setCount] = Behave.useState(0);
-  const [output, setInput] = Behave.useModel(input.instance);
-  const [snapshot, publish] = Behave.useSnapshot(dependencySnapshot);
-  const mutable = Behave.useMutable(0);
+  const [count, setCount] = Behavon.useState(0);
+  const [output, setInput] = Behavon.useModel(input.instance);
+  const [snapshot, publish] = Behavon.useSnapshot(dependencySnapshot);
+  const mutable = Behavon.useMutable(0);
   const customCommand = useCustomCommand();
-  const signalBody = Behave.useCallback(() => undefined, []);
-  const signal = Behave.useSignal("signal", signalBody);
-  const slotBody = Behave.useCallback(() => undefined, []);
-  const slot = Behave.useSlot("slot", slotBody);
+  const signalBody = Behavon.useCallback(() => undefined, []);
+  const signal = Behavon.useSignal("signal", signalBody);
+  const slotBody = Behavon.useCallback(() => undefined, []);
+  const slot = Behavon.useSlot("slot", slotBody);
   const { step } = input;
   const user = input.user;
 
-  const update = Behave.useCallback(() => {
+  const update = Behavon.useCallback(() => {
     setCount((current) => current + step);
     setInput((current) => current + step);
     publish(`${moduleLabel}:${output}:${snapshot}:${user.id}`);
@@ -36,10 +36,10 @@ export function DependencyCompletenessModel(input: Input): undefined {
     slot();
     customCommand();
   }, [customCommand, output, snapshot, step, user.id]);
-  Behave.useSignal("update", update);
+  Behavon.useSignal("update", update);
 
-  const derived = Behave.useMemo(() => count + input.user.id.length, [count, input.user]);
-  Behave.useEffect(() => void input.step);
-  Behave.useEffect(() => void derived, [derived, input.step]);
+  const derived = Behavon.useMemo(() => count + input.user.id.length, [count, input.user]);
+  Behavon.useEffect(() => void input.step);
+  Behavon.useEffect(() => void derived, [derived, input.step]);
   return undefined;
 }

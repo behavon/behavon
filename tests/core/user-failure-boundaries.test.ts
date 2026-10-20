@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { Signal, Slot, StateSetter, UntypedModelRef } from "behavon";
 import { inspectSnapshotChannelForTests } from "../../src/internal/snapshot-channels";
-import { uniqueChannel, waitFor } from "../helpers";
+import { uniqueChannel, waitFor, signalOf } from "../helpers";
 
 function captureThrown(trigger: () => void): unknown {
   try {
@@ -64,7 +64,7 @@ describe("user-code failure boundaries", () => {
 
     function Broken(): undefined {
       // eslint-disable-next-line behavon-hooks/canonical-api -- initializer-failure probe throws before a state handle can be consumed
-      Behave.useState(() => {
+      Behavon.useState(() => {
         throw failure;
       });
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -72,7 +72,7 @@ describe("user-code failure boundaries", () => {
       return undefined;
     }
 
-    expect(captureThrown(() => Behave.createModel(Broken, undefined))).toBe(failure);
+    expect(captureThrown(() => Behavon.createModel(Broken, undefined))).toBe(failure);
     expect(modelCompleted).toBe(false);
   });
 
@@ -84,22 +84,22 @@ describe("user-code failure boundaries", () => {
     let evaluations = 0;
 
     function Model(): undefined {
-      const [, setValue] = Behave.useState(0);
+      const [, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
-      const failBody = Behave.useCallback(() => {
+      const failBody = Behavon.useCallback(() => {
         setValue(() => {
           throw failure;
         });
       }, [setValue]);
-      Behave.useSignal("fail", failBody);
+      Behavon.useSignal("fail", failBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(await captureScheduledFailure(() => root.fail())).toBe(failure);
+    const root = Behavon.createModel(Model, undefined);
+    expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
     expect(evaluations).toBe(1);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("B04 preserves a Model input updater failure without reevaluating the target", async () => {
@@ -113,21 +113,21 @@ describe("user-code failure boundaries", () => {
       return undefined;
     }
 
-    const child = Behave.createModel(Child, 1);
+    const child = Behavon.createModel(Child, 1);
     function Observer(): undefined {
-      const [, setter] = Behave.useModel(child);
+      const [, setter] = Behavon.useModel(child);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setInput = setter;
       return undefined;
     }
 
-    const observer = Behave.createModel(Observer, undefined);
+    const observer = Behavon.createModel(Observer, undefined);
     observer.dispose();
     expect(await captureScheduledFailure(() => setInput?.(() => {
       throw failure;
     }))).toBe(failure);
     expect(childEvaluations).toBe(1);
-    expect(() => Behave.getInterface(child)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(child)).toThrow(/disposed/);
   });
 
   it("B05 preserves a memo factory failure and the latest successful endpoint registry", async () => {
@@ -139,25 +139,25 @@ describe("user-code failure boundaries", () => {
     let stableCalls = 0;
 
     function Model(): undefined {
-      const [shouldFail, setShouldFail] = Behave.useState(false);
+      const [shouldFail, setShouldFail] = Behavon.useState(false);
       // eslint-disable-next-line behavon-hooks/canonical-api -- memo-failure probe needs the factory invocation, not its value
-      Behave.useMemo(() => {
+      Behavon.useMemo(() => {
         if (shouldFail) throw failure;
         return 1;
       }, [shouldFail]);
-      const failBody = Behave.useCallback(() => setShouldFail(true), [setShouldFail]);
-      Behave.useSignal("fail", failBody);
-      const stableBody = Behave.useCallback(() => {
+      const failBody = Behavon.useCallback(() => setShouldFail(true), [setShouldFail]);
+      Behavon.useSignal("fail", failBody);
+      const stableBody = Behavon.useCallback(() => {
         stableCalls += 1;
       }, []);
-      Behave.useSignal("stable", stableBody);
+      Behavon.useSignal("stable", stableBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(await captureScheduledFailure(() => root.fail())).toBe(failure);
+    const root = Behavon.createModel(Model, undefined);
+    expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
     expect(stableCalls).toBe(0);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("B06 preserves a dependency-list Proxy accessor failure", async () => {
@@ -167,7 +167,7 @@ describe("user-code failure boundaries", () => {
     const failure = new Error("dependency length failed");
 
     function Model(): undefined {
-      const [shouldFail, setShouldFail] = Behave.useState(false);
+      const [shouldFail, setShouldFail] = Behavon.useState(false);
       const dependencies = shouldFail
         ? new Proxy([] as unknown[], {
           get(target, property, receiver) {
@@ -177,15 +177,15 @@ describe("user-code failure boundaries", () => {
         })
         : [];
       // eslint-disable-next-line behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only dependency-access failure probe requires a dynamic dependency object
-      Behave.useMemo(() => 1, dependencies);
-      const failBody = Behave.useCallback(() => setShouldFail(true), [setShouldFail]);
-      Behave.useSignal("fail", failBody);
+      Behavon.useMemo(() => 1, dependencies);
+      const failBody = Behavon.useCallback(() => setShouldFail(true), [setShouldFail]);
+      Behavon.useSignal("fail", failBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(await captureScheduledFailure(() => root.fail())).toBe(failure);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    const root = Behavon.createModel(Model, undefined);
+    expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("B06 preserves dependency-list every and index accessor failures", async () => {
@@ -203,7 +203,7 @@ describe("user-code failure boundaries", () => {
 
     function createBrokenRoot(mode: "every" | "index"): UntypedModelRef {
       function Model(): undefined {
-        const [epoch, setEpoch] = Behave.useState(0);
+        const [epoch, setEpoch] = Behavon.useState(0);
         const initial = mode === "every" ? everyDependencies : [0];
         const next = mode === "index" && epoch > 0
           ? new Proxy([0], {
@@ -214,23 +214,23 @@ describe("user-code failure boundaries", () => {
           })
           : initial;
         // eslint-disable-next-line behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only dependency-access failure probe requires a dynamic dependency object
-        Behave.useMemo(() => 1, next);
-        const reevaluateBody = Behave.useCallback(() => {
+        Behavon.useMemo(() => 1, next);
+        const reevaluateBody = Behavon.useCallback(() => {
           setEpoch((value) => value + 1);
         }, [setEpoch]);
-        Behave.useSignal("reevaluate", reevaluateBody);
+        Behavon.useSignal("reevaluate", reevaluateBody);
         return undefined;
       }
-      return Behave.createModel(Model, undefined);
+      return Behavon.createModel(Model, undefined);
     }
 
     const everyRoot = createBrokenRoot("every");
-    expect(await captureScheduledFailure(() => everyRoot.reevaluate())).toBe(everyFailure);
-    expect(() => Behave.getInterface(everyRoot)).toThrow(/disposed/);
+    expect(await captureScheduledFailure(() => signalOf(everyRoot, "reevaluate")())).toBe(everyFailure);
+    expect(() => Behavon.getInterface(everyRoot)).toThrow(/disposed/);
 
     const indexRoot = createBrokenRoot("index");
-    expect(await captureScheduledFailure(() => indexRoot.reevaluate())).toBe(indexFailure);
-    expect(() => Behave.getInterface(indexRoot)).toThrow(/disposed/);
+    expect(await captureScheduledFailure(() => signalOf(indexRoot, "reevaluate")())).toBe(indexFailure);
+    expect(() => Behavon.getInterface(indexRoot)).toThrow(/disposed/);
   });
 
   it("B06 preserves a custom dependency every method failure", async () => {
@@ -247,19 +247,19 @@ describe("user-code failure boundaries", () => {
     } as unknown as readonly unknown[];
 
     function Model(): undefined {
-      const [, setEpoch] = Behave.useState(0);
+      const [, setEpoch] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only dependency-method failure probe requires a dynamic dependency object
-      Behave.useMemo(() => 1, dependencies);
-      const reevaluateBody = Behave.useCallback(() => {
+      Behavon.useMemo(() => 1, dependencies);
+      const reevaluateBody = Behavon.useCallback(() => {
         setEpoch((value) => value + 1);
       }, [setEpoch]);
-      Behave.useSignal("reevaluate", reevaluateBody);
+      Behavon.useSignal("reevaluate", reevaluateBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(await captureScheduledFailure(() => root.reevaluate())).toBe(failure);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    const root = Behavon.createModel(Model, undefined);
+    expect(await captureScheduledFailure(() => signalOf(root, "reevaluate")())).toBe(failure);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("B07 preserves a primitive thrown by an ordinary managed callback", () => {
@@ -268,13 +268,13 @@ describe("user-code failure boundaries", () => {
 
     function Model(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      callback = Behave.useCallback(() => {
+      callback = Behavon.useCallback(() => {
         throw failure;
       }, []);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(captureThrown(() => callback?.())).toBe(failure);
     root.dispose();
   });
@@ -286,13 +286,13 @@ describe("user-code failure boundaries", () => {
     const failure = { boundary: "async Signal body" };
 
     function Model(): undefined {
-      const fireBody = Behave.useCallback(() => Promise.reject(failure), []);
-      Behave.useSignal("fire", fireBody);
+      const fireBody = Behavon.useCallback(() => Promise.reject(failure), []);
+      Behavon.useSignal("fire", fireBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(await captureUnhandledRejection(() => root.fire())).toBe(failure);
+    const root = Behavon.createModel(Model, undefined);
+    expect(await captureUnhandledRejection(() => signalOf(root, "fire")())).toBe(failure);
     root.dispose();
   });
 
@@ -303,22 +303,22 @@ describe("user-code failure boundaries", () => {
     let siblingCalls = 0;
 
     function Model(): undefined {
-      const receiveBody = Behave.useCallback(() => Object.defineProperty({}, "then", {
+      const receiveBody = Behavon.useCallback(() => Object.defineProperty({}, "then", {
         get(): never {
           getterCalls += 1;
           throw failure;
         },
       }), []);
-      const siblingBody = Behave.useCallback(() => {
+      const siblingBody = Behavon.useCallback(() => {
         siblingCalls += 1;
       }, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      direct = Behave.useSlot("receive", receiveBody);
-      Behave.useSlot("receive", siblingBody);
+      direct = Behavon.useSlot("receive", receiveBody);
+      Behavon.useSlot("receive", siblingBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     let returned: unknown;
     expect(await captureUnhandledRejection(() => {
       returned = direct?.();
@@ -334,14 +334,14 @@ describe("user-code failure boundaries", () => {
     const failure = new Error("effect setup failed");
 
     function Broken(): undefined {
-      Behave.useSnapshot(channel);
-      Behave.useEffect(() => {
+      Behavon.useSnapshot(channel);
+      Behavon.useEffect(() => {
         throw failure;
       }, []);
       return undefined;
     }
 
-    expect(captureThrown(() => Behave.createModel(Broken, undefined))).toBe(failure);
+    expect(captureThrown(() => Behavon.createModel(Broken, undefined))).toBe(failure);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
   });
 
@@ -350,7 +350,7 @@ describe("user-code failure boundaries", () => {
     let subscribeCalls = 0;
 
     function Broken(): undefined {
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         () => {
           subscribeCalls += 1;
           return () => undefined;
@@ -362,7 +362,7 @@ describe("user-code failure boundaries", () => {
       return undefined;
     }
 
-    expect(captureThrown(() => Behave.createModel(Broken, undefined))).toBe(failure);
+    expect(captureThrown(() => Behavon.createModel(Broken, undefined))).toBe(failure);
     expect(subscribeCalls).toBe(0);
   });
 
@@ -374,32 +374,32 @@ describe("user-code failure boundaries", () => {
     let shouldFail = false;
 
     function Model(): undefined {
-      const [, setEpoch] = Behave.useState(0);
-      Behave.useSyncExternalStore(
+      const [, setEpoch] = Behavon.useState(0);
+      Behavon.useSyncExternalStore(
         () => () => undefined,
         () => {
           if (shouldFail) throw failure;
           return 0;
         },
       );
-      const reevaluateBody = Behave.useCallback(() => {
+      const reevaluateBody = Behavon.useCallback(() => {
         setEpoch((value) => value + 1);
       }, [setEpoch]);
-      Behave.useSignal("reevaluate", reevaluateBody);
+      Behavon.useSignal("reevaluate", reevaluateBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     shouldFail = true;
-    expect(await captureScheduledFailure(() => root.reevaluate())).toBe(failure);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(await captureScheduledFailure(() => signalOf(root, "reevaluate")())).toBe(failure);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("B16 preserves an initial external-store subscribe failure", () => {
     const failure = new Error("initial subscribe failed");
 
     function Broken(): undefined {
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         () => {
           throw failure;
         },
@@ -408,7 +408,7 @@ describe("user-code failure boundaries", () => {
       return undefined;
     }
 
-    expect(captureThrown(() => Behave.createModel(Broken, undefined))).toBe(failure);
+    expect(captureThrown(() => Behavon.createModel(Broken, undefined))).toBe(failure);
   });
 
   it("B17 keeps an initial subscription when the post-subscribe changed-check fails", async () => {
@@ -424,7 +424,7 @@ describe("user-code failure boundaries", () => {
     };
 
     function Broken(): undefined {
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         subscribeStore,
         () => {
           // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -436,7 +436,7 @@ describe("user-code failure boundaries", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Broken, undefined);
+    const root = Behavon.createModel(Broken, undefined);
     await waitFor(() => reads >= 3);
     expect(subscribeCalls).toBe(1);
     expect(unsubscribeCalls).toBe(0);
@@ -452,7 +452,7 @@ describe("user-code failure boundaries", () => {
     const observed: number[] = [];
 
     function Model(): undefined {
-      const value = Behave.useSyncExternalStore(
+      const value = Behavon.useSyncExternalStore(
         (nextListener) => {
           listener = nextListener;
           return () => {
@@ -469,7 +469,7 @@ describe("user-code failure boundaries", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     shouldFail = true;
     expect(() => listener?.()).not.toThrow();
     shouldFail = false;
@@ -484,19 +484,19 @@ describe("user-code failure boundaries", () => {
     const failure = new Error("unsubscribe failed");
 
     function Model(): undefined {
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         () => () => {
           throw failure;
         },
         () => 0,
       );
-      Behave.useSnapshot(channel);
+      Behavon.useSnapshot(channel);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(captureThrown(() => root.dispose())).toBe(failure);
-    expect(() => Behave.getInterface(root as UntypedModelRef)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root as UntypedModelRef)).toThrow(/disposed/);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
   });
 
@@ -505,19 +505,19 @@ describe("user-code failure boundaries", () => {
     const failure = new Error("nested Child unsubscribe failed");
 
     function Child(): undefined {
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         () => () => {
           throw failure;
         },
         () => 0,
       );
-      Behave.useSnapshot(childChannel);
+      Behavon.useSnapshot(childChannel);
       return undefined;
     }
 
-    const root = Behave.createModel(Behave.boundary(Child), undefined);
+    const root = Behavon.createModel(Behavon.boundary(Child), undefined);
     expect(captureThrown(() => root.dispose())).toBe(failure);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
     expect(inspectSnapshotChannelForTests(childChannel)).toBeUndefined();
   });
 
@@ -526,11 +526,11 @@ describe("user-code failure boundaries", () => {
     const failure = new Error("Child construction failed");
 
     function BrokenChild(): never {
-      Behave.useSnapshot(channel);
+      Behavon.useSnapshot(channel);
       throw failure;
     }
 
-    expect(captureThrown(() => Behave.createModel(BrokenChild, undefined))).toBe(failure);
+    expect(captureThrown(() => Behavon.createModel(BrokenChild, undefined))).toBe(failure);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
   });
 
@@ -544,28 +544,28 @@ describe("user-code failure boundaries", () => {
     let setInput: StateSetter<number> | undefined;
 
     function Child(input: number): undefined {
-      const [state] = Behave.useState(7);
-      const pingBody = Behave.useCallback(() => {
+      const [state] = Behavon.useState(7);
+      const pingBody = Behavon.useCallback(() => {
         pingCalls += 1;
         observedStates.push(state);
       }, [state]);
-      Behave.useSignal("ping", pingBody);
+      Behavon.useSignal("ping", pingBody);
       if (input === 2) throw failure;
       return undefined;
     }
 
-    const child = Behave.createModel(Child, 1);
+    const child = Behavon.createModel(Child, 1);
     function Observer(): undefined {
-      const [, setter] = Behave.useModel(child);
+      const [, setter] = Behavon.useModel(child);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setInput = setter;
       return undefined;
     }
 
-    const observer = Behave.createModel(Observer, undefined);
+    const observer = Behavon.createModel(Observer, undefined);
     observer.dispose();
     expect(await captureScheduledFailure(() => setInput?.(2))).toBe(failure);
-    expect(() => Behave.getInterface(child)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(child)).toThrow(/disposed/);
     expect(() => child.ping()).toThrow(/disposed/);
     expect(pingCalls).toBe(0);
     expect(observedStates).toEqual([]);
@@ -578,18 +578,18 @@ describe("user-code failure boundaries", () => {
     let cleanupCalls = 0;
 
     function Broken(): undefined {
-      Behave.useSnapshot(channel);
-      Behave.useEffect(() => () => {
+      Behavon.useSnapshot(channel);
+      Behavon.useEffect(() => () => {
         cleanupCalls += 1;
         throw cleanupFailure;
       }, []);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         throw primary;
       }, []);
       return undefined;
     }
 
-    const surfaced = captureThrown(() => Behave.createModel(Broken, undefined));
+    const surfaced = captureThrown(() => Behavon.createModel(Broken, undefined));
     expect(surfaced).toBeInstanceOf(AggregateError);
     expect((surfaced as AggregateError).errors).toEqual([primary, cleanupFailure]);
     expect(cleanupCalls).toBe(1);

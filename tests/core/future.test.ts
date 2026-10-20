@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import Behave, { FutureCancellationError, futureDiagnostics } from "behavon";
+import Behavon, { FutureCancellationError, futureDiagnostics } from "behavon";
 import type { BoundaryState, Future, Signal, StateSetter } from "behavon";
 import { inspectModelInstanceForTests, observeModelInstanceCreationForTests } from "../../src/internal/model-inspection";
 import { waitFor } from "../helpers";
@@ -18,7 +18,7 @@ function deferred<Value>() {
 describe("useFuture", () => {
   it("is structurally compatible with native AbortSignal in DOM consumers", () => {
     function Model() {
-      const future = Behave.useFuture(async (input: string, context) => {
+      const future = Behavon.useFuture(async (input: string, context) => {
         const native: AbortSignal = context.signal;
         const request = fetch(input, { signal: context.signal });
         // @ts-expect-error Native dispatchEvent requires an Event, not an event-shaped plain object.
@@ -28,7 +28,7 @@ describe("useFuture", () => {
       }, { concurrency: "serial" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(outputOf<Future<string, Response>>(root).snapshot()).toEqual({ status: "idle" });
     root.dispose();
   });
@@ -37,12 +37,12 @@ describe("useFuture", () => {
     const work = vi.fn((input: number) => input * 2);
     const effects: string[] = [];
     function Model() {
-      const future = Behave.useFuture(work, { concurrency: "serial" });
+      const future = Behavon.useFuture(work, { concurrency: "serial" });
       const snapshot = future.snapshot();
-      Behave.useEffect(() => { effects.push(snapshot.status); }, [snapshot]);
+      Behavon.useEffect(() => { effects.push(snapshot.status); }, [snapshot]);
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<number, number>>(root);
     expect(Object.isFrozen(future)).toBe(true);
     expect(future.snapshot()).toEqual({ status: "idle" });
@@ -64,12 +64,12 @@ describe("useFuture", () => {
     const first = deferred<number>();
     let version = 1;
     function Model() {
-      const [, rerender] = Behave.useState(0);
+      const [, rerender] = Behavon.useState(0);
       const capturedVersion = version;
-      const future = Behave.useFuture((value: number) => capturedVersion === 1 ? first.promise : value * capturedVersion, { concurrency: "serial" });
+      const future = Behavon.useFuture((value: number) => capturedVersion === 1 ? first.promise : value * capturedVersion, { concurrency: "serial" });
       return { future, rerender, capturedVersion };
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const initial = outputOf<ReturnType<typeof Model>>(root);
     const future = initial.future;
     const one = future.start(1);
@@ -86,14 +86,14 @@ describe("useFuture", () => {
   it("latest supersedes with ordered rejected publication before replacement pending", async () => {
     const calls = new Map<number, ReturnType<typeof deferred<number>>>();
     function Model() {
-      const future = Behave.useFuture((input: number) => {
+      const future = Behavon.useFuture((input: number) => {
         const call = deferred<number>();
         calls.set(input, call);
         return call.promise;
       }, { concurrency: "latest" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<number, number>>(root);
     const events: string[] = [];
     future.pending.subscribe(({ input }) => events.push(`p${input}`));
@@ -113,13 +113,13 @@ describe("useFuture", () => {
     const active = deferred<number>();
     let selfAbort: ((reason?: unknown) => void) | undefined;
     function Model() {
-      const future = Behave.useFuture((_input: string, context) => {
+      const future = Behavon.useFuture((_input: string, context) => {
         selfAbort = context.abort;
         return active.promise;
       }, { concurrency: "serial" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<string, number>>(root);
     const diagnostics: unknown[] = [];
     const unsubscribe = futureDiagnostics.subscribe(value => diagnostics.push(value));
@@ -132,22 +132,22 @@ describe("useFuture", () => {
 
     const secondWork = deferred<number>();
     function SelfModel() {
-      const next = Behave.useFuture((_input: string, context) => {
+      const next = Behavon.useFuture((_input: string, context) => {
         context.abort("factory-stop");
         return secondWork.promise;
       }, { concurrency: "serial" });
       return next;
     }
-    const selfRoot = Behave.createModel(SelfModel, undefined);
+    const selfRoot = Behavon.createModel(SelfModel, undefined);
     await expect(outputOf<Future<string, number>>(selfRoot).start("self")).rejects.toMatchObject({ kind: "self", cause: "factory-stop" });
     selfRoot.dispose();
 
     const disposeWork = deferred<number>();
     function DisposeModel() {
-      const next = Behave.useFuture(() => disposeWork.promise, { concurrency: "serial" });
+      const next = Behavon.useFuture(() => disposeWork.promise, { concurrency: "serial" });
       return next;
     }
-    const disposeRoot = Behave.createModel(DisposeModel, undefined);
+    const disposeRoot = Behavon.createModel(DisposeModel, undefined);
     const retained = outputOf<Future<void, number>>(disposeRoot);
     const disposed = retained.start(undefined);
     await waitFor(() => retained.snapshot().status === "pending");
@@ -166,10 +166,10 @@ describe("useFuture", () => {
     const runCase = async (reason: unknown, late: unknown): Promise<void> => {
       const work = deferred<number>();
       function Model() {
-        const future = Behave.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
+        const future = Behavon.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
         return future;
       }
-      const root = Behave.createModel(Model, undefined);
+      const root = Behavon.createModel(Model, undefined);
       const future = outputOf<Future<void, number>>(root);
       const completion = future.start(undefined);
       await waitFor(() => future.snapshot().status === "pending");
@@ -200,14 +200,14 @@ describe("useFuture", () => {
   it("normalizes synchronous throw, then getter throw, and custom thenable settlement", async () => {
     const getterFailure = new Error("then getter failed");
     function Model() {
-      const future = Behave.useFuture((kind: string): number | PromiseLike<number> => {
+      const future = Behavon.useFuture((kind: string): number | PromiseLike<number> => {
         if (kind === "throw") throw new Error("factory failed");
         if (kind === "getter") return Object.defineProperty({}, "then", { get: () => { throw getterFailure; } }) as PromiseLike<number>;
         return { then: (resolve: (value: number) => void) => { resolve(42); } } as unknown as PromiseLike<number>;
       }, { concurrency: "serial" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<string, number>>(root);
     await expect(future.start("throw")).rejects.toThrow("factory failed");
     await expect(future.start("getter")).rejects.toBe(getterFailure);
@@ -219,10 +219,10 @@ describe("useFuture", () => {
     const surfaced = new Error("listener failed");
     const values: number[] = [];
     function Model() {
-      const future = Behave.useFuture((input: number) => input, { concurrency: "serial" });
+      const future = Behavon.useFuture((input: number) => input, { concurrency: "serial" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<number, number>>(root);
     let second: Promise<number> | undefined;
     future.fulfilled.subscribe(({ input }) => {
@@ -254,10 +254,10 @@ describe("useFuture", () => {
     const listenerFailure = new Error("pending listener failed");
     const factory = vi.fn((input: number) => input);
     function Model() {
-      const future = Behave.useFuture(factory, { concurrency: "serial" });
+      const future = Behavon.useFuture(factory, { concurrency: "serial" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<number, number>>(root);
     const events: string[] = [];
     const surfaced: unknown[] = [];
@@ -297,10 +297,10 @@ describe("useFuture", () => {
   it("does not duplicate an explicit cancellation transition requested by a pending listener", async () => {
     const factory = vi.fn((input: number) => input);
     function Model() {
-      const future = Behave.useFuture(factory, { concurrency: "serial" });
+      const future = Behavon.useFuture(factory, { concurrency: "serial" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<number, number>>(root);
     const events: string[] = [];
     const hostFailures: unknown[] = [];
@@ -332,10 +332,10 @@ describe("useFuture", () => {
   it("does not duplicate a latest supersede transition requested by a pending listener", async () => {
     const factory = vi.fn((input: number) => input * 10);
     function Model() {
-      const future = Behave.useFuture(factory, { concurrency: "latest" });
+      const future = Behavon.useFuture(factory, { concurrency: "latest" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<number, number>>(root);
     const events: string[] = [];
     const hostFailures: unknown[] = [];
@@ -378,12 +378,12 @@ describe("useFuture", () => {
     let created: object | undefined;
     const stop = observeModelInstanceCreationForTests((instance) => { created = instance; });
     function Broken(): never {
-      const future = Behave.useFuture<void, number>(factory, { concurrency: "serial" });
+      const future = Behavon.useFuture<void, number>(factory, { concurrency: "serial" });
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only failed-construction capability probe
       retained = future;
       throw new Error("construction failed");
     }
-    expect(() => Behave.createModel(Broken, undefined)).toThrow("construction failed");
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow("construction failed");
     stop();
     expect(factory).not.toHaveBeenCalled();
     expect(created === undefined ? undefined : inspectModelInstanceForTests(created).status).toBe("disposed");
@@ -397,13 +397,13 @@ describe("useFuture", () => {
     console.warn = (...args: unknown[]) => { warnings.push(args); };
     let completion: Promise<number> | undefined;
     function Model() {
-      const future = Behave.useFuture(async (input: number) => input, { concurrency: "serial" });
+      const future = Behavon.useFuture(async (input: number) => input, { concurrency: "serial" });
       future.snapshot();
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- invalid-reproduction runtime policy probe
       completion ??= future.start(7);
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     try {
       await expect(completion).resolves.toBe(7);
       expect(warnings).toHaveLength(1);
@@ -416,29 +416,30 @@ describe("useFuture", () => {
 
   it("executes transaction.run commands immediately and does not roll them back", async () => {
     interface Port { run: Signal }
-    const port = Behave.createPort<Port>({ run: Behave.SignalType() });
-    const state = Behave.createId({ value: Behave.StateType<number>() });
+    const port = Behavon.createPort<Port>({ run: Behavon.SignalType() });
+    const state = Behavon.createId({ value: Behavon.StateType<number>() });
     const work = deferred<number>();
     let completion: Promise<number> | undefined;
     const warnings: unknown[][] = [];
     const originalWarn = console.warn;
     console.warn = (...args: unknown[]) => { warnings.push(args); };
     function Model(): { value: number; future: Future<void, number> } {
-      const [value, setValue] = Behave.useLabelState(state.value, 0);
-      const future = Behave.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
-      const run = Behave.useCallback(() => {
-        const id = Behave.createId();
-        Behave.transaction.start(id, [state.value]);
-        Behave.transaction.run(id, () => {
+      const [value, setValue] = Behavon.useLabelState(state.value, 0);
+      const future = Behavon.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
+      const run = Behavon.useCallback(() => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, [state.value]);
+        Behavon.transaction.run(id, () => {
           completion = future.start(undefined);
           setValue(1);
           throw new Error("rollback");
         });
       }, [future, setValue]);
-      Behave.useSignal(port, "run", run);
+      Behavon.useSignal(port, "run", run);
+      Behavon.useExport(port, "run");
       return { value, future };
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     try {
       expect(() => root.run()).toThrow("rollback");
       await waitFor(() => outputOf<ReturnType<typeof Model>>(root).future.snapshot().status === "pending");
@@ -456,26 +457,26 @@ describe("useFuture", () => {
     const work = deferred<number>();
     let completion: Promise<number> | undefined;
     function Child(fail: boolean): Future<void, number> {
-      const future = Behave.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
-      Behave.useEffect(() => {
+      const future = Behavon.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
+      Behavon.useEffect(() => {
         completion = future.start(undefined);
         void completion.catch(() => undefined);
       }, [future]);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         if (fail) throw new Error("commit failure");
       }, [fail]);
       return future;
     }
-    const SafeChild = Behave.boundary(Child);
-    const root = Behave.createModel(SafeChild, false);
+    const SafeChild = Behavon.boundary(Child);
+    const root = Behavon.createModel(SafeChild, false);
     let state: BoundaryState<Future<void, number>> | undefined;
     let setInput: StateSetter<boolean> | undefined;
     function Observer(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only Boundary state probe
-      [state, setInput] = Behave.useModel(root);
+      [state, setInput] = Behavon.useModel(root);
       return undefined;
     }
-    const observer = Behave.createModel(Observer, undefined);
+    const observer = Behavon.createModel(Observer, undefined);
     await waitFor(() => state?.status === "active" && state.output.snapshot().status === "pending");
     setInput?.(true);
     await waitFor(() => state?.status === "failed");
@@ -489,13 +490,13 @@ describe("useFuture", () => {
     const second = deferred<number>();
     const signals: Array<{ input: number; signal: { readonly aborted: boolean } }> = [];
     function Model() {
-      const future = Behave.useFuture((input: number, { signal }) => {
+      const future = Behavon.useFuture((input: number, { signal }) => {
         signals.push({ input, signal });
         return input === 1 ? first.promise : second.promise;
       }, { concurrency: "serial" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<number, number>>(root);
     const one = future.start(1);
     const two = future.start(2);
@@ -515,15 +516,15 @@ describe("useFuture", () => {
     const work = deferred<number>();
     const effectSnapshots: Array<Readonly<{ status: string }>> = [];
     function Model() {
-      const [tick, setTick] = Behave.useState(0);
-      const future = Behave.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
+      const [tick, setTick] = Behavon.useState(0);
+      const future = Behavon.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
       const snapshot = future.snapshot();
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         effectSnapshots.push(snapshot);
       }, [snapshot]);
       return { tick, setTick, future, snapshot };
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const initial = outputOf<ReturnType<typeof Model>>(root);
     let pendingAtOccurrence: unknown;
     let pendingOutputAtOccurrence: unknown;
@@ -569,13 +570,13 @@ describe("useFuture", () => {
     const factory = vi.fn(async () => 1);
     let completion: Promise<number> | undefined;
     function Broken(): never {
-      const future = Behave.useFuture<void, number>(factory, { concurrency: "serial" });
+      const future = Behavon.useFuture<void, number>(factory, { concurrency: "serial" });
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- invalid-reproduction provisional cleanup probe
       completion = future.start(undefined);
       void completion.catch(() => undefined);
       throw new Error("after start");
     }
-    expect(() => Behave.createModel(Broken, undefined)).toThrow("after start");
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow("after start");
     await expect(completion).rejects.toMatchObject({ kind: "owner-dispose" });
     expect(factory).not.toHaveBeenCalled();
   });
@@ -583,10 +584,10 @@ describe("useFuture", () => {
   it("preserves a fulfilled terminal outcome when its occurrence listener disposes the owner", async () => {
     const work = deferred<number>();
     function Model() {
-      const future = Behave.useFuture((input: number) => input === 1 ? work.promise : input, { concurrency: "serial" });
+      const future = Behavon.useFuture((input: number) => input === 1 ? work.promise : input, { concurrency: "serial" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<number, number>>(root);
     const events: string[] = [];
     future.fulfilled.subscribe(({ value }) => {
@@ -611,10 +612,10 @@ describe("useFuture", () => {
     const work = deferred<number>();
     const failure = new Error("factory rejected");
     function Model() {
-      const future = Behave.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
+      const future = Behavon.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
       return future;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const future = outputOf<Future<void, number>>(root);
     const events: string[] = [];
     future.rejected.subscribe(({ reason }) => {

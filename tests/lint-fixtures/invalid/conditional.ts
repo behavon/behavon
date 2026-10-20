@@ -1,6 +1,6 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
 export function ConditionalModel(enabled: boolean): undefined {
-  if (enabled) Behave.useState(0);
+  if (enabled) Behavon.useState(0);
   return undefined;
 }

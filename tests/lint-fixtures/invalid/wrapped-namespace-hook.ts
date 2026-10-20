@@ -1,8 +1,8 @@
-import * as Behave from "behavon";
+import * as Behavon from "behavon";
 
 export function WrappedNamespaceHookModel(): number {
-  const [state] = (Behave as typeof Behave).useState(0);
-  const memo = Behave!.useMemo(() => state, [state]);
-  const callback = (Behave as typeof Behave)["useCallback"](() => memo, [memo]);
+  const [state] = (Behavon as typeof Behavon).useState(0);
+  const memo = Behavon!.useMemo(() => state, [state]);
+  const callback = (Behavon as typeof Behavon)["useCallback"](() => memo, [memo]);
   return callback();
 }

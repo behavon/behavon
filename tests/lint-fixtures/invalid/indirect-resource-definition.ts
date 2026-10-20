@@ -1,7 +1,7 @@
-import Behave, { createResource } from "behavon";
+import Behavon, { createResource } from "behavon";
 
-const extracted = Behave.createResource;
-const { createResource: destructured } = Behave;
+const extracted = Behavon.createResource;
+const { createResource: destructured } = Behavon;
 void extracted;
 void destructured;
 

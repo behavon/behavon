@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { DependencyProxy, Signal, Slot, SnapshotId, SnapshotRootId, UntypedModelRef } from "behavon";
 import {
   acquireSnapshotFamily,
@@ -11,7 +11,7 @@ import {
   publishSnapshot,
   releaseSnapshotOwner,
 } from "../../src/internal/snapshot-channels";
-import { uniqueChannel } from "../helpers";
+import { uniqueChannel, signalOf } from "../helpers";
 
 const protocolNames = ["dispose", "then", "toJSON", "constructor"] as const;
 const snapshotProtocolNames = [...protocolNames, "__proto__"] as const;
@@ -22,30 +22,30 @@ interface SnapshotEndpoints {
 
 function createSnapshotModel(channel: SnapshotRootId<number | undefined>): UntypedModelRef {
   function SnapshotModel(): undefined {
-    const [, publish] = Behave.useSnapshot(channel);
-    const stage = Behave.useCallback((value: number | undefined) => publish(value), [publish]);
-    Behave.useSignal("stage", stage);
+    const [, publish] = Behavon.useSnapshot(channel);
+    const stage = Behavon.useCallback((value: number | undefined) => publish(value), [publish]);
+    Behavon.useSignal("stage", stage);
     return undefined;
   }
-  return Behave.createModel(SnapshotModel, undefined);
+  return Behavon.createModel(SnapshotModel, undefined);
 }
 
 describe("snapshot identities", () => {
   it("does not expose the snapshot retention test seam from the package entry", () => {
-    expect("inspectSnapshotChannelForTests" in Behave).toBe(false);
+    expect("inspectSnapshotChannelForTests" in Behavon).toBe(false);
   });
 
   it("creates one recursively frozen family with independent payload-node current and listeners", () => {
     const groupDescriptor = {
-      $: Behave.SnapshotType<{ readonly phase: string }>(),
-      completed: Behave.SnapshotType<boolean>(),
+      $: Behavon.SnapshotType<{ readonly phase: string }>(),
+      completed: Behavon.SnapshotType<boolean>(),
     };
     const descriptor = {
-      $: Behave.SnapshotType<number>(),
-      change: Behave.SnapshotType<string>(),
+      $: Behavon.SnapshotType<number>(),
+      change: Behavon.SnapshotType<string>(),
       group: groupDescriptor,
     };
-    const family = Behave.createId(descriptor);
+    const family = Behavon.createId(descriptor);
     interface Endpoints {
       readonly root: Signal<readonly [value: number]>;
       readonly change: Signal<readonly [value: string]>;
@@ -53,18 +53,18 @@ describe("snapshot identities", () => {
       readonly complete: Signal;
     }
     function FamilyModel(): undefined {
-      const [, publish] = Behave.useSnapshot(family);
-      const root = Behave.useCallback((value: number) => publish(value), []);
-      const change = Behave.useCallback((value: string) => publish(family.change, value), []);
-      const group = Behave.useCallback((phase: string) => publish(family.group, { phase }), []);
-      const complete = Behave.useCallback(
+      const [, publish] = Behavon.useSnapshot(family);
+      const root = Behavon.useCallback((value: number) => publish(value), []);
+      const change = Behavon.useCallback((value: string) => publish(family.change, value), []);
+      const group = Behavon.useCallback((phase: string) => publish(family.group, { phase }), []);
+      const complete = Behavon.useCallback(
         () => publish(family.group.completed, (previous) => !(previous ?? false)),
         [],
       );
-      Behave.useSignal("root", root);
-      Behave.useSignal("change", change);
-      Behave.useSignal("group", group);
-      Behave.useSignal("complete", complete);
+      Behavon.useSignal("root", root);
+      Behavon.useSignal("change", change);
+      Behavon.useSignal("group", group);
+      Behavon.useSignal("complete", complete);
       return undefined;
     }
 
@@ -75,26 +75,26 @@ describe("snapshot identities", () => {
     expect(Object.isFrozen(descriptor)).toBe(false);
     expect(Object.isFrozen(groupDescriptor)).toBe(false);
 
-    const model = Behave.createModel(FamilyModel, undefined) as unknown as UntypedModelRef & Endpoints;
+    const model = Behavon.createModel(FamilyModel, undefined) as unknown as UntypedModelRef & Endpoints;
     const notifications = { root: 0, change: 0, group: 0, completed: 0 };
-    const offRoot = Behave.subscribe(family)(() => { notifications.root += 1; });
-    const offChange = Behave.subscribe(family.change)(() => { notifications.change += 1; });
-    const offGroup = Behave.subscribe(family.group)(() => { notifications.group += 1; });
-    const offCompleted = Behave.subscribe(family.group.completed)(() => { notifications.completed += 1; });
+    const offRoot = Behavon.subscribe(family)(() => { notifications.root += 1; });
+    const offChange = Behavon.subscribe(family.change)(() => { notifications.change += 1; });
+    const offGroup = Behavon.subscribe(family.group)(() => { notifications.group += 1; });
+    const offCompleted = Behavon.subscribe(family.group.completed)(() => { notifications.completed += 1; });
 
-    model.change("next");
-    expect(Behave.getSnapshot(family.change)()).toBe("next");
-    expect(Behave.getSnapshot(family)()).toBeUndefined();
+    signalOf(model, "change")("next");
+    expect(Behavon.getSnapshot(family.change)()).toBe("next");
+    expect(Behavon.getSnapshot(family)()).toBeUndefined();
     expect(notifications).toEqual({ root: 0, change: 1, group: 0, completed: 0 });
 
-    model.group("active");
-    model.complete();
-    model.complete();
-    model.root(1);
-    model.root(1);
-    expect(Behave.getSnapshot(family.group)()).toEqual({ phase: "active" });
-    expect(Behave.getSnapshot(family.group.completed)()).toBe(false);
-    expect(Behave.getSnapshot(family)()).toBe(1);
+    signalOf(model, "group")("active");
+    signalOf(model, "complete")();
+    signalOf(model, "complete")();
+    signalOf(model, "root")(1);
+    signalOf(model, "root")(1);
+    expect(Behavon.getSnapshot(family.group)()).toEqual({ phase: "active" });
+    expect(Behavon.getSnapshot(family.group.completed)()).toBe(false);
+    expect(Behavon.getSnapshot(family)()).toBe(1);
     expect(notifications).toEqual({ root: 1, change: 1, group: 1, completed: 2 });
 
     offRoot();
@@ -102,60 +102,60 @@ describe("snapshot identities", () => {
     offGroup();
     offCompleted();
     model.dispose();
-    expect(() => Behave.getSnapshot(family.change)).toThrow(/no live owner/);
+    expect(() => Behavon.getSnapshot(family.change)).toThrow(/no live owner/);
   });
 
   it("supports a root-only SnapshotType identity through use, publish, and read", () => {
-    const rootId = Behave.createId(Behave.SnapshotType<number>());
+    const rootId = Behavon.createId(Behavon.SnapshotType<number>());
     let publish: ((value: number | undefined) => void) | undefined;
     function RootOnlyModel(): undefined {
-      const [, rootPublish] = Behave.useSnapshot(rootId);
+      const [, rootPublish] = Behavon.useSnapshot(rootId);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains the root-only publisher
       publish = rootPublish;
       return undefined;
     }
-    const model = Behave.createModel(RootOnlyModel, undefined);
+    const model = Behavon.createModel(RootOnlyModel, undefined);
     publish?.(4);
-    expect(Behave.getSnapshot(rootId)()).toBe(4);
+    expect(Behavon.getSnapshot(rootId)()).toBe(4);
     model.dispose();
   });
 
   it("rejects publication targets from another family at runtime", () => {
-    const family = Behave.createId({
-      $: Behave.SnapshotType<number>(),
-      child: Behave.SnapshotType<string>(),
+    const family = Behavon.createId({
+      $: Behavon.SnapshotType<number>(),
+      child: Behavon.SnapshotType<string>(),
     });
-    const other = Behave.createId({
-      $: Behave.SnapshotType<number>(),
-      child: Behave.SnapshotType<string>(),
+    const other = Behavon.createId({
+      $: Behavon.SnapshotType<number>(),
+      child: Behavon.SnapshotType<string>(),
     });
     let publish: ((target: unknown, value: unknown) => void) | undefined;
     function Model(): undefined {
-      const [, familyPublish] = Behave.useSnapshot(family);
+      const [, familyPublish] = Behavon.useSnapshot(family);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a publisher to test runtime family validation
       publish = familyPublish as (target: unknown, value: unknown) => void;
       return undefined;
     }
-    const model = Behave.createModel(Model, undefined);
+    const model = Behavon.createModel(Model, undefined);
     expect(() => publish?.(other.child, "wrong")).toThrow(/different snapshot family/);
     expect(() => publish?.(family, 1)).toThrow(/publish\(value\)/);
-    expect(Behave.getSnapshot(family.child)()).toBeUndefined();
+    expect(Behavon.getSnapshot(family.child)()).toBeUndefined();
     model.dispose();
   });
 
   it("accepts exactly one root argument or two child arguments", () => {
-    const family = Behave.createId({
-      $: Behave.SnapshotType<number | undefined>(),
-      child: Behave.SnapshotType<string | undefined>(),
+    const family = Behavon.createId({
+      $: Behavon.SnapshotType<number | undefined>(),
+      child: Behavon.SnapshotType<string | undefined>(),
     });
     let publish: ((...args: readonly unknown[]) => void) | undefined;
     function Model(): undefined {
-      const [, familyPublish] = Behave.useSnapshot(family);
+      const [, familyPublish] = Behavon.useSnapshot(family);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a publisher to test runtime arity validation
       publish = familyPublish as (...args: readonly unknown[]) => void;
       return undefined;
     }
-    const model = Behave.createModel(Model, undefined);
+    const model = Behavon.createModel(Model, undefined);
 
     expect(() => publish?.()).toThrow(/exactly 1 or 2 arguments/);
     expect(() => publish?.(1, 2, 3)).toThrow(/exactly 1 or 2 arguments/);
@@ -163,15 +163,15 @@ describe("snapshot identities", () => {
     publish?.(undefined);
     publish?.(family.child, "value");
     publish?.(family.child, undefined);
-    expect(Behave.getSnapshot(family)()).toBeUndefined();
-    expect(Behave.getSnapshot(family.child)()).toBeUndefined();
+    expect(Behavon.getSnapshot(family)()).toBeUndefined();
+    expect(Behavon.getSnapshot(family.child)()).toBeUndefined();
     model.dispose();
   });
 
   it("keeps closed-generation nodes isolated after the same root is reopened", () => {
-    const family = Behave.createId({
-      $: Behave.SnapshotType<number>(),
-      child: Behave.SnapshotType<string>(),
+    const family = Behavon.createId({
+      $: Behavon.SnapshotType<number>(),
+      child: Behavon.SnapshotType<string>(),
     });
     const firstGeneration = acquireSnapshotFamily(family);
     commitSnapshotOwner(firstGeneration);
@@ -221,15 +221,15 @@ describe("snapshot identities", () => {
 
     function SnapshotModel(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, publish] = Behave.useSnapshot(channel);
+      [, publish] = Behavon.useSnapshot(channel);
       return undefined;
     }
 
-    const root = Behave.createModel(SnapshotModel, undefined);
+    const root = Behavon.createModel(SnapshotModel, undefined);
     for (const version of versions) publish?.(version);
 
-    const unsubscribe = Behave.subscribe(channel)(() => undefined);
-    const read = Behave.getSnapshot(channel);
+    const unsubscribe = Behavon.subscribe(channel)(() => undefined);
+    const read = Behavon.getSnapshot(channel);
     expect(inspectSnapshotChannelForTests(channel)?.current).toBe(versions[3]);
     expect(read()).toBe(versions[3]);
     expect(inspectSnapshotChannelForTests(channel)?.current).toBe(versions[3]);
@@ -244,13 +244,13 @@ describe("snapshot identities", () => {
 
     function SnapshotModel(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, publish] = Behave.useSnapshot(channel);
+      [, publish] = Behavon.useSnapshot(channel);
       return undefined;
     }
 
-    const root = Behave.createModel(SnapshotModel, undefined);
-    const offFirst = Behave.subscribe(channel)(() => undefined);
-    const offSecond = Behave.subscribe(channel)(() => undefined);
+    const root = Behavon.createModel(SnapshotModel, undefined);
+    const offFirst = Behavon.subscribe(channel)(() => undefined);
+    const offSecond = Behavon.subscribe(channel)(() => undefined);
     publish?.(1);
     publish?.(2);
     publish?.(3);
@@ -265,7 +265,7 @@ describe("snapshot identities", () => {
     offSecond();
     expect(inspectSnapshotChannelForTests(channel)?.current).toBe(4);
     offSecond();
-    const read = Behave.getSnapshot(channel);
+    const read = Behavon.getSnapshot(channel);
     expect(read()).toBe(4);
     expect(read()).toBe(4);
     expect(inspectSnapshotChannelForTests(channel)?.current).toBe(4);
@@ -281,11 +281,11 @@ describe("snapshot identities", () => {
 
     function SnapshotModel(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, publish] = Behave.useSnapshot(channel);
+      [, publish] = Behavon.useSnapshot(channel);
       return undefined;
     }
 
-    const root = Behave.createModel(SnapshotModel, undefined);
+    const root = Behavon.createModel(SnapshotModel, undefined);
     publish?.(1);
     publish?.(2);
     publish?.(3);
@@ -302,72 +302,72 @@ describe("snapshot identities", () => {
 
   it.each(snapshotProtocolNames)("uses the protocol-like child key %s without Proxy semantics", (name) => {
     const published = { name } as const;
-    const family = Behave.createId({
-      $: Behave.SnapshotType<undefined>(),
-      [name]: Behave.SnapshotType<typeof published>(),
+    const family = Behavon.createId({
+      $: Behavon.SnapshotType<undefined>(),
+      [name]: Behavon.SnapshotType<typeof published>(),
     });
     const child = Object.getOwnPropertyDescriptor(family, name)?.value as SnapshotId<typeof published>;
     function SnapshotModel(): undefined {
-      const [, publish] = Behave.useSnapshot(family);
-      Behave.useEffect(
+      const [, publish] = Behavon.useSnapshot(family);
+      Behavon.useEffect(
         () => (publish as unknown as (target: SnapshotId<typeof published>, value: typeof published) => void)(child, published),
         [publish],
       );
       return undefined;
     }
 
-    const root = Behave.createModel(SnapshotModel, undefined);
-    const read = Behave.getSnapshot(child);
-    const subscribe = Behave.subscribe(child);
+    const root = Behavon.createModel(SnapshotModel, undefined);
+    const read = Behavon.getSnapshot(child);
+    const subscribe = Behavon.subscribe(child);
     const seen: Array<typeof published | undefined> = [];
     const unsubscribe = subscribe(() => seen.push(read()));
 
     expect(read()).toBe(published);
-    expect(Behave.getSnapshot(child)).toBe(read);
-    expect(Behave.subscribe(child)).toBe(subscribe);
+    expect(Behavon.getSnapshot(child)).toBe(read);
+    expect(Behavon.subscribe(child)).toBe(subscribe);
     unsubscribe();
     root.dispose();
   });
 
   it("rejects non-identities, namespace nodes, and child ownership", () => {
-    const family = Behave.createId({
-      $: Behave.SnapshotType<number>(),
-      group: { value: Behave.SnapshotType<number>() },
+    const family = Behavon.createId({
+      $: Behavon.SnapshotType<number>(),
+      group: { value: Behavon.SnapshotType<number>() },
     });
     function StringIdentityModel(): undefined {
-      Behave.useSnapshot("legacy" as never);
+      Behavon.useSnapshot("legacy" as never);
       return undefined;
     }
     function ChildOwnerModel(): undefined {
-      Behave.useSnapshot(family.group.value as never);
+      Behavon.useSnapshot(family.group.value as never);
       return undefined;
     }
 
-    expect(() => Behave.createModel(StringIdentityModel, undefined)).toThrow(/identity created by Behave\.createId/);
-    expect(() => Behave.createModel(ChildOwnerModel, undefined)).toThrow(/root snapshot identity/);
-    expect(() => Behave.subscribe(family.group as never)).toThrow(/payload-bearing snapshot identity/);
-    expect(() => Behave.getSnapshot(family.group as never)).toThrow(/payload-bearing snapshot identity/);
+    expect(() => Behavon.createModel(StringIdentityModel, undefined)).toThrow(/identity created by Behavon\.createId/);
+    expect(() => Behavon.createModel(ChildOwnerModel, undefined)).toThrow(/root snapshot identity/);
+    expect(() => Behavon.subscribe(family.group as never)).toThrow(/payload-bearing snapshot identity/);
+    expect(() => Behavon.getSnapshot(family.group as never)).toThrow(/payload-bearing snapshot identity/);
   });
 
   it("accepts only JSON string-keyed data descriptors", () => {
     const symbol = Symbol("child");
     const symbolDescriptor = {
-      $: Behave.SnapshotType<number>(),
-      [symbol]: Behave.SnapshotType<string>(),
+      $: Behavon.SnapshotType<number>(),
+      [symbol]: Behavon.SnapshotType<string>(),
     };
     const accessorDescriptor = {
-      $: Behave.SnapshotType<number>(),
+      $: Behavon.SnapshotType<number>(),
       get child() {
-        return Behave.SnapshotType<string>();
+        return Behavon.SnapshotType<string>();
       },
     };
-    expect(() => Behave.createId(symbolDescriptor as never)).toThrow(/only accepts JSON string keys/);
-    expect(() => Behave.createId(accessorDescriptor as never)).toThrow(/enumerable data property/);
-    expect(() => Behave.createId({
-      $: Behave.SnapshotType<number>(),
-      group: { $: undefined, value: Behave.SnapshotType<number>() },
+    expect(() => Behavon.createId(symbolDescriptor as never)).toThrow(/only accepts JSON string keys/);
+    expect(() => Behavon.createId(accessorDescriptor as never)).toThrow(/enumerable data property/);
+    expect(() => Behavon.createId({
+      $: Behavon.SnapshotType<number>(),
+      group: { $: undefined, value: Behavon.SnapshotType<number>() },
     } as never)).toThrow(/group\.\$.*SnapshotType/);
-    expect(() => Behave.createId({ group: { value: Behave.SnapshotType<number>() } } as never)).toThrow(
+    expect(() => Behavon.createId({ group: { value: Behavon.SnapshotType<number>() } } as never)).toThrow(
       /root descriptor must declare a payload/,
     );
   });
@@ -380,19 +380,19 @@ describe("snapshot identities", () => {
         configurable: true,
         get() {
           inheritedGetterCalls += 1;
-          return Behave.SnapshotType<number>();
+          return Behavon.SnapshotType<number>();
         },
       });
-      expect(() => Behave.createId({ child: Behave.SnapshotType<string>() } as never)).toThrow(
+      expect(() => Behavon.createId({ child: Behavon.SnapshotType<string>() } as never)).toThrow(
         /root descriptor must declare a payload/,
       );
       expect(inheritedGetterCalls).toBe(0);
 
       Object.defineProperty(Object.prototype, "$", {
         configurable: true,
-        value: Behave.SnapshotType<number>(),
+        value: Behavon.SnapshotType<number>(),
       });
-      expect(() => Behave.createId({ child: Behave.SnapshotType<string>() } as never)).toThrow(
+      expect(() => Behavon.createId({ child: Behavon.SnapshotType<string>() } as never)).toThrow(
         /root descriptor must declare a payload/,
       );
     } finally {
@@ -403,18 +403,18 @@ describe("snapshot identities", () => {
 
   it("publishes current without consuming it on read and caches accessors", () => {
     const channel = uniqueChannel("committed");
-    expect("render" in Behave).toBe(false);
-    expect(() => Behave.getSnapshot(channel)).toThrow(/no live owner/);
-    expect(() => Behave.subscribe(channel)).toThrow(/no live owner/);
+    expect("render" in Behavon).toBe(false);
+    expect(() => Behavon.getSnapshot(channel)).toThrow(/no live owner/);
+    expect(() => Behavon.subscribe(channel)).toThrow(/no live owner/);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
 
     const root = createSnapshotModel(channel);
-    const read = Behave.getSnapshot(channel);
-    const subscribe = Behave.subscribe(channel);
-    expect(Behave.getSnapshot(channel)).toBe(read);
-    expect(Behave.subscribe(channel)).toBe(subscribe);
+    const read = Behavon.getSnapshot(channel);
+    const subscribe = Behavon.subscribe(channel);
+    expect(Behavon.getSnapshot(channel)).toBe(read);
+    expect(Behavon.subscribe(channel)).toBe(subscribe);
 
-    root.stage(3);
+    signalOf(root, "stage")(3);
     expect(read()).toBe(3);
     root.dispose();
     expect(() => read()).toThrow(/no live owner/);
@@ -432,12 +432,12 @@ describe("snapshot identities", () => {
 
     function SnapshotModel(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, publish] = Behave.useSnapshot(channel);
+      [, publish] = Behavon.useSnapshot(channel);
       return undefined;
     }
 
-    const root = Behave.createModel(SnapshotModel, undefined);
-    const unsubscribe = Behave.subscribe(channel)(() => {
+    const root = Behavon.createModel(SnapshotModel, undefined);
+    const unsubscribe = Behavon.subscribe(channel)(() => {
       notifications += 1;
     });
     publish?.(first);
@@ -448,7 +448,7 @@ describe("snapshot identities", () => {
 
     expect(previousValues).toEqual([first]);
     expect(notifications).toBe(2);
-    const read = Behave.getSnapshot(channel);
+    const read = Behavon.getSnapshot(channel);
     expect(read()).toBe(second);
     expect(read()).toBe(second);
 
@@ -462,14 +462,14 @@ describe("snapshot identities", () => {
     let publish: ((value: typeof published | undefined) => void) | undefined;
     function SnapshotModel(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, publish] = Behave.useSnapshot(channel);
+      [, publish] = Behavon.useSnapshot(channel);
       return undefined;
     }
-    const root = Behave.createModel(SnapshotModel, undefined);
-    const read = Behave.getSnapshot(channel);
+    const root = Behavon.createModel(SnapshotModel, undefined);
+    const read = Behavon.getSnapshot(channel);
     const seen: Array<typeof published | undefined> = [];
-    const offFirst = Behave.subscribe(channel)(() => seen.push(read()));
-    const offSecond = Behave.subscribe(channel)(() => seen.push(read()));
+    const offFirst = Behavon.subscribe(channel)(() => seen.push(read()));
+    const offSecond = Behavon.subscribe(channel)(() => seen.push(read()));
 
     publish?.(published);
 
@@ -484,16 +484,16 @@ describe("snapshot identities", () => {
   it("returns the same current whether subscription happens before or after the first read", () => {
     const channel = uniqueChannel("subscribe-read-order");
     const root = createSnapshotModel(channel);
-    const readFirst = Behave.getSnapshot(channel);
+    const readFirst = Behavon.getSnapshot(channel);
 
-    root.stage(1);
+    signalOf(root, "stage")(1);
     const beforeSubscribe = readFirst();
-    const offFirst = Behave.subscribe(channel)(() => undefined);
+    const offFirst = Behavon.subscribe(channel)(() => undefined);
     const afterSubscribe = readFirst();
     offFirst();
 
-    const offSecond = Behave.subscribe(channel)(() => undefined);
-    const readAfterSubscribe = Behave.getSnapshot(channel)();
+    const offSecond = Behavon.subscribe(channel)(() => undefined);
+    const readAfterSubscribe = Behavon.getSnapshot(channel)();
     offSecond();
 
     expect(beforeSubscribe).toBe(afterSubscribe);
@@ -504,20 +504,20 @@ describe("snapshot identities", () => {
   it("changes current only on changed publication", () => {
     const channel = uniqueChannel("publication-only-version-change");
     const root = createSnapshotModel(channel);
-    const read = Behave.getSnapshot(channel);
+    const read = Behavon.getSnapshot(channel);
 
-    root.stage(1);
+    signalOf(root, "stage")(1);
     const afterFirstPublish = inspectSnapshotChannelForTests(channel)?.current;
     read();
     read();
-    const off = Behave.subscribe(channel)(() => undefined);
+    const off = Behavon.subscribe(channel)(() => undefined);
     read();
     off();
     expect(inspectSnapshotChannelForTests(channel)?.current).toBe(afterFirstPublish);
 
-    root.stage(1);
+    signalOf(root, "stage")(1);
     expect(inspectSnapshotChannelForTests(channel)?.current).toBe(afterFirstPublish);
-    root.stage(2);
+    signalOf(root, "stage")(2);
     expect(inspectSnapshotChannelForTests(channel)?.current).toBe(2);
     root.dispose();
   });
@@ -525,15 +525,15 @@ describe("snapshot identities", () => {
   it("keeps the latest current when a listener publishes reentrantly", () => {
     const channel = uniqueChannel("reentrant-latest-wins");
     const root = createSnapshotModel(channel);
-    const read = Behave.getSnapshot(channel);
+    const read = Behavon.getSnapshot(channel);
     const trace: number[] = [];
-    const unsubscribe = Behave.subscribe(channel)(() => {
+    const unsubscribe = Behavon.subscribe(channel)(() => {
       const current = read();
       trace.push(current ?? -1);
-      if (current === 1) root.stage(2);
+      if (current === 1) signalOf(root, "stage")(2);
     });
 
-    root.stage(1);
+    signalOf(root, "stage")(1);
 
     expect(trace).toEqual([1, 2]);
     expect(read()).toBe(2);
@@ -547,16 +547,16 @@ describe("snapshot identities", () => {
     const first = createSnapshotModel(channel);
     const second = createSnapshotModel(channel);
     expect(inspectSnapshotChannelForTests(channel)?.ownerCount).toBe(2);
-    first.stage(1);
-    expect(Behave.getSnapshot(channel)()).toBe(1);
-    second.stage(2);
-    expect(Behave.getSnapshot(channel)()).toBe(2);
+    signalOf(first, "stage")(1);
+    expect(Behavon.getSnapshot(channel)()).toBe(1);
+    signalOf(second, "stage")(2);
+    expect(Behavon.getSnapshot(channel)()).toBe(2);
     first.dispose();
     expect(inspectSnapshotChannelForTests(channel)?.ownerCount).toBe(1);
-    second.stage(3);
-    expect(Behave.getSnapshot(channel)()).toBe(3);
+    signalOf(second, "stage")(3);
+    expect(Behavon.getSnapshot(channel)()).toBe(3);
     second.dispose();
-    expect(() => Behave.getSnapshot(channel)).toThrow(/no live owner/);
+    expect(() => Behavon.getSnapshot(channel)).toThrow(/no live owner/);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
   });
 
@@ -566,16 +566,16 @@ describe("snapshot identities", () => {
     const seen: Array<number | undefined> = [];
 
     function Reader(): undefined {
-      const [snapshot] = Behave.useSnapshot(channel);
+      const [snapshot] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       seen.push(snapshot);
       return undefined;
     }
 
-    sourceModel.stage(7);
-    const reader = Behave.createModel(Reader, undefined);
+    signalOf(sourceModel, "stage")(7);
+    const reader = Behavon.createModel(Reader, undefined);
     expect(seen).toEqual([7]);
-    expect(Behave.getSnapshot(channel)()).toBe(7);
+    expect(Behavon.getSnapshot(channel)()).toBe(7);
     reader.dispose();
     sourceModel.dispose();
   });
@@ -584,9 +584,9 @@ describe("snapshot identities", () => {
     const channel = uniqueChannel("dispose-does-not-publish");
     const calls: string[] = [];
     const root = createSnapshotModel(channel);
-    const read = Behave.getSnapshot(channel);
-    const unsubscribe = Behave.subscribe(channel)(() => calls.push("changed"));
-    root.stage(4);
+    const read = Behavon.getSnapshot(channel);
+    const unsubscribe = Behavon.subscribe(channel)(() => calls.push("changed"));
+    signalOf(root, "stage")(4);
     calls.length = 0;
     root.dispose();
     expect(calls).toEqual([]);
@@ -600,21 +600,21 @@ describe("snapshot identities", () => {
     const root = createSnapshotModel(channel);
     const trace: string[] = [];
     const shared = () => trace.push("shared");
-    const unsubscribeFirst = Behave.subscribe(channel)(shared);
+    const unsubscribeFirst = Behavon.subscribe(channel)(shared);
     let unsubscribeSecond: () => void = () => undefined;
     let unsubscribeLate: (() => void) | undefined;
-    const unsubscribeController = Behave.subscribe(channel)(() => {
+    const unsubscribeController = Behavon.subscribe(channel)(() => {
       trace.push("controller");
       unsubscribeSecond();
-      unsubscribeLate ??= Behave.subscribe(channel)(() => trace.push("late"));
+      unsubscribeLate ??= Behavon.subscribe(channel)(() => trace.push("late"));
     });
-    unsubscribeSecond = Behave.subscribe(channel)(shared);
+    unsubscribeSecond = Behavon.subscribe(channel)(shared);
 
-    root.stage(1);
+    signalOf(root, "stage")(1);
     expect(trace).toEqual(["shared", "controller"]);
 
     trace.length = 0;
-    root.stage(2);
+    signalOf(root, "stage")(2);
     expect(trace).toEqual(["shared", "controller", "late"]);
 
     unsubscribeFirst();
@@ -629,19 +629,19 @@ describe("snapshot identities", () => {
     let publish: ((value: typeof published | undefined) => void) | undefined;
     function SnapshotModel(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, publish] = Behave.useSnapshot(channel);
+      [, publish] = Behavon.useSnapshot(channel);
       return undefined;
     }
-    const root = Behave.createModel(SnapshotModel, undefined);
+    const root = Behavon.createModel(SnapshotModel, undefined);
     const failure = new Error("listener failed");
     const trace: string[] = [];
-    const read = Behave.getSnapshot(channel);
-    const offFirst = Behave.subscribe(channel)(() => {
+    const read = Behavon.getSnapshot(channel);
+    const offFirst = Behavon.subscribe(channel)(() => {
       trace.push("first");
       expect(read()).toBe(published);
       throw failure;
     });
-    const offSecond = Behave.subscribe(channel)(() => trace.push("second"));
+    const offSecond = Behavon.subscribe(channel)(() => trace.push("second"));
     expect(() => publish?.(published)).toThrow(failure);
     expect(trace).toEqual(["first"]);
     expect(read()).toBe(published);
@@ -656,8 +656,8 @@ describe("snapshot identities", () => {
     let publishSnapshot: ((value: number | undefined | ((previous: number | undefined) => number | undefined)) => void) | undefined;
 
     function Model(): undefined {
-      const [, set] = Behave.useState(0);
-      const [, publish] = Behave.useSnapshot(channel);
+      const [, set] = Behavon.useState(0);
+      const [, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setState = set;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -665,17 +665,17 @@ describe("snapshot identities", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     root.dispose();
     expect(() => setState?.(1)).not.toThrow();
     expect(() => publishSnapshot?.(2)).not.toThrow();
-    expect(() => Behave.getSnapshot(channel)).toThrow(/no live owner/);
+    expect(() => Behavon.getSnapshot(channel)).toThrow(/no live owner/);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
 
     const replacement = createSnapshotModel(channel);
-    replacement.stage(3);
+    signalOf(replacement, "stage")(3);
     publishSnapshot?.(4);
-    expect(Behave.getSnapshot(channel)()).toBe(3);
+    expect(Behavon.getSnapshot(channel)()).toBe(3);
     replacement.dispose();
   });
 
@@ -686,18 +686,18 @@ describe("snapshot identities", () => {
 
     function SnapshotModel(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, publish] = Behave.useSnapshot(channel);
+      [, publish] = Behavon.useSnapshot(channel);
       return undefined;
     }
 
-    const root = Behave.createModel(SnapshotModel, undefined);
-    const unsubscribe = Behave.subscribe(channel)(() => {
+    const root = Behavon.createModel(SnapshotModel, undefined);
+    const unsubscribe = Behavon.subscribe(channel)(() => {
       notifications += 1;
     });
     publish?.(1);
     publish?.((previous) => (previous ?? 0) + 1);
     publish?.(2);
-    expect(Behave.getSnapshot(channel)()).toBe(2);
+    expect(Behavon.getSnapshot(channel)()).toBe(2);
     expect(notifications).toBe(2);
     unsubscribe();
     root.dispose();
@@ -706,7 +706,7 @@ describe("snapshot identities", () => {
   it("physically removes listeners and keeps unsubscribe idempotent", () => {
     const channel = uniqueChannel("listener-release");
     const root = createSnapshotModel(channel);
-    const unsubscribe = Behave.subscribe(channel)(() => undefined);
+    const unsubscribe = Behavon.subscribe(channel)(() => undefined);
     expect(inspectSnapshotChannelForTests(channel)?.listenerCount).toBe(1);
     unsubscribe();
     expect(inspectSnapshotChannelForTests(channel)?.listenerCount).toBe(0);
@@ -718,41 +718,41 @@ describe("snapshot identities", () => {
   it("does not attach stale capabilities to a later same-name lifetime", () => {
     const channel = uniqueChannel("new-lifetime");
     const first = createSnapshotModel(channel);
-    const oldRead = Behave.getSnapshot(channel);
-    const oldSubscribe = Behave.subscribe(channel);
-    first.stage(1);
+    const oldRead = Behavon.getSnapshot(channel);
+    const oldSubscribe = Behavon.subscribe(channel);
+    signalOf(first, "stage")(1);
     first.dispose();
 
     const second = createSnapshotModel(channel);
-    const newRead = Behave.getSnapshot(channel);
-    const newSubscribe = Behave.subscribe(channel);
+    const newRead = Behavon.getSnapshot(channel);
+    const newSubscribe = Behavon.subscribe(channel);
     expect(newRead).not.toBe(oldRead);
     expect(newSubscribe).not.toBe(oldSubscribe);
     expect(() => oldRead()).toThrow(/no live owner/);
     expect(() => oldSubscribe(() => undefined)).toThrow(/no live owner/);
     expect(newRead()).toBeUndefined();
-    second.stage(2);
+    signalOf(second, "stage")(2);
     expect(newRead()).toBe(2);
     second.dispose();
   });
 
   it("keeps stale root and child publishers, accessors, and listeners out of a reopened generation", () => {
-    const family = Behave.createId({
-      $: Behave.SnapshotType<number>(),
-      child: Behave.SnapshotType<string>(),
+    const family = Behavon.createId({
+      $: Behavon.SnapshotType<number>(),
+      child: Behavon.SnapshotType<string>(),
     });
     let oldPublish: ((...args: readonly unknown[]) => void) | undefined;
     function First(): undefined {
-      const [, publish] = Behave.useSnapshot(family);
+      const [, publish] = Behavon.useSnapshot(family);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a publisher across owner generations
       oldPublish = publish as (...args: readonly unknown[]) => void;
       return undefined;
     }
-    const first = Behave.createModel(First, undefined);
-    const oldRootRead = Behave.getSnapshot(family);
-    const oldChildRead = Behave.getSnapshot(family.child);
-    const oldRootSubscribe = Behave.subscribe(family);
-    const oldChildSubscribe = Behave.subscribe(family.child);
+    const first = Behavon.createModel(First, undefined);
+    const oldRootRead = Behavon.getSnapshot(family);
+    const oldChildRead = Behavon.getSnapshot(family.child);
+    const oldRootSubscribe = Behavon.subscribe(family);
+    const oldChildSubscribe = Behavon.subscribe(family.child);
     let oldNotifications = 0;
     oldRootSubscribe(() => { oldNotifications += 1; });
     oldChildSubscribe(() => { oldNotifications += 1; });
@@ -763,17 +763,17 @@ describe("snapshot identities", () => {
 
     let newPublish: ((...args: readonly unknown[]) => void) | undefined;
     function Second(): undefined {
-      const [, publish] = Behave.useSnapshot(family);
+      const [, publish] = Behavon.useSnapshot(family);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains the replacement generation publisher
       newPublish = publish as (...args: readonly unknown[]) => void;
       return undefined;
     }
-    const second = Behave.createModel(Second, undefined);
-    const newRootRead = Behave.getSnapshot(family);
-    const newChildRead = Behave.getSnapshot(family.child);
+    const second = Behavon.createModel(Second, undefined);
+    const newRootRead = Behavon.getSnapshot(family);
+    const newChildRead = Behavon.getSnapshot(family.child);
     let newNotifications = 0;
-    const offNewRoot = Behave.subscribe(family)(() => { newNotifications += 1; });
-    const offNewChild = Behave.subscribe(family.child)(() => { newNotifications += 1; });
+    const offNewRoot = Behavon.subscribe(family)(() => { newNotifications += 1; });
+    const offNewChild = Behavon.subscribe(family.child)(() => { newNotifications += 1; });
     let staleUpdaterCalls = 0;
     oldPublish?.(() => {
       staleUpdaterCalls += 1;
@@ -807,9 +807,9 @@ describe("snapshot identities", () => {
   it.each(["root", "child"] as const)(
     "does not commit an old %s updater after it disposes the last owner and reopens the root",
     (target) => {
-      const family = Behave.createId({
-        $: Behave.SnapshotType<number>(),
-        child: Behave.SnapshotType<string>(),
+      const family = Behavon.createId({
+        $: Behavon.SnapshotType<number>(),
+        child: Behavon.SnapshotType<string>(),
       });
       const openGeneration = (): Readonly<{
         owner: UntypedModelRef;
@@ -817,12 +817,12 @@ describe("snapshot identities", () => {
       }> => {
         let retainedPublish: ((...args: readonly unknown[]) => void) | undefined;
         function Writer(): undefined {
-          const [, publish] = Behave.useSnapshot(family);
+          const [, publish] = Behavon.useSnapshot(family);
           // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a publisher across a reentrant generation replacement
           retainedPublish = publish as (...args: readonly unknown[]) => void;
           return undefined;
         }
-        const owner = Behave.createModel(Writer, undefined);
+        const owner = Behavon.createModel(Writer, undefined);
         if (retainedPublish === undefined) throw new Error("publisher was not captured");
         return { owner, publish: retainedPublish };
       };
@@ -830,11 +830,11 @@ describe("snapshot identities", () => {
       const oldGeneration = openGeneration();
       oldGeneration.publish(1);
       oldGeneration.publish(family.child, "old");
-      const oldRootRead = Behave.getSnapshot(family);
-      const oldChildRead = Behave.getSnapshot(family.child);
+      const oldRootRead = Behavon.getSnapshot(family);
+      const oldChildRead = Behavon.getSnapshot(family.child);
       let oldNotifications = 0;
-      Behave.subscribe(family)(() => { oldNotifications += 1; });
-      Behave.subscribe(family.child)(() => { oldNotifications += 1; });
+      Behavon.subscribe(family)(() => { oldNotifications += 1; });
+      Behavon.subscribe(family.child)(() => { oldNotifications += 1; });
 
       let newGeneration: ReturnType<typeof openGeneration> | undefined;
       let newRootRead: (() => number | undefined) | undefined;
@@ -843,10 +843,10 @@ describe("snapshot identities", () => {
       const replaceGeneration = (): void => {
         oldGeneration.owner.dispose();
         newGeneration = openGeneration();
-        newRootRead = Behave.getSnapshot(family);
-        newChildRead = Behave.getSnapshot(family.child);
-        Behave.subscribe(family)(() => { newNotifications += 1; });
-        Behave.subscribe(family.child)(() => { newNotifications += 1; });
+        newRootRead = Behavon.getSnapshot(family);
+        newChildRead = Behavon.getSnapshot(family.child);
+        Behavon.subscribe(family)(() => { newNotifications += 1; });
+        Behavon.subscribe(family.child)(() => { newNotifications += 1; });
         newGeneration.publish(100);
         newGeneration.publish(family.child, "new");
       };
@@ -886,16 +886,16 @@ describe("snapshot identities", () => {
 
     function First(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, firstPublish] = Behave.useSnapshot(channel);
+      [, firstPublish] = Behavon.useSnapshot(channel);
       return undefined;
     }
-    const first = Behave.createModel(First, undefined);
+    const first = Behavon.createModel(First, undefined);
     firstPublish?.(firstValue);
-    const oldRead = Behave.getSnapshot(channel);
-    const oldSubscribe = Behave.subscribe(channel);
+    const oldRead = Behavon.getSnapshot(channel);
+    const oldSubscribe = Behavon.subscribe(channel);
 
     function Provisional(): undefined {
-      const [snapshot, publish] = Behave.useSnapshot(channel);
+      const [snapshot, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       provisionalRead = snapshot;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -904,7 +904,7 @@ describe("snapshot identities", () => {
       return undefined;
     }
 
-    expect(() => Behave.createModel(Provisional, undefined)).toThrow(
+    expect(() => Behavon.createModel(Provisional, undefined)).toThrow(
       /no provisional owner to commit|closed/,
     );
     expect(provisionalRead).toBe(firstValue);
@@ -916,12 +916,12 @@ describe("snapshot identities", () => {
 
     function Second(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, secondPublish] = Behave.useSnapshot(channel);
+      [, secondPublish] = Behavon.useSnapshot(channel);
       return undefined;
     }
-    const second = Behave.createModel(Second, undefined);
-    const newRead = Behave.getSnapshot(channel);
-    const newSubscribe = Behave.subscribe(channel);
+    const second = Behavon.createModel(Second, undefined);
+    const newRead = Behavon.getSnapshot(channel);
+    const newSubscribe = Behavon.subscribe(channel);
     expect(newRead).not.toBe(oldRead);
     expect(newSubscribe).not.toBe(oldSubscribe);
     expect(newRead()).toBeUndefined();
@@ -942,11 +942,11 @@ describe("snapshot identities", () => {
   it("counts one lifecycle owner when one Model declares the same channel twice", () => {
     const channel = uniqueChannel("duplicate-declaration-owner");
     function Model(): undefined {
-      Behave.useSnapshot(channel);
-      Behave.useSnapshot(channel);
+      Behavon.useSnapshot(channel);
+      Behavon.useSnapshot(channel);
       return undefined;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(inspectSnapshotChannelForTests(channel)?.ownerCount).toBe(1);
     root.dispose();
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
@@ -956,13 +956,13 @@ describe("snapshot identities", () => {
     const channel = uniqueChannel("cleanup-error-release");
     const failure = new Error("cleanup failed");
     function Model(): undefined {
-      Behave.useSnapshot(channel);
-      Behave.useEffect(() => () => {
+      Behavon.useSnapshot(channel);
+      Behavon.useEffect(() => () => {
         throw failure;
       }, []);
       return undefined;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(() => root.dispose()).toThrow(failure);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
   });
@@ -976,12 +976,12 @@ describe("snapshot identities", () => {
 
     function SnapshotModel(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, publish] = Behave.useSnapshot(channel);
+      [, publish] = Behavon.useSnapshot(channel);
       return undefined;
     }
 
-    const root = Behave.createModel(SnapshotModel, undefined);
-    const unsubscribe = Behave.subscribe(channel)(() => {
+    const root = Behavon.createModel(SnapshotModel, undefined);
+    const unsubscribe = Behavon.subscribe(channel)(() => {
       notifications += 1;
     });
     publish?.(first);
@@ -990,7 +990,7 @@ describe("snapshot identities", () => {
       throw failure;
     })).toThrow(failure);
     expect(notifications).toBe(1);
-    expect(Behave.getSnapshot(channel)()).toBe(first);
+    expect(Behavon.getSnapshot(channel)()).toBe(first);
     expect(inspectSnapshotChannelForTests(channel)?.current).toBe(currentBeforeFailure);
 
     unsubscribe();
@@ -1007,14 +1007,14 @@ describe("Proxy safety and interface reflection", () => {
   it("fails fast when usePort receives null at runtime", () => {
     function InvalidDependency(): undefined {
       const invalidRef: UntypedModelRef = null as any;
-      const dependency = Behave.usePort(invalidRef);
+      const dependency = Behavon.usePort(invalidRef);
       const unreachable = dependency.unreachableEndpoint;
       void unreachable;
       return undefined;
     }
 
-    expect(() => Behave.createModel(InvalidDependency, undefined)).toThrow(
-      /Behave\.usePort requires a live Model instance/,
+    expect(() => Behavon.createModel(InvalidDependency, undefined)).toThrow(
+      /Behavon\.usePort requires a live Model instance/,
     );
   });
 
@@ -1022,36 +1022,36 @@ describe("Proxy safety and interface reflection", () => {
     let proxy: DependencyProxy | undefined;
 
     function Target(): undefined {
-      const alpha = Behave.useCallback((_value: number) => undefined, []);
-      const first = Behave.useCallback(() => undefined, []);
-      const second = Behave.useCallback(() => undefined, []);
-      Behave.useSignal("alpha", alpha);
-      Behave.useSignal("shared", first);
-      Behave.useSignal("shared", second);
-      Behave.useSlot("shared", first);
+      const alpha = Behavon.useCallback((_value: number) => undefined, []);
+      const first = Behavon.useCallback(() => undefined, []);
+      const second = Behavon.useCallback(() => undefined, []);
+      Behavon.useSignal("alpha", alpha);
+      Behavon.useSignal("shared", first);
+      Behavon.useSignal("shared", second);
+      Behavon.useSlot("shared", first);
       return undefined;
     }
 
-    const target = Behave.createModel(Target, undefined);
+    const target = Behavon.createModel(Target, undefined);
 
     function Inspector(input: UntypedModelRef): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      proxy = Behave.usePort(input);
+      proxy = Behavon.usePort(input);
       return undefined;
     }
 
-    const inspector = Behave.createModel(Inspector, target);
+    const inspector = Behavon.createModel(Inspector, target);
     const expected = {
       endpoints: [
         { name: "alpha", signalRegistrations: 1, slotRegistrations: 0 },
         { name: "shared", signalRegistrations: 2, slotRegistrations: 1 },
       ],
     };
-    expect(Behave.getInterface(target)).toEqual(expected);
+    expect(Behavon.getInterface(target)).toEqual(expected);
     expect(proxy).toBeDefined();
-    expect(Behave.getInterface(proxy as NonNullable<typeof proxy>)).toEqual(expected);
+    expect(Behavon.getInterface(proxy as NonNullable<typeof proxy>)).toEqual(expected);
 
-    const mutableCopy = Behave.getInterface(target) as {
+    const mutableCopy = Behavon.getInterface(target) as {
       endpoints: Array<{ name: string; signalRegistrations: number; slotRegistrations: number }>;
     };
     try {
@@ -1059,60 +1059,60 @@ describe("Proxy safety and interface reflection", () => {
     } catch {
       // Runtime freezing is allowed but not required.
     }
-    expect(Behave.getInterface(target)).toEqual(expected);
+    expect(Behavon.getInterface(target)).toEqual(expected);
     inspector.dispose();
     target.dispose();
-    expect(() => Behave.getInterface(target)).toThrow();
-    expect(() => Behave.getInterface({} as never)).toThrow();
+    expect(() => Behavon.getInterface(target)).toThrow();
+    expect(() => Behavon.getInterface({} as never)).toThrow();
   });
 
   it.each(protocolNames)("rejects the reserved endpoint name %s", (name) => {
     function InvalidSignal(): undefined {
-      const callback = Behave.useCallback(() => undefined, []);
-      Behave.useSignal(name, callback);
+      const callback = Behavon.useCallback(() => undefined, []);
+      Behavon.useSignal(name, callback);
       return undefined;
     }
     function InvalidSlot(): undefined {
-      const callback = Behave.useCallback(() => undefined, []);
-      Behave.useSlot(name, callback);
+      const callback = Behavon.useCallback(() => undefined, []);
+      Behavon.useSlot(name, callback);
       return undefined;
     }
-    expect(() => Behave.createModel(InvalidSignal, undefined)).toThrow();
-    expect(() => Behave.createModel(InvalidSlot, undefined)).toThrow();
+    expect(() => Behavon.createModel(InvalidSignal, undefined)).toThrow();
+    expect(() => Behavon.createModel(InvalidSlot, undefined)).toThrow();
   });
 
   it("requires non-empty string endpoint names", () => {
     function EmptySignal(): undefined {
-      const callback = Behave.useCallback(() => undefined, []);
-      Behave.useSignal("", callback);
+      const callback = Behavon.useCallback(() => undefined, []);
+      Behavon.useSignal("", callback);
       return undefined;
     }
     function NonStringSlot(): undefined {
-      const callback = Behave.useCallback(() => undefined, []);
-      Behave.useSlot(42 as unknown as string, callback);
+      const callback = Behavon.useCallback(() => undefined, []);
+      Behavon.useSlot(42 as unknown as string, callback);
       return undefined;
     }
 
-    expect(() => Behave.createModel(EmptySignal, undefined)).toThrow(/non-empty string/);
-    expect(() => Behave.createModel(NonStringSlot, undefined)).toThrow(/non-empty string/);
+    expect(() => Behavon.createModel(EmptySignal, undefined)).toThrow(/non-empty string/);
+    expect(() => Behavon.createModel(NonStringSlot, undefined)).toThrow(/non-empty string/);
   });
 
   it("handles Promise, serialization and symbols without treating them as endpoints", async () => {
-    let proxy: ReturnType<typeof Behave.usePort> | undefined;
+    let proxy: ReturnType<typeof Behavon.usePort> | undefined;
 
     function Target(): undefined {
-      const event = Behave.useCallback(() => undefined, []);
-      Behave.useSignal("event", event);
+      const event = Behavon.useCallback(() => undefined, []);
+      Behavon.useSignal("event", event);
       return undefined;
     }
 
-    const target = Behave.createModel(Target, undefined);
+    const target = Behavon.createModel(Target, undefined);
     function Inspector(input: UntypedModelRef): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      proxy = Behave.usePort(input);
+      proxy = Behavon.usePort(input);
       return undefined;
     }
-    const inspector = Behave.createModel(Inspector, target);
+    const inspector = Behavon.createModel(Inspector, target);
     const dependency = proxy as NonNullable<typeof proxy>;
     await expect(Promise.resolve(dependency)).resolves.toBe(dependency);
     expect(() => JSON.stringify(dependency)).not.toThrow();
@@ -1131,18 +1131,18 @@ describe("Proxy safety and interface reflection", () => {
       return undefined;
     }
 
-    const target = Behave.createModel(
+    const target = Behavon.createModel(
       Target,
       undefined,
     );
     function Inspector(input: UntypedModelRef): undefined {
       // eslint-disable-next-line behavon-hooks/canonical-api -- missing-endpoint probe consumes the proxy through its throwing property lookup
-      const dependency = Behave.usePort(input);
+      const dependency = Behavon.usePort(input);
       dependency.missing;
       return undefined;
     }
 
-    expect(() => Behave.createModel(Inspector, target)).toThrow(/has no endpoint 'missing'/);
+    expect(() => Behavon.createModel(Inspector, target)).toThrow(/has no endpoint 'missing'/);
     target.dispose();
   });
 });

@@ -1,4 +1,4 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { Model, Signal } from "behavon";
 
 interface FirstPort {
@@ -9,67 +9,67 @@ interface SecondPort {
   second: Signal;
 }
 
-const firstPort = Behave.createPort<FirstPort>({ first: Behave.SignalType() });
-const secondPort = Behave.createPort<SecondPort>({ second: Behave.SignalType() });
+const firstPort = Behavon.createPort<FirstPort>({ first: Behavon.SignalType() });
+const secondPort = Behavon.createPort<SecondPort>({ second: Behavon.SignalType() });
 const firstDeclaration = {
-  first: Behave.SignalType<[]>(),
-  extra: Behave.SignalType<[]>(),
+  first: Behavon.SignalType<[]>(),
+  extra: Behavon.SignalType<[]>(),
 };
-const variablePort = Behave.createPort<FirstPort>(firstDeclaration);
-const makePort = Behave.createPort;
-const { createPort } = Behave;
-const storedPortFactory = { make: Behave.createPort };
-const boundPortFactory = Behave.createPort.bind(Behave);
+const variablePort = Behavon.createPort<FirstPort>(firstDeclaration);
+const makePort = Behavon.createPort;
+const { createPort } = Behavon;
+const storedPortFactory = { make: Behavon.createPort };
+const boundPortFactory = Behavon.createPort.bind(Behavon);
 
-function defaultPortFactory(make = Behave.createPort): typeof make {
+function defaultPortFactory(make = Behavon.createPort): typeof make {
   return make;
 }
 
-function acceptPortFactory(make: typeof Behave.createPort): typeof make {
+function acceptPortFactory(make: typeof Behavon.createPort): typeof make {
   return make;
 }
 
-const passedPortFactory = acceptPortFactory(Behave.createPort);
+const passedPortFactory = acceptPortFactory(Behavon.createPort);
 
 const MissingDescriptor: Model<undefined, undefined, FirstPort> = () => undefined;
 
 const MissingModelPort: Model<undefined, undefined> = () => {
-  const first = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(firstPort, "first", first);
+  const first = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(firstPort, "first", first);
   return undefined;
 };
 
 const WrongDescriptor: Model<undefined, undefined, FirstPort> = () => {
-  const second = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(secondPort, "second", second);
+  const second = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(secondPort, "second", second);
   return undefined;
 };
 
 const MixedDescriptors: Model<undefined, undefined, FirstPort> = () => {
-  const first = Behave.useCallback(() => undefined, []);
-  const second = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(firstPort, "first", first);
-  Behave.useSignal(secondPort, "second", second);
+  const first = Behavon.useCallback(() => undefined, []);
+  const second = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(firstPort, "first", first);
+  Behavon.useSignal(secondPort, "second", second);
   return undefined;
 };
 
 type FirstPortModel = Model<undefined, undefined, FirstPort>;
 
 const AliasWrongDescriptor: FirstPortModel = () => {
-  const second = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(secondPort, "second", second);
+  const second = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(secondPort, "second", second);
   return undefined;
 };
 
 const SatisfiesWrongDescriptor = (() => {
-  const second = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(secondPort, "second", second);
+  const second = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(secondPort, "second", second);
   return undefined;
 }) satisfies Model<undefined, undefined, FirstPort>;
 
 const AssertedWrongDescriptor = (() => {
-  const second = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(secondPort, "second", second);
+  const second = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(secondPort, "second", second);
   return undefined;
 }) as Model<undefined, undefined, FirstPort>;
 
@@ -93,15 +93,15 @@ export function createDynamicModels(): void {
     return undefined;
   }
 
-  Behave.createModel(NestedModel, undefined);
-  Behave.createModel(() => undefined, undefined);
-  Behave.createModel(function ExpressionModel() { return undefined; }, undefined);
-  Behave.boundary(StaticModel);
-  Behave.createModel(selectModel(), undefined);
+  Behavon.createModel(NestedModel, undefined);
+  Behavon.createModel(() => undefined, undefined);
+  Behavon.createModel(function ExpressionModel() { return undefined; }, undefined);
+  Behavon.boundary(StaticModel);
+  Behavon.createModel(selectModel(), undefined);
   const selected = selectModel();
-  Behave.createModel(selected, undefined);
+  Behavon.createModel(selected, undefined);
   const models = { NestedModel };
-  Behave.createModel(models.NestedModel, undefined);
-  Behave.createPort<FirstPort>({ first: Behave.SignalType() });
-  makePort<FirstPort>({ first: Behave.SignalType() });
+  Behavon.createModel(models.NestedModel, undefined);
+  Behavon.createPort<FirstPort>({ first: Behavon.SignalType() });
+  makePort<FirstPort>({ first: Behavon.SignalType() });
 }

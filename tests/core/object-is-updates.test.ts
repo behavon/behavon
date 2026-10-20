@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { UntypedModelRef, Signal, Slot, StateSetter } from "behavon";
-import { uniqueChannel, waitFor, waitForSnapshot } from "../helpers";
+import { uniqueChannel, waitFor, waitForSnapshot, signalOf } from "../helpers";
 
 async function settle(): Promise<void> {
   await Promise.resolve();
@@ -40,9 +40,9 @@ describe("Object.is update bailout", () => {
     let updaterCalls = 0;
 
     function Model(): undefined {
-      const [left, setLeft] = Behave.useState(1);
-      const [right, setRight] = Behave.useState(shared);
-      const update = Behave.useCallback((mode: string) => {
+      const [left, setLeft] = Behavon.useState(1);
+      const [right, setRight] = Behavon.useState(shared);
+      const update = Behavon.useCallback((mode: string) => {
         if (mode === "value") setLeft(1);
         if (mode === "updater") setLeft((previous) => {
           updaterCalls += 1;
@@ -58,8 +58,8 @@ describe("Object.is update bailout", () => {
         }
         if (mode === "object") setRight(shared);
       }, [setLeft, setRight]);
-      Behave.useSignal("update", update);
-      Behave.useEffect(() => {
+      Behavon.useSignal("update", update);
+      Behavon.useEffect(() => {
         setups += 1;
         return () => {
           cleanups += 1;
@@ -69,10 +69,10 @@ describe("Object.is update bailout", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect({ setups, cleanups }).toEqual({ setups: 1, cleanups: 0 });
     for (const mode of ["value", "updater", "batch", "multi", "object"]) {
-      root.update(mode);
+      signalOf(root, "update")(mode);
       await settle();
       expect({ setups, cleanups }).toEqual({ setups: 1, cleanups: 0 });
     }
@@ -90,15 +90,15 @@ describe("Object.is update bailout", () => {
     let cleanups = 0;
 
     function Model(): undefined {
-      const [left, setLeft] = Behave.useState(0);
-      const [right, setRight] = Behave.useState(0);
-      const change = Behave.useCallback(() => {
+      const [left, setLeft] = Behavon.useState(0);
+      const [right, setRight] = Behavon.useState(0);
+      const change = Behavon.useCallback(() => {
         setLeft(1);
         setLeft(0);
         setRight((previous) => previous + 1);
       }, [setLeft, setRight]);
-      Behave.useSignal("change", change);
-      Behave.useEffect(() => {
+      Behavon.useSignal("change", change);
+      Behavon.useEffect(() => {
         setups += 1;
         values.push([left, right]);
         return () => {
@@ -109,8 +109,8 @@ describe("Object.is update bailout", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    root.change();
+    const root = Behavon.createModel(Model, undefined);
+    signalOf(root, "change")();
     await waitFor(() => values.length === 2);
     expect(values).toEqual([[0, 0], [0, 1]]);
     expect({ setups, cleanups }).toEqual({ setups: 2, cleanups: 1 });
@@ -128,12 +128,12 @@ describe("Object.is update bailout", () => {
     let setups = 0;
 
     function Model(): undefined {
-      const [value, setValue] = Behave.useState(Number.NaN);
-      const sameNaNBody = Behave.useCallback(() => setValue(Number.NaN), [setValue]);
-      Behave.useSignal("sameNaN", sameNaNBody);
-      const negativeZeroBody = Behave.useCallback(() => setValue(-0), [setValue]);
-      Behave.useSignal("negativeZero", negativeZeroBody);
-      Behave.useEffect(() => {
+      const [value, setValue] = Behavon.useState(Number.NaN);
+      const sameNaNBody = Behavon.useCallback(() => setValue(Number.NaN), [setValue]);
+      Behavon.useSignal("sameNaN", sameNaNBody);
+      const negativeZeroBody = Behavon.useCallback(() => setValue(-0), [setValue]);
+      Behavon.useSignal("negativeZero", negativeZeroBody);
+      Behavon.useEffect(() => {
         setups += 1;
         committed.push(value);
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only Object.is probe intentionally wraps the captured value in a fresh object dependency
@@ -141,11 +141,11 @@ describe("Object.is update bailout", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    root.sameNaN();
+    const root = Behavon.createModel(Model, undefined);
+    signalOf(root, "sameNaN")();
     await settle();
     expect(setups).toBe(1);
-    root.negativeZero();
+    signalOf(root, "negativeZero")();
     await waitFor(() => setups === 2);
     expect(Object.is(committed[1], -0)).toBe(true);
     root.dispose();
@@ -157,16 +157,16 @@ describe("Object.is update bailout", () => {
     }
     const committed: object[] = [];
     function Model(): undefined {
-      const [value, setValue] = Behave.useState({ value: 1 });
-      const replaceBody = Behave.useCallback(() => setValue({ value: 1 }), [setValue]);
-      Behave.useSignal("replace", replaceBody);
-      Behave.useEffect(() => {
+      const [value, setValue] = Behavon.useState({ value: 1 });
+      const replaceBody = Behavon.useCallback(() => setValue({ value: 1 }), [setValue]);
+      Behavon.useSignal("replace", replaceBody);
+      Behavon.useEffect(() => {
         committed.push(value);
       }, [value]);
       return undefined;
     }
-    const root = Behave.createModel(Model, undefined);
-    root.replace();
+    const root = Behavon.createModel(Model, undefined);
+    signalOf(root, "replace")();
     await waitFor(() => committed.length === 2);
     expect(committed[1]).not.toBe(committed[0]);
     root.dispose();
@@ -181,8 +181,8 @@ describe("Object.is update bailout", () => {
     let committed = 0;
 
     function Model(): undefined {
-      const [value, setValue] = Behave.useState(0);
-      const failBody = Behave.useCallback(() => {
+      const [value, setValue] = Behavon.useState(0);
+      const failBody = Behavon.useCallback(() => {
         setValue(() => {
           order.push("first");
           return 1;
@@ -196,18 +196,18 @@ describe("Object.is update bailout", () => {
           return 2;
         });
       }, [setValue]);
-      Behave.useSignal("fail", failBody);
-      Behave.useEffect(() => {
+      Behavon.useSignal("fail", failBody);
+      Behavon.useEffect(() => {
         committed = value;
       }, [value]);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(await captureScheduledFailure(() => root.fail())).toBe(failure);
+    const root = Behavon.createModel(Model, undefined);
+    expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
     expect(order).toEqual(["first", "throw"]);
     expect(committed).toBe(0);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("S12 E25 preserves suffix updates enqueued by an updater without loss or duplication", async () => {
@@ -219,9 +219,9 @@ describe("Object.is update bailout", () => {
     let suffixCalls = 0;
 
     function Model(): undefined {
-      const [right, setRight] = Behave.useState(0);
-      const [left, setLeft] = Behave.useState(0);
-      const updateBody = Behave.useCallback(() => {
+      const [right, setRight] = Behavon.useState(0);
+      const [left, setLeft] = Behavon.useState(0);
+      const updateBody = Behavon.useCallback(() => {
         setLeft((previous) => {
           outerCalls += 1;
           setLeft((suffixPrevious) => {
@@ -232,15 +232,15 @@ describe("Object.is update bailout", () => {
           return previous;
         });
       }, [setLeft, setRight]);
-      Behave.useSignal("update", updateBody);
-      Behave.useEffect(() => {
+      Behavon.useSignal("update", updateBody);
+      Behavon.useEffect(() => {
         committed.push([left, right]);
       }, [left, right]);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    root.update();
+    const root = Behavon.createModel(Model, undefined);
+    signalOf(root, "update")();
     await waitFor(() => committed.length === 2);
     expect(committed).toEqual([[0, 0], [1, 1]]);
     expect({ outerCalls, suffixCalls }).toEqual({ outerCalls: 1, suffixCalls: 1 });
@@ -249,7 +249,7 @@ describe("Object.is update bailout", () => {
     root.dispose();
   });
 
-  it("M21 preserves Model input updater failure identity before terminal target cleanup", async () => {
+  it("preserves Model input updater failure identity before terminal target cleanup", async () => {
     const failure = new Error("input updater failed");
     let childEvaluations = 0;
     let laterCalls = 0;
@@ -260,15 +260,15 @@ describe("Object.is update bailout", () => {
       childEvaluations += 1;
       return undefined;
     }
-    const child = Behave.createModel(Child, 1);
+    const child = Behavon.createModel(Child, 1);
     function Observer(): undefined {
-      const [, setter] = Behave.useModel(child);
+      const [, setter] = Behavon.useModel(child);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setInput = setter;
       return undefined;
     }
 
-    const observer = Behave.createModel(Observer, undefined);
+    const observer = Behavon.createModel(Observer, undefined);
     observer.dispose();
     expect(await captureScheduledFailure(() => {
       setInput?.(() => {
@@ -281,26 +281,26 @@ describe("Object.is update bailout", () => {
     })).toBe(failure);
     expect(childEvaluations).toBe(1);
     expect(laterCalls).toBe(0);
-    expect(() => Behave.getInterface(child)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(child)).toThrow(/disposed/);
   });
 
   it("E23 performs the initial commit but bails out a same update queued during construction", async () => {
     let queued = false;
     let activations = 0;
     function Model(): undefined {
-      const [value, setValue] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
       if (!queued) {
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
         queued = true;
         setValue(value);
       }
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         activations += 1;
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only Object.is probe intentionally allocates a fresh object dependency
       }, [{}]);
       return undefined;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     await settle();
     expect(activations).toBe(1);
     root.dispose();
@@ -313,22 +313,22 @@ describe("Object.is update bailout", () => {
     const committed: number[] = [];
     let followUpQueued = false;
     function Model(): undefined {
-      const [value, setValue] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
       if (value === 1 && !followUpQueued) {
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
         followUpQueued = true;
         setValue(1);
       }
-      const changeBody = Behave.useCallback(() => setValue(1), [setValue]);
-      Behave.useSignal("change", changeBody);
-      Behave.useEffect(() => {
+      const changeBody = Behavon.useCallback(() => setValue(1), [setValue]);
+      Behavon.useSignal("change", changeBody);
+      Behavon.useEffect(() => {
         committed.push(value);
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only Object.is probe intentionally wraps the captured value in a fresh object dependency
       }, [{ value }]);
       return undefined;
     }
-    const root = Behave.createModel(Model, undefined);
-    root.change();
+    const root = Behavon.createModel(Model, undefined);
+    signalOf(root, "change")();
     await waitFor(() => committed.length === 2);
     expect(committed).toEqual([0, 1]);
     await settle();
@@ -346,31 +346,31 @@ describe("Object.is update bailout", () => {
     let setValue: StateSetter<number> | undefined;
 
     function Model(): undefined {
-      const [, setter] = Behave.useState(0);
+      const [, setter] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setValue = setter;
-      const failBody = Behave.useCallback(() => setter(() => {
+      const failBody = Behavon.useCallback(() => setter(() => {
         setter(1);
         throw failure;
       }), [setter]);
-      Behave.useSignal("fail", failBody);
-      const terminateBody = Behave.useCallback(() => setter((previous) => {
+      Behavon.useSignal("fail", failBody);
+      const terminateBody = Behavon.useCallback(() => setter((previous) => {
         setter(2);
         root.dispose();
         return previous;
       }), [setter]);
-      Behave.useSignal("terminate", terminateBody);
+      Behavon.useSignal("terminate", terminateBody);
       return undefined;
     }
 
-    root = Behave.createModel(Model, undefined);
-    expect(await captureScheduledFailure(() => root.fail())).toBe(failure);
+    root = Behavon.createModel(Model, undefined);
+    expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
     expect(() => setValue?.(3)).not.toThrow();
 
-    root = Behave.createModel(Model, undefined);
-    const terminalFailure = await captureScheduledFailure(() => root.terminate());
+    root = Behavon.createModel(Model, undefined);
+    const terminalFailure = await captureScheduledFailure(() => signalOf(root, "terminate")());
     expect(String(terminalFailure)).toMatch(/disposed during evaluation.*cannot be committed/);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
     expect(() => setValue?.(3)).not.toThrow();
   });
 
@@ -387,16 +387,16 @@ describe("Object.is update bailout", () => {
     const callbackPhases: number[] = [];
 
     function Model(): undefined {
-      const [value, setValue] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
       const renderedPhase = phase;
-      const memoPhase = Behave.useMemo(() => renderedPhase, [renderedPhase]);
-      const inspect = Behave.useCallback(() => callbackPhases.push(memoPhase), [memoPhase]);
-      Behave.useSignal("inspect", inspect);
-      const speculateBody = Behave.useCallback(() => setValue((previous) => {
+      const memoPhase = Behavon.useMemo(() => renderedPhase, [renderedPhase]);
+      const inspect = Behavon.useCallback(() => callbackPhases.push(memoPhase), [memoPhase]);
+      Behavon.useSignal("inspect", inspect);
+      const speculateBody = Behavon.useCallback(() => setValue((previous) => {
         phase = 1;
         return previous;
       }), [setValue]);
-      Behave.useSignal("speculate", speculateBody);
+      Behavon.useSignal("speculate", speculateBody);
       const subscribe = (_listener: () => void) => {
         subscribeCalls += 1;
         return () => {
@@ -406,8 +406,8 @@ describe("Object.is update bailout", () => {
       const getSnapshot = () => {
         return phase;
       };
-      Behave.useSyncExternalStore(subscribe, getSnapshot);
-      Behave.useEffect(() => {
+      Behavon.useSyncExternalStore(subscribe, getSnapshot);
+      Behavon.useEffect(() => {
         effectSetups += 1;
         return () => {
           effectCleanups += 1;
@@ -417,8 +417,8 @@ describe("Object.is update bailout", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    root.speculate();
+    const root = Behavon.createModel(Model, undefined);
+    signalOf(root, "speculate")();
     await settle();
     expect({ effectSetups, effectCleanups, subscribeCalls, unsubscribeCalls }).toEqual({
       effectSetups: 1,
@@ -426,7 +426,7 @@ describe("Object.is update bailout", () => {
       subscribeCalls: 1,
       unsubscribeCalls: 0,
     });
-    root.inspect();
+    signalOf(root, "inspect")();
     expect(callbackPhases).toEqual([0]);
     root.dispose();
     expect(unsubscribeCalls).toBe(1);
@@ -439,31 +439,31 @@ describe("Object.is update bailout", () => {
     const observedOutputs: number[] = [];
 
     function Child(): number {
-      const [, setValue] = Behave.useState(0);
+      const [, setValue] = Behavon.useState(0);
       const renderedPhase = phase;
-      const speculateBody = Behave.useCallback(() => setValue((previous) => {
+      const speculateBody = Behavon.useCallback(() => setValue((previous) => {
         phase = 1;
         return previous;
       }), [setValue]);
-      Behave.useSignal("speculate", speculateBody);
+      Behavon.useSignal("speculate", speculateBody);
       return renderedPhase;
     }
-    const child = Behave.createModel(Child, undefined);
+    const child = Behavon.createModel(Child, undefined);
     function Parent(): undefined {
-      const [epoch, setEpoch] = Behave.useState(0);
-      const [output] = Behave.useModel(child);
-      const inspectBody = Behave.useCallback(() => setEpoch((previous) => previous + 1), [setEpoch]);
-      Behave.useSignal("inspect", inspectBody);
-      Behave.useEffect(() => {
+      const [epoch, setEpoch] = Behavon.useState(0);
+      const [output] = Behavon.useModel(child);
+      const inspectBody = Behavon.useCallback(() => setEpoch((previous) => previous + 1), [setEpoch]);
+      Behavon.useSignal("inspect", inspectBody);
+      Behavon.useEffect(() => {
         if (output !== undefined) observedOutputs.push(output);
       }, [epoch, output]);
       return undefined;
     }
 
-    const root = Behave.createModel(Parent, undefined);
-    child.speculate();
+    const root = Behavon.createModel(Parent, undefined);
+    signalOf(child, "speculate")();
     await settle();
-    root.inspect();
+    signalOf(root, "inspect")();
     await waitFor(() => observedOutputs.length === 2);
     expect(observedOutputs).toEqual([0, 0]);
     root.dispose();
@@ -478,35 +478,34 @@ describe("Object.is update bailout", () => {
     const deliveries: number[] = [];
 
     function Source(): undefined {
-      const fireBody = Behave.useCallback(() => undefined, []);
-      Behave.useSignal("fire", fireBody);
+      const fireBody = Behavon.useCallback(() => undefined, []);
+      Behavon.useSignal("fire", fireBody);
       return undefined;
     }
     function Sink(id: number): undefined {
-      const receiveBody = Behave.useCallback(() => deliveries.push(id), [id]);
-      Behave.useSlot("receive", receiveBody);
+      const receiveBody = Behavon.useCallback(() => deliveries.push(id), [id]);
+      Behavon.useSlot("receive", receiveBody);
       return undefined;
     }
-    const source = Behave.createModel(Source, undefined);
-    const first = Behave.createModel(Sink, 1);
-    const second = Behave.createModel(Sink, 2);
+    const source = Behavon.createModel(Source, undefined);
+    const first = Behavon.createModel(Sink, 1);
+    const second = Behavon.createModel(Sink, 2);
     function Parent(): undefined {
-      const [, setValue] = Behave.useState(0);
-      const sourceDependency = Behave.usePort(source);
-      const sinkDependency = Behave.usePort(target === 0 ? first : second);
-      Behave.useConnect(sourceDependency.fire, sinkDependency.receive);
-      const speculateBody = Behave.useCallback(() => setValue((previous) => {
+      const [, setValue] = Behavon.useState(0);
+      const sinkDependency = Behavon.usePort(target === 0 ? first : second);
+      Behavon.useConnect(signalOf(source, "fire"), sinkDependency.receive);
+      const speculateBody = Behavon.useCallback(() => setValue((previous) => {
         target = 1;
         return previous;
       }), [setValue]);
-      Behave.useSignal("speculate", speculateBody);
+      Behavon.useSignal("speculate", speculateBody);
       return undefined;
     }
 
-    const root = Behave.createModel(Parent, undefined);
-    root.speculate();
+    const root = Behavon.createModel(Parent, undefined);
+    signalOf(root, "speculate")();
     await settle();
-    source.fire();
+    signalOf(source, "fire")();
     expect(deliveries).toEqual([1]);
     root.dispose();
     second.dispose();
@@ -527,21 +526,21 @@ describe("Object.is update bailout", () => {
     };
     const getSnapshot = () => current;
     function Model(): undefined {
-      const [state, setState] = Behave.useState(0);
-      const external = Behave.useSyncExternalStore(subscribe, getSnapshot);
-      const notifyBody = Behave.useCallback(() => {
+      const [state, setState] = Behavon.useState(0);
+      const external = Behavon.useSyncExternalStore(subscribe, getSnapshot);
+      const notifyBody = Behavon.useCallback(() => {
         setState(state);
         current = 1;
         listener?.();
       }, [setState, state]);
-      Behave.useSignal("notify", notifyBody);
-      Behave.useEffect(() => {
+      Behavon.useSignal("notify", notifyBody);
+      Behavon.useEffect(() => {
         seen.push(external);
       }, [external]);
       return undefined;
     }
-    const root = Behave.createModel(Model, undefined);
-    root.notify();
+    const root = Behavon.createModel(Model, undefined);
+    signalOf(root, "notify")();
     await waitFor(() => seen.length === 2);
     expect(seen).toEqual([0, 1]);
     root.dispose();
@@ -561,22 +560,22 @@ describe("Object.is update bailout", () => {
     const getSnapshot = () => current;
 
     function Model(): undefined {
-      const [, setState] = Behave.useState(0);
-      const external = Behave.useSyncExternalStore(subscribe, getSnapshot);
-      const notifyDuringUpdateBody = Behave.useCallback(() => setState((previous) => {
+      const [, setState] = Behavon.useState(0);
+      const external = Behavon.useSyncExternalStore(subscribe, getSnapshot);
+      const notifyDuringUpdateBody = Behavon.useCallback(() => setState((previous) => {
         current = 1;
         listener?.();
         return previous;
       }), [setState]);
-      Behave.useSignal("notifyDuringUpdate", notifyDuringUpdateBody);
-      Behave.useEffect(() => {
+      Behavon.useSignal("notifyDuringUpdate", notifyDuringUpdateBody);
+      Behavon.useEffect(() => {
         committedSnapshots.push(external);
       }, [external]);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    root.notifyDuringUpdate();
+    const root = Behavon.createModel(Model, undefined);
+    signalOf(root, "notifyDuringUpdate")();
     await waitFor(() => committedSnapshots.length === 2);
     expect(committedSnapshots).toEqual([0, 1]);
     root.dispose();
@@ -586,16 +585,16 @@ describe("Object.is update bailout", () => {
     let activations = 0;
     let setter: StateSetter<number> | undefined;
     function Model(): undefined {
-      const [, setValue] = Behave.useState(0);
+      const [, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setter = setValue;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         activations += 1;
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only stale-setter probe intentionally allocates a fresh dependency object
       }, [{}]);
       return undefined;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     root.dispose();
     expect(() => setter?.(1)).not.toThrow();
     expect(() => setter?.((previous) => previous + 1)).not.toThrow();
@@ -612,20 +611,20 @@ describe("Object.is update bailout", () => {
     function Child(_input: number): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       childEvaluations += 1;
-      Behave.useEffect(() => () => {
+      Behavon.useEffect(() => () => {
         childCleanups += 1;
       }, []);
       return undefined;
     }
-    const child = Behave.createModel(Child, 1);
+    const child = Behavon.createModel(Child, 1);
     function Observer(): undefined {
-      const [, setter] = Behave.useModel(child);
+      const [, setter] = Behavon.useModel(child);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setInput = setter;
       return undefined;
     }
 
-    const root = Behave.createModel(Observer, undefined);
+    const root = Behavon.createModel(Observer, undefined);
     root.dispose();
     child.dispose();
     expect(() => setInput?.(2)).toThrow(/requires a live Model instance/);
@@ -645,21 +644,21 @@ describe("Object.is update bailout", () => {
     const channel = uniqueChannel("same-state-publication");
     let activations = 0;
     function Model(): undefined {
-      const [, setValue] = Behave.useState(0);
-      const [, publish] = Behave.useSnapshot(channel);
-      const updateBody = Behave.useCallback(() => setValue((previous) => {
+      const [, setValue] = Behavon.useState(0);
+      const [, publish] = Behavon.useSnapshot(channel);
+      const updateBody = Behavon.useCallback(() => setValue((previous) => {
         publish(2);
         return previous;
       }), [publish, setValue]);
-      Behave.useSignal("update", updateBody);
-      Behave.useEffect(() => {
+      Behavon.useSignal("update", updateBody);
+      Behavon.useEffect(() => {
         activations += 1;
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only publication bailout probe intentionally allocates a fresh dependency object
       }, [{}]);
       return undefined;
     }
-    const root = Behave.createModel(Model, undefined);
-    root.update();
+    const root = Behavon.createModel(Model, undefined);
+    signalOf(root, "update")();
     expect(await waitForSnapshot<number>(channel, (snapshot) => snapshot === 2)).toBe(2);
     expect(activations).toBe(1);
     root.dispose();

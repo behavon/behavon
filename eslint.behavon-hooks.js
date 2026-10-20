@@ -129,7 +129,7 @@ function importedBinding(sourceCode, identifier) {
   return undefined;
 }
 
-function isBehaveFacadeBinding(binding) {
+function isBehavonFacadeBinding(binding) {
   return binding?.kind === "namespace" || binding?.kind === "default";
 }
 
@@ -146,7 +146,7 @@ function publicHookCallName(sourceCode, call) {
   if (object.type !== "Identifier") return undefined;
   const binding = importedBinding(sourceCode, object);
   const name = staticallyKnownMemberName(sourceCode, callee);
-  return isBehaveFacadeBinding(binding) && name !== undefined && publicHooks.has(name)
+  return isBehavonFacadeBinding(binding) && name !== undefined && publicHooks.has(name)
     ? name
     : undefined;
 }
@@ -166,11 +166,11 @@ function canonicalPublicHookCallName(sourceCode, call) {
     callee.computed ||
     callee.optional ||
     callee.object.type !== "Identifier" ||
-    callee.object.name !== "Behave"
+    callee.object.name !== "Behavon"
   ) return undefined;
   const binding = importedBinding(sourceCode, callee.object);
   const name = memberName(callee);
-  return isBehaveFacadeBinding(binding) && name !== undefined && publicHooks.has(name)
+  return isBehavonFacadeBinding(binding) && name !== undefined && publicHooks.has(name)
     ? name
     : undefined;
 }
@@ -246,7 +246,7 @@ function variableFunction(sourceCode, identifier) {
   return undefined;
 }
 
-function directBehaveCallName(sourceCode, call) {
+function directBehavonCallName(sourceCode, call) {
   const callee = innerExpression(call.callee);
   if (callee.type === "Identifier") {
     const binding = importedBinding(sourceCode, callee);
@@ -258,7 +258,7 @@ function directBehaveCallName(sourceCode, call) {
     callee.object.type !== "Identifier"
   ) return undefined;
   const binding = importedBinding(sourceCode, callee.object);
-  return isBehaveFacadeBinding(binding) ? memberName(callee) : undefined;
+  return isBehavonFacadeBinding(binding) ? memberName(callee) : undefined;
 }
 
 function patternVariables(sourceCode, pattern) {
@@ -464,21 +464,21 @@ const canonicalApiRule = {
     type: "problem",
     schema: [],
     messages: {
-      namespaceName: "The 'behavon' namespace import must use the exact local name 'Behave'.",
-      defaultName: "The default 'behavon' import must use the exact local name 'Behave'.",
-      namedHookAlias: "A named Behave Hook import must keep a local name matching use[A-Z0-9].",
-      computedNamespaceMember: "Access the Behave facade through a non-computed direct member such as Behave.useState or Behave.createModel.",
-      wrappedNamespaceHook: "Call Behave public Hooks through the direct Behave facade without casts or wrappers.",
-      optionalHook: "Do not optional-chain Behave public Hooks; call the direct Behave Hook member.",
-      extractedHook: "Do not destructure or extract Behave public Hooks; call the facade member directly.",
-      directNamedHook: "Call a named Behave Hook import directly instead of extracting or passing it.",
-      namespaceAlias: "Do not copy the Behave facade; call public Hooks through the direct Behave import.",
-      hookReexport: "Do not re-export Behave public Hooks through a wrapper module; import them directly from behavon.",
-      tryHook: "Hooks matching Behave public names or use[A-Z0-9] cannot be called inside try/catch/finally.",
-      nestedEndpointHook: "Declare each Hook in a separate top-level statement before passing its result to another Behave Hook.",
-      inlineHookResult: "Declare the Behave Hook result in its own top-level local variable before using it in another expression.",
-      directHookReturn: "Assign the Behave Hook result to a local variable before returning it from a Model or custom Hook.",
-      discardedValueHook: "Use the value returned by Behave.{{name}}(...), or remove the Hook call.",
+      namespaceName: "The 'behavon' namespace import must use the exact local name 'Behavon'.",
+      defaultName: "The default 'behavon' import must use the exact local name 'Behavon'.",
+      namedHookAlias: "A named Behavon Hook import must keep a local name matching use[A-Z0-9].",
+      computedNamespaceMember: "Access the Behavon facade through a non-computed direct member such as Behavon.useState or Behavon.createModel.",
+      wrappedNamespaceHook: "Call Behavon public Hooks through the direct Behavon facade without casts or wrappers.",
+      optionalHook: "Do not optional-chain Behavon public Hooks; call the direct Behavon Hook member.",
+      extractedHook: "Do not destructure or extract Behavon public Hooks; call the facade member directly.",
+      directNamedHook: "Call a named Behavon Hook import directly instead of extracting or passing it.",
+      namespaceAlias: "Do not copy the Behavon facade; call public Hooks through the direct Behavon import.",
+      hookReexport: "Do not re-export Behavon public Hooks through a wrapper module; import them directly from behavon.",
+      tryHook: "Hooks matching Behavon public names or use[A-Z0-9] cannot be called inside try/catch/finally.",
+      nestedEndpointHook: "Declare each Hook in a separate top-level statement before passing its result to another Behavon Hook.",
+      inlineHookResult: "Declare the Behavon Hook result in its own top-level local variable before using it in another expression.",
+      directHookReturn: "Assign the Behavon Hook result to a local variable before returning it from a Model or custom Hook.",
+      discardedValueHook: "Use the value returned by Behavon.{{name}}(...), or remove the Hook call.",
     },
   },
   create(context) {
@@ -487,18 +487,18 @@ const canonicalApiRule = {
       ImportDeclaration(node) {
         if (node.source.value !== "behavon") return;
         for (const specifier of node.specifiers) {
-          if (specifier.type === "ImportDefaultSpecifier" && specifier.local.name !== "Behave") {
+          if (specifier.type === "ImportDefaultSpecifier" && specifier.local.name !== "Behavon") {
             context.report({ node: specifier.local, messageId: "defaultName" });
             continue;
           }
-          if (specifier.type === "ImportNamespaceSpecifier" && specifier.local.name !== "Behave") {
+          if (specifier.type === "ImportNamespaceSpecifier" && specifier.local.name !== "Behavon") {
             context.report({ node: specifier.local, messageId: "namespaceName" });
             continue;
           }
           if (specifier.type !== "ImportSpecifier") continue;
           const imported = specifier.imported.name ?? specifier.imported.value;
           if (imported === "default") {
-            if (specifier.local.name !== "Behave") {
+            if (specifier.local.name !== "Behavon") {
               context.report({ node: specifier.local, messageId: "defaultName" });
             }
           } else if (publicHooks.has(imported) && !customHookName.test(specifier.local.name)) {
@@ -522,7 +522,7 @@ const canonicalApiRule = {
         const object = innerExpression(node.object);
         if (object.type !== "Identifier") return;
         const binding = importedBinding(sourceCode, object);
-        if (!isBehaveFacadeBinding(binding)) return;
+        if (!isBehavonFacadeBinding(binding)) return;
         if (node.computed) {
           context.report({ node, messageId: "computedNamespaceMember" });
           return;
@@ -553,14 +553,14 @@ const canonicalApiRule = {
         if (
           node.id.type === "Identifier" &&
           init?.type === "Identifier" &&
-          isBehaveFacadeBinding(importedBinding(sourceCode, init))
+          isBehavonFacadeBinding(importedBinding(sourceCode, init))
         ) {
           context.report({ node, messageId: "namespaceAlias" });
         }
         if (
           node.id.type !== "ObjectPattern" ||
           node.init?.type !== "Identifier" ||
-          !isBehaveFacadeBinding(importedBinding(sourceCode, node.init))
+          !isBehavonFacadeBinding(importedBinding(sourceCode, node.init))
         ) return;
         for (const property of node.id.properties) {
           if (property.type === "RestElement") {
@@ -580,14 +580,14 @@ const canonicalApiRule = {
         const right = innerExpression(node.right);
         if (
           right.type === "Identifier" &&
-          isBehaveFacadeBinding(importedBinding(sourceCode, right))
+          isBehavonFacadeBinding(importedBinding(sourceCode, right))
         ) {
           context.report({ node, messageId: "namespaceAlias" });
         }
       },
       Identifier(node) {
         const binding = importedBinding(sourceCode, node);
-        if (isBehaveFacadeBinding(binding)) {
+        if (isBehavonFacadeBinding(binding)) {
           if (
             node.parent?.type === "ImportNamespaceSpecifier" ||
             node.parent?.type === "ImportDefaultSpecifier" ||
@@ -675,20 +675,20 @@ const staticModelDefinitionRule = {
     type: "problem",
     schema: [],
     messages: {
-      inlineModelDefinition: "Define the Model as a static module-scope function before passing it to Behave.{{api}}.",
-      dynamicModelDefinition: "Do not pass a Model defined inside another function to Behave.{{api}}; move the Model definition to module scope.",
-      dynamicBoundaryDefinition: "Create a Behave boundary Model at module scope instead of creating its definition inside another function.",
-      dynamicModelFactory: "Pass a static Model reference to Behave.{{api}} instead of creating or selecting a Model during the call.",
-      dynamicPortDefinition: "Declare Behave.createPort<Port>(...) at module scope so its identity and Model contract stay static.",
-      dynamicResourceDefinition: "Declare Behave.createResource(...) at module scope so its adapter identity stays static.",
-      missingPortDescriptor: "Model<..., {{port}}> must register its public members through one module-scope Behave.createPort<{{port}}>(...) descriptor.",
-      missingModelPort: "A Model using Behave.createPort<{{port}}>(...) must declare the same Port as its third Model type argument.",
+      inlineModelDefinition: "Define the Model as a static module-scope function before passing it to Behavon.{{api}}.",
+      dynamicModelDefinition: "Do not pass a Model defined inside another function to Behavon.{{api}}; move the Model definition to module scope.",
+      dynamicBoundaryDefinition: "Create a Behavon boundary Model at module scope instead of creating its definition inside another function.",
+      dynamicModelFactory: "Pass a static Model reference to Behavon.{{api}} instead of creating or selecting a Model during the call.",
+      dynamicPortDefinition: "Declare Behavon.createPort<Port>(...) at module scope so its identity and Model contract stay static.",
+      dynamicResourceDefinition: "Declare Behavon.createResource(...) at module scope so its adapter identity stays static.",
+      missingPortDescriptor: "Model<..., {{port}}> must register its public members through one module-scope Behavon.createPort<{{port}}>(...) descriptor.",
+      missingModelPort: "A Model using Behavon.createPort<{{port}}>(...) must declare the same Port as its third Model type argument.",
       mismatchedPortDescriptor: "Model Port '{{modelPort}}' does not match the used createPort descriptor contract '{{descriptorPort}}'.",
       mixedPortDescriptors: "One Model cannot register public members from multiple createPort descriptors.",
-      nonInlinePortDeclaration: "Pass an inline object literal to Behave.createPort<Port>(...) so the exact runtime declaration can be statically verified.",
-      reservedPortMemberName: "Behave.createPort declarations cannot use an empty top-level member name or the reserved '__proto__' name.",
-      indirectPortDefinition: "Use a canonical Behave.createPort<Port>(...) or named createPort<Port>(...) direct call; do not extract, wrap, re-export, or dynamically load createPort.",
-      indirectResourceDefinition: "Use a canonical Behave.createResource(...) or named createResource(...) direct call; do not extract, wrap, re-export, or dynamically load createResource.",
+      nonInlinePortDeclaration: "Pass an inline object literal to Behavon.createPort<Port>(...) so the exact runtime declaration can be statically verified.",
+      reservedPortMemberName: "Behavon.createPort declarations cannot use an empty top-level member name or the reserved '__proto__' name.",
+      indirectPortDefinition: "Use a canonical Behavon.createPort<Port>(...) or named createPort<Port>(...) direct call; do not extract, wrap, re-export, or dynamically load createPort.",
+      indirectResourceDefinition: "Use a canonical Behavon.createResource(...) or named createResource(...) direct call; do not extract, wrap, re-export, or dynamically load createResource.",
       nonPreservingModelType: "Use an explicit Model<Input, Output, Port> annotation on the provider variable or contextual container member; satisfies checks assignability but does not carry the Model Port into createModel inference.",
     },
   },
@@ -725,7 +725,7 @@ const staticModelDefinitionRule = {
         name.right.type !== "Identifier" ||
         name.right.name !== "Model"
       ) return undefined;
-      return isBehaveFacadeBinding(importedBinding(sourceCode, name.left)) ? current : undefined;
+      return isBehavonFacadeBinding(importedBinding(sourceCode, name.left)) ? current : undefined;
     }
 
     function objectTypeBody(node, resolving = new Set()) {
@@ -867,7 +867,7 @@ const staticModelDefinitionRule = {
       if (current.type === "MemberExpression") {
         const object = innerExpression(current.object);
         return object.type === "Identifier" &&
-          isBehaveFacadeBinding(importedBinding(sourceCode, object)) &&
+          isBehavonFacadeBinding(importedBinding(sourceCode, object)) &&
           staticallyKnownMemberName(sourceCode, current) === "createPort"
           ? { indirect: false }
           : undefined;
@@ -887,11 +887,11 @@ const staticModelDefinitionRule = {
       return factory === undefined ? undefined : { indirect: true };
     }
 
-    function behaveCreatePortMember(node) {
+    function behavonCreatePortMember(node) {
       if (node.type !== "MemberExpression") return false;
       const object = innerExpression(node.object);
       return object.type === "Identifier" &&
-        isBehaveFacadeBinding(importedBinding(sourceCode, object)) &&
+        isBehavonFacadeBinding(importedBinding(sourceCode, object)) &&
         staticallyKnownMemberName(sourceCode, node) === "createPort";
     }
 
@@ -906,7 +906,7 @@ const staticModelDefinitionRule = {
       if (current.type === "MemberExpression") {
         const object = innerExpression(current.object);
         return object.type === "Identifier" &&
-          isBehaveFacadeBinding(importedBinding(sourceCode, object)) &&
+          isBehavonFacadeBinding(importedBinding(sourceCode, object)) &&
           staticallyKnownMemberName(sourceCode, current) === "createResource"
           ? { indirect: false }
           : undefined;
@@ -924,11 +924,11 @@ const staticModelDefinitionRule = {
       return factory === undefined ? undefined : { indirect: true };
     }
 
-    function behaveCreateResourceMember(node) {
+    function behavonCreateResourceMember(node) {
       if (node.type !== "MemberExpression") return false;
       const object = innerExpression(node.object);
       return object.type === "Identifier" &&
-        isBehaveFacadeBinding(importedBinding(sourceCode, object)) &&
+        isBehavonFacadeBinding(importedBinding(sourceCode, object)) &&
         staticallyKnownMemberName(sourceCode, node) === "createResource";
     }
 
@@ -942,13 +942,13 @@ const staticModelDefinitionRule = {
       const parent = node.parent;
       if (parent?.type !== "CallExpression" || parent.callee !== node || parent.optional) return false;
       if (node.type === "Identifier") return namedCreateResourceReference(node);
-      return behaveCreateResourceMember(node) && !node.computed && !node.optional;
+      return behavonCreateResourceMember(node) && !node.computed && !node.optional;
     }
 
     function destructuredCreateResourceProperties(node) {
       if (node.type !== "VariableDeclarator" || node.id.type !== "ObjectPattern") return [];
       const initializer = node.init === null ? undefined : innerExpression(node.init);
-      if (initializer?.type !== "Identifier" || !isBehaveFacadeBinding(importedBinding(sourceCode, initializer))) return [];
+      if (initializer?.type !== "Identifier" || !isBehavonFacadeBinding(importedBinding(sourceCode, initializer))) return [];
       return node.id.properties.filter((property) => {
         if (property.type !== "Property") return false;
         const name = !property.computed && property.key.type === "Identifier"
@@ -962,7 +962,7 @@ const staticModelDefinitionRule = {
       const parent = node.parent;
       if (parent?.type !== "CallExpression" || parent.callee !== node || parent.optional) return false;
       if (node.type === "Identifier") return namedCreatePortReference(node);
-      return behaveCreatePortMember(node) && !node.computed && !node.optional;
+      return behavonCreatePortMember(node) && !node.computed && !node.optional;
     }
 
     function destructuredCreatePortProperties(node) {
@@ -970,7 +970,7 @@ const staticModelDefinitionRule = {
       const initializer = node.init === null ? undefined : innerExpression(node.init);
       if (
         initializer?.type !== "Identifier" ||
-        !isBehaveFacadeBinding(importedBinding(sourceCode, initializer))
+        !isBehavonFacadeBinding(importedBinding(sourceCode, initializer))
       ) return [];
       return node.id.properties.filter((property) => {
         if (property.type !== "Property") return false;
@@ -1002,7 +1002,7 @@ const staticModelDefinitionRule = {
         callee.computed ||
         callee.optional ||
         callee.object.type !== "Identifier" ||
-        !isBehaveFacadeBinding(importedBinding(sourceCode, callee.object))
+        !isBehavonFacadeBinding(importedBinding(sourceCode, callee.object))
       ) return false;
       const name = memberName(callee);
       return name === "SignalType" || name === "SlotType" || name === "SnapshotType";
@@ -1040,17 +1040,17 @@ const staticModelDefinitionRule = {
       return undefined;
     }
 
-    function behaveModuleSource(node) {
+    function behavonModuleSource(node) {
       return staticallyKnownString(sourceCode, node) === "behavon";
     }
 
-    function behaveRequireCall(node) {
+    function behavonRequireCall(node) {
       if (node.type !== "CallExpression") return false;
       const callee = innerExpression(node.callee);
       if (callee.type !== "Identifier" || callee.name !== "require") return false;
       if (resolvedVariable(sourceCode, callee) !== undefined) return false;
       const source = node.arguments[0];
-      return source !== undefined && source.type !== "SpreadElement" && behaveModuleSource(source);
+      return source !== undefined && source.type !== "SpreadElement" && behavonModuleSource(source);
     }
 
     function importedVariable(variable) {
@@ -1295,7 +1295,7 @@ const staticModelDefinitionRule = {
         visiting.add(fn);
         walk(sourceCode, fn.body, (node) => {
           if (node.type !== "CallExpression") return;
-          const api = directBehaveCallName(sourceCode, node);
+          const api = directBehavonCallName(sourceCode, node);
           if (api === "useExport" || api === "useSignal" || api === "useSlot") {
             const first = node.arguments[0];
             if (first === undefined || first.type === "SpreadElement") return;
@@ -1735,7 +1735,7 @@ const staticModelDefinitionRule = {
       }
       if (
         current.type === "CallExpression" &&
-        directBehaveCallName(sourceCode, current) === "boundary" &&
+        directBehavonCallName(sourceCode, current) === "boundary" &&
         current.arguments[0] !== undefined &&
         current.arguments[0].type !== "SpreadElement"
       ) {
@@ -1755,7 +1755,7 @@ const staticModelDefinitionRule = {
     return {
       "Program:exit": reportPortContracts,
       ExportNamedDeclaration(node) {
-        if (node.source === null || !behaveModuleSource(node.source)) return;
+        if (node.source === null || !behavonModuleSource(node.source)) return;
         for (const specifier of node.specifiers) {
           const local = specifier.local?.name ?? specifier.local?.value;
           if (local === "createPort") {
@@ -1764,7 +1764,7 @@ const staticModelDefinitionRule = {
         }
       },
       ImportExpression(node) {
-        if (behaveModuleSource(node.source)) {
+        if (behavonModuleSource(node.source)) {
           context.report({ node, messageId: "indirectPortDefinition" });
         }
       },
@@ -1786,10 +1786,10 @@ const staticModelDefinitionRule = {
         if (!directCreateResourceCallee(node)) context.report({ node, messageId: "indirectResourceDefinition" });
       },
       MemberExpression(node) {
-        if (behaveCreatePortMember(node) && !directCreatePortCallee(node)) {
+        if (behavonCreatePortMember(node) && !directCreatePortCallee(node)) {
           context.report({ node, messageId: "indirectPortDefinition" });
         }
-        if (behaveCreateResourceMember(node) && !directCreateResourceCallee(node)) {
+        if (behavonCreateResourceMember(node) && !directCreateResourceCallee(node)) {
           context.report({ node, messageId: "indirectResourceDefinition" });
         }
       },
@@ -1805,7 +1805,7 @@ const staticModelDefinitionRule = {
         pendingSatisfiesExpressions.push(node);
       },
       CallExpression(node) {
-        if (behaveRequireCall(node)) {
+        if (behavonRequireCall(node)) {
           context.report({ node, messageId: "indirectPortDefinition" });
           return;
         }
@@ -1838,7 +1838,7 @@ const staticModelDefinitionRule = {
           }
           return;
         }
-        const api = directBehaveCallName(sourceCode, node);
+        const api = directBehavonCallName(sourceCode, node);
         if (api !== "createModel" && api !== "boundary") return;
         const modelArgument = node.arguments[0];
         const model = modelArgument === undefined ? undefined : innerExpression(modelArgument);
@@ -1881,7 +1881,7 @@ const evaluationPurityRule = {
       immutableValue: "Do not mutate Model input, props, state, or a value returned by a Hook.",
       impureCall: "Do not call {{name}} during Model or custom Hook evaluation.",
       evaluationOperation: "Invoke Resource/Future operations, snapshot publication, and Signal/Slot dispatch from an Effect or managed callback after evaluation; invoke transaction lifecycle operations from a managed callback.",
-      asyncTransactionRun: "Behave.transaction.run requires a synchronous body; do not pass an async function.",
+      asyncTransactionRun: "Behavon.transaction.run requires a synchronous body; do not pass an async function.",
     },
   },
   create(context) {
@@ -1998,7 +1998,7 @@ const evaluationPurityRule = {
         ) modelRoots.add(fn);
         walk(sourceCode, fn.body, (node) => {
           if (node.type !== "CallExpression") return;
-          const name = directBehaveCallName(sourceCode, node);
+          const name = directBehavonCallName(sourceCode, node);
           if (name !== undefined && publicHooks.has(name)) modelRoots.add(fn);
         }, false);
       }
@@ -2041,7 +2041,7 @@ const evaluationPurityRule = {
         }
         if (
           current.type === "CallExpression" &&
-          directBehaveCallName(sourceCode, current) === "boundary" &&
+          directBehavonCallName(sourceCode, current) === "boundary" &&
           current.arguments[0]?.type !== "SpreadElement"
         ) return referencedFunction(current.arguments[0], at, resolving);
         return undefined;
@@ -2049,7 +2049,7 @@ const evaluationPurityRule = {
 
       for (const call of calls) {
         if (call.type !== "CallExpression") continue;
-        const name = directBehaveCallName(sourceCode, call);
+        const name = directBehavonCallName(sourceCode, call);
         if (name !== "createModel" && name !== "boundary") continue;
         const argument = call.arguments[0];
         if (argument === undefined || argument.type === "SpreadElement") continue;
@@ -2091,7 +2091,7 @@ const evaluationPurityRule = {
       }
 
       function hookCallShape(call) {
-        const hook = directBehaveCallName(sourceCode, call);
+        const hook = directBehavonCallName(sourceCode, call);
         if (hook === "useState" || hook === "useLabelState" || hook === "useReducer" || hook === "useSnapshot" || hook === "useModel") return "array";
         if (hook === "useMemo" && call.arguments[0]?.type !== "SpreadElement") {
           return callbackResultShape(call.arguments[0]);
@@ -2100,7 +2100,7 @@ const evaluationPurityRule = {
       }
 
       function hookVariableShape(call, pattern, variable) {
-        const hook = directBehaveCallName(sourceCode, call);
+        const hook = directBehavonCallName(sourceCode, call);
         if ((hook === "useState" || hook === "useLabelState") && pattern.type === "ArrayPattern") {
           const first = pattern.elements[0];
           if (first !== null && patternVariables(sourceCode, first).includes(variable)) {
@@ -2147,7 +2147,7 @@ const evaluationPurityRule = {
       function registerHookResult(pattern, initializer) {
           const current = innerExpression(initializer);
           if (current.type !== "CallExpression") return;
-          const hook = directBehaveCallName(sourceCode, current);
+          const hook = directBehavonCallName(sourceCode, current);
           const custom = current.callee.type === "Identifier" && customHookName.test(current.callee.name);
           if (hook === undefined && !custom) return;
           const variables = patternVariables(sourceCode, pattern);
@@ -2171,7 +2171,7 @@ const evaluationPurityRule = {
       function isHookResult(initializer) {
         const current = innerExpression(initializer);
         if (current.type !== "CallExpression") return false;
-        const hook = directBehaveCallName(sourceCode, current);
+        const hook = directBehavonCallName(sourceCode, current);
         return hook !== undefined && publicHooks.has(hook) ||
           current.callee.type === "Identifier" && customHookName.test(current.callee.name);
       }
@@ -2418,7 +2418,7 @@ const evaluationPurityRule = {
           return { kind: "local", shape: "unknown" };
         }
         if (isHookResult(write.value)) {
-          const hook = directBehaveCallName(sourceCode, innerExpression(write.value));
+          const hook = directBehavonCallName(sourceCode, innerExpression(write.value));
           return hook === "usePort"
             ? { kind: "dependency", shape: "endpoint" }
             : { kind: "immutable", shape: hookShapeByVariable.get(variable) ?? "unknown" };
@@ -2500,7 +2500,7 @@ const evaluationPurityRule = {
       }
 
       function hookOperation(call, path) {
-        const hook = directBehaveCallName(sourceCode, call);
+        const hook = directBehavonCallName(sourceCode, call);
         if ((hook === "useSignal" || hook === "useSlot") && path.length === 0) return true;
         if (hook === "useSnapshot" && path.length === 1 && path[0] === "1") return true;
         if (hook === "useFuture" && path.length >= 1 && (path[0] === "start" || path[0] === "abort")) return true;
@@ -2524,7 +2524,7 @@ const evaluationPurityRule = {
         ) return undefined;
         const facade = innerExpression(owner.object);
         if (facade.type !== "Identifier") return undefined;
-        return isBehaveFacadeBinding(importedBinding(sourceCode, facade)) ? method : undefined;
+        return isBehavonFacadeBinding(importedBinding(sourceCode, facade)) ? method : undefined;
       }
 
       function dependencyProxyExpression(expression, at) {
@@ -2532,7 +2532,7 @@ const evaluationPurityRule = {
           const current = innerExpression(value);
           if (
             current.type === "CallExpression" &&
-            directBehaveCallName(sourceCode, current) === "usePort" &&
+            directBehavonCallName(sourceCode, current) === "usePort" &&
             path.length === 0
           ) return true;
           if (path.length !== 0 || current.type !== "Identifier") return undefined;
@@ -2550,7 +2550,7 @@ const evaluationPurityRule = {
           const current = innerExpression(value);
           if (
             current.type === "CallExpression" &&
-            directBehaveCallName(sourceCode, current) === "usePort" &&
+            directBehavonCallName(sourceCode, current) === "usePort" &&
             path.length === 1
           ) return true;
           return path.length === 0 &&
@@ -2598,7 +2598,7 @@ const evaluationPurityRule = {
       function managedCallbackExpressions(expression, at) {
         const traced = traceWrittenValue(expression, at, (current, path) => {
           if (current.type !== "CallExpression" || path.length !== 0) return undefined;
-          const hook = directBehaveCallName(sourceCode, current);
+          const hook = directBehavonCallName(sourceCode, current);
           return hook === "useCallback" && current.arguments[0]?.type !== "SpreadElement"
             ? current.arguments[0]
             : undefined;
@@ -2722,7 +2722,7 @@ const evaluationPurityRule = {
           if (parentFunction === undefined) continue;
           const parentIsEvaluation = evaluationFunctions.has(parentFunction);
           const parentIsModelContext = modelContextFunctions.has(parentFunction);
-          const name = directBehaveCallName(sourceCode, call);
+          const name = directBehavonCallName(sourceCode, call);
           if (parentIsModelContext && name !== undefined && publicHooks.has(name)) {
             for (const argument of call.arguments) {
               if (argument === undefined || argument.type === "SpreadElement") continue;
@@ -3053,7 +3053,7 @@ function variableDeclarator(variable) {
     : undefined;
 }
 
-function directStableBehaveHookValue(sourceCode, variable) {
+function directStableBehavonHookValue(sourceCode, variable) {
   const declaration = variableDeclarator(variable);
   if (declaration === undefined || declaration.init === null) return false;
   if (variable.references.some((reference) => reference.isWrite() && reference.init !== true)) {
@@ -3102,15 +3102,15 @@ const exhaustiveDependenciesRule = {
     schema: [],
     hasSuggestions: true,
     messages: {
-      missingDependencies: "Behave.{{hook}} has missing dependencies: {{dependencies}}. Include them or remove the dependency array.",
-      unnecessaryDependencies: "Behave.{{hook}} has unnecessary dependencies: {{dependencies}}. Exclude them from the dependency array.",
-      duplicateDependencies: "Behave.{{hook}} has duplicate dependencies: {{dependencies}}. Omit the duplicates.",
-      outerScopeDependencies: "Behave.{{hook}} has outer-scope dependencies: {{dependencies}}. Outer-scope values are not valid dependencies because changing them does not reevaluate the Model.",
-      dynamicDependencies: "Behave.{{hook}} received a dependency list that is not an array literal, so its dependencies cannot be statically verified.",
-      missingDependencyArray: "Behave.{{hook}} requires an explicit dependency array so its dependencies can be statically verified.",
-      complexDependency: "Behave.{{hook}} has a complex dependency expression. Extract it to a local variable so it can be statically verified.",
-      unknownDependencies: "Behave.{{hook}} received a callback whose dependencies are unknown. Pass an inline callback or a same-file local function.",
-      staleAssignment: "Assignments to '{{dependency}}' from inside Behave.{{hook}} are lost after each Model evaluation. Move the value inside the callback or store it in Model state.",
+      missingDependencies: "Behavon.{{hook}} has missing dependencies: {{dependencies}}. Include them or remove the dependency array.",
+      unnecessaryDependencies: "Behavon.{{hook}} has unnecessary dependencies: {{dependencies}}. Exclude them from the dependency array.",
+      duplicateDependencies: "Behavon.{{hook}} has duplicate dependencies: {{dependencies}}. Omit the duplicates.",
+      outerScopeDependencies: "Behavon.{{hook}} has outer-scope dependencies: {{dependencies}}. Outer-scope values are not valid dependencies because changing them does not reevaluate the Model.",
+      dynamicDependencies: "Behavon.{{hook}} received a dependency list that is not an array literal, so its dependencies cannot be statically verified.",
+      missingDependencyArray: "Behavon.{{hook}} requires an explicit dependency array so its dependencies can be statically verified.",
+      complexDependency: "Behavon.{{hook}} has a complex dependency expression. Extract it to a local variable so it can be statically verified.",
+      unknownDependencies: "Behavon.{{hook}} received a callback whose dependencies are unknown. Pass an inline callback or a same-file local function.",
+      staleAssignment: "Assignments to '{{dependency}}' from inside Behavon.{{hook}} are lost after each Model evaluation. Move the value inside the callback or store it in Model state.",
       updateDependencies: "Update the dependencies array to: [{{dependencies}}].",
     },
   },
@@ -3137,7 +3137,7 @@ const exhaustiveDependenciesRule = {
           return;
         }
         if (!reference.isRead()) return;
-        if (constantPrimitive(captured) || directStableBehaveHookValue(sourceCode, captured)) return;
+        if (constantPrimitive(captured) || directStableBehavonHookValue(sourceCode, captured)) return;
         if (functionWithoutReactiveCaptures(captured, owner, resolving)) return;
         stable = false;
       });
@@ -3175,7 +3175,7 @@ const exhaustiveDependenciesRule = {
           dependencies.set(key, {
             expression,
             stable: constantPrimitive(variable) ||
-              directStableBehaveHookValue(sourceCode, variable) ||
+              directStableBehavonHookValue(sourceCode, variable) ||
               functionWithoutReactiveCaptures(variable, owner),
           });
         }

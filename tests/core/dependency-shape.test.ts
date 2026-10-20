@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { Signal } from "behavon";
+import { signalOf } from "../helpers";
 
 async function captureScheduledFailure(trigger: () => void): Promise<unknown> {
   const originalSetTimeout = globalThis.setTimeout;
@@ -31,7 +32,7 @@ function expectShapeFailure(
 ): void {
   expect(failure).toBeInstanceOf(Error);
   expect((failure as Error).message).toMatch(
-    new RegExp(`^Behave\\.${api} dependency shape changed in Model#\\d+ at hook index ${hookIndex}: expected ${expected}, received ${received}$`),
+    new RegExp(`^Behavon\\.${api} dependency shape changed in Model#\\d+ at hook index ${hookIndex}: expected ${expected}, received ${received}$`),
   );
 }
 
@@ -43,23 +44,23 @@ describe("hook dependency shape invariants", () => {
       }
 
       function Model(): undefined {
-        const [expanded, setExpanded] = Behave.useState(false);
+        const [expanded, setExpanded] = Behavon.useState(false);
         const dependencies = expanded ? [0, 1] : [0];
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- generated runtime probe selects one Hook kind and only exercises its dependency shape
-        if (api === "useMemo") Behave.useMemo(() => 1, dependencies);
+        if (api === "useMemo") Behavon.useMemo(() => 1, dependencies);
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- generated runtime probe selects one Hook kind and only exercises its dependency shape
-        else if (api === "useCallback") Behave.useCallback(() => undefined, dependencies);
+        else if (api === "useCallback") Behavon.useCallback(() => undefined, dependencies);
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/exhaustive-deps -- generated runtime probe selects one Hook kind and only exercises its dependency shape
-        else Behave.useEffect(() => undefined, dependencies);
-        const expand = Behave.useCallback(() => setExpanded(true), [setExpanded]);
-        Behave.useSignal("expand", expand);
+        else Behavon.useEffect(() => undefined, dependencies);
+        const expand = Behavon.useCallback(() => setExpanded(true), [setExpanded]);
+        Behavon.useSignal("expand", expand);
         return undefined;
       }
 
-      const root = Behave.createModel(Model, undefined);
-      const failure = await captureScheduledFailure(() => root.expand());
+      const root = Behavon.createModel(Model, undefined);
+      const failure = await captureScheduledFailure(() => signalOf(root, "expand")());
       expectShapeFailure(failure, api, "array\\(length 1\\)", "array\\(length 2\\)");
-      expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+      expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
     });
   }
 
@@ -71,25 +72,25 @@ describe("hook dependency shape invariants", () => {
       const dependencies: unknown[] = [0];
 
       function Model(): undefined {
-        const [, setEpoch] = Behave.useState(0);
+        const [, setEpoch] = Behavon.useState(0);
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- generated runtime probe selects one Hook kind and only exercises its dependency shape
-        if (api === "useMemo") Behave.useMemo(() => 1, dependencies);
+        if (api === "useMemo") Behavon.useMemo(() => 1, dependencies);
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- generated runtime probe selects one Hook kind and only exercises its dependency shape
-        else if (api === "useCallback") Behave.useCallback(() => undefined, dependencies);
+        else if (api === "useCallback") Behavon.useCallback(() => undefined, dependencies);
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/exhaustive-deps -- generated runtime probe selects one Hook kind and only exercises its dependency shape
-        else Behave.useEffect(() => undefined, dependencies);
-        const expand = Behave.useCallback(() => {
+        else Behavon.useEffect(() => undefined, dependencies);
+        const expand = Behavon.useCallback(() => {
           dependencies.push(1);
           setEpoch((value) => value + 1);
         }, [setEpoch]);
-        Behave.useSignal("expand", expand);
+        Behavon.useSignal("expand", expand);
         return undefined;
       }
 
-      const root = Behave.createModel(Model, undefined);
-      const failure = await captureScheduledFailure(() => root.expand());
+      const root = Behavon.createModel(Model, undefined);
+      const failure = await captureScheduledFailure(() => signalOf(root, "expand")());
       expectShapeFailure(failure, api, "array\\(length 1\\)", "array\\(length 2\\)");
-      expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+      expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
     });
   }
 
@@ -100,26 +101,26 @@ describe("hook dependency shape invariants", () => {
       }
 
       function Model(): undefined {
-        const [changed, setChanged] = Behave.useState(false);
+        const [changed, setChanged] = Behavon.useState(false);
         const dependencies = initialMode === "omitted"
           ? (changed ? [] : undefined)
           : (changed ? undefined : []);
         // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only runtime probe transitions between omitted and explicit dependency modes
-        Behave.useEffect(() => undefined, dependencies);
-        const changeMode = Behave.useCallback(() => setChanged(true), [setChanged]);
-        Behave.useSignal("changeMode", changeMode);
+        Behavon.useEffect(() => undefined, dependencies);
+        const changeMode = Behavon.useCallback(() => setChanged(true), [setChanged]);
+        Behavon.useSignal("changeMode", changeMode);
         return undefined;
       }
 
-      const root = Behave.createModel(Model, undefined);
-      const failure = await captureScheduledFailure(() => root.changeMode());
+      const root = Behavon.createModel(Model, undefined);
+      const failure = await captureScheduledFailure(() => signalOf(root, "changeMode")());
       expectShapeFailure(
         failure,
         "useEffect",
         initialMode === "omitted" ? "omitted" : "array\\(length 0\\)",
         initialMode === "omitted" ? "array\\(length 0\\)" : "omitted",
       );
-      expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+      expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
     });
   }
 
@@ -132,28 +133,28 @@ describe("hook dependency shape invariants", () => {
     const observed: boolean[] = [];
 
     function Model(): undefined {
-      const [failedCandidate, setFailedCandidate] = Behave.useState(false);
-      const inspect = Behave.useCallback(() => {
+      const [failedCandidate, setFailedCandidate] = Behavon.useState(false);
+      const inspect = Behavon.useCallback(() => {
         observed.push(failedCandidate);
       }, [failedCandidate]);
-      Behave.useSignal("inspect", inspect);
-      Behave.useEffect(() => {
+      Behavon.useSignal("inspect", inspect);
+      Behavon.useEffect(() => {
         effects.push(`setup:${failedCandidate}`);
         return () => effects.push(`cleanup:${failedCandidate}`);
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only runtime probe intentionally changes dependency mode in a failing candidate
       }, failedCandidate ? undefined : []);
-      const fail = Behave.useCallback(() => setFailedCandidate(true), [setFailedCandidate]);
-      Behave.useSignal("fail", fail);
+      const fail = Behavon.useCallback(() => setFailedCandidate(true), [setFailedCandidate]);
+      Behavon.useSignal("fail", fail);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(effects).toEqual(["setup:false"]);
 
-    const failure = await captureScheduledFailure(() => root.fail());
+    const failure = await captureScheduledFailure(() => signalOf(root, "fail")());
     expectShapeFailure(failure, "useEffect", "array\\(length 0\\)", "omitted", 3);
     expect(observed).toEqual([]);
     expect(effects).toEqual(["setup:false", "cleanup:false"]);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 });

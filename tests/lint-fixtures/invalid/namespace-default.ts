@@ -1,17 +1,17 @@
-import * as Behave from "behavon";
+import * as Behavon from "behavon";
 
 export function DirectNamespaceDefaultModel(): number {
-  const [value] = Behave.default.useState(0);
+  const [value] = Behavon.default.useState(0);
   return value;
 }
 
 export function ComputedNamespaceDefaultModel(): number {
-  const [value] = Behave["default"].useState(0);
+  const [value] = Behavon["default"].useState(0);
   return value;
 }
 
-const DefaultFacade = Behave.default;
-const { default: DestructuredDefault } = Behave;
+const DefaultFacade = Behavon.default;
+const { default: DestructuredDefault } = Behavon;
 void DestructuredDefault;
 
 export function AliasedNamespaceDefaultModel(): number {

@@ -1,4 +1,4 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { PortDescriptor, Signal } from "behavon";
 
 export interface ImportedPort {
@@ -6,12 +6,12 @@ export interface ImportedPort {
   reset: Signal;
 }
 
-export const importedPort = Behave.createPort<ImportedPort>({
-  fire: Behave.SignalType(),
-  reset: Behave.SignalType(),
+export const importedPort = Behavon.createPort<ImportedPort>({
+  fire: Behavon.SignalType(),
+  reset: Behavon.SignalType(),
 });
 
 export function useImportedPort(port: PortDescriptor<ImportedPort>): void {
-  const fire = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(port, "fire", fire);
+  const fire = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(port, "fire", fire);
 }

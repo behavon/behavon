@@ -1,16 +1,27 @@
 # behavon
 
+[English](./README.en.md) | 한국어
+
 Behavon은 React와 runtime을 공유하지 않으면서 React hook의 공개 상태 의미를 Model에 적용하고, Signal·Slot·typed snapshot identity로 Model 조합과 외부 구독을 표현하는 ESM 패키지다.
+
+## 문서
+
+- [시작하기](./docs/getting-started.md)
+- [주요 개념](./docs/core-concepts.md)
+- [전체 목차와 API](./docs/README.md)
 
 ## 개발 명령
 
 ```sh
 npm install
 npm run typecheck
+npm test
 npm run build
 npm run pack:check
 ```
 
+- `npm test`는 문서 예제 추출, typecheck, Hook lint, lint 규칙 계약, runtime 테스트(문서 예제 테스트 포함), 패키지 타입 테스트를 실행한다.
+- `npm run test:docs`는 `docs/`의 예제만 추출해 typecheck·lint·실행 테스트를 한다.
 - `npm run build`는 `dist/index.js`와 TypeScript declaration을 만든다.
 - `npm run pack:check`는 publish 파일 목록을 확인한다.
 

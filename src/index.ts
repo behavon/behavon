@@ -426,7 +426,7 @@ export interface EndpointInterfaceDescriptor {
   readonly slotRegistrations: number;
 }
 
-export interface BehaveInterfaceDescriptor {
+export interface BehavonInterfaceDescriptor {
   readonly endpoints: readonly EndpointInterfaceDescriptor[];
 }
 
@@ -472,27 +472,27 @@ export function createPort<Port extends object = MissingPortType>(
 ): PortDescriptor<Port> {
   if (currentContext !== undefined) {
     throw new Error(
-      `Behave.createPort cannot declare a Port while evaluating Model#${currentContext.instance.id}`,
+      `Behavon.createPort cannot declare a Port while evaluating Model#${currentContext.instance.id}`,
     );
   }
   if (declaration === null || typeof declaration !== "object" || Array.isArray(declaration)) {
-    throw new Error("Behave.createPort requires a non-null plain object declaration");
+    throw new Error("Behavon.createPort requires a non-null plain object declaration");
   }
   const prototype = Object.getPrototypeOf(declaration);
   if (prototype !== Object.prototype && prototype !== null) {
-    throw new Error("Behave.createPort requires an ordinary object or null-prototype object");
+    throw new Error("Behavon.createPort requires an ordinary object or null-prototype object");
   }
   if (Object.getOwnPropertySymbols(declaration).length > 0) {
-    throw new Error("Behave.createPort does not allow symbol member names");
+    throw new Error("Behavon.createPort does not allow symbol member names");
   }
   const members = new Map<string, RuntimePortMember>();
   for (const name of Object.getOwnPropertyNames(declaration)) {
     const property = Object.getOwnPropertyDescriptor(declaration, name) as PropertyDescriptor;
     if (!property.enumerable || !("value" in property)) {
-      throw new Error(`Behave.createPort member '${name}' must be an enumerable data property`);
+      throw new Error(`Behavon.createPort member '${name}' must be an enumerable data property`);
     }
     if (reservedEndpointNames.has(name)) {
-      throw new Error(`Behave.createPort member name is reserved: ${name}`);
+      throw new Error(`Behavon.createPort member name is reserved: ${name}`);
     }
     const markerKind = typeof property.value === "object" && property.value !== null
       ? portMemberMarkers.get(property.value)
@@ -530,17 +530,17 @@ export function createResource<
   Actions extends ResourceActions<Resource> = {},
 >(definition: ResourceDefinition<Input, Resource, Reason, Actions>): ResourceType<Input, Resource, Reason, Actions> {
   if (currentContext !== undefined) {
-    throw new Error("Behave.createResource must be called at module scope, outside Model evaluation");
+    throw new Error("Behavon.createResource must be called at module scope, outside Model evaluation");
   }
   if (typeof definition.open !== "function" || typeof definition.close !== "function" || typeof definition.abort !== "function") {
-    throw new Error("Behave.createResource requires open, close, and abort functions");
+    throw new Error("Behavon.createResource requires open, close, and abort functions");
   }
   for (const name of Object.keys(definition.actions ?? {})) {
     if (resourceReservedMembers.has(name)) {
-      throw new Error(`Behave.createResource action '${name}' conflicts with the core controller surface`);
+      throw new Error(`Behavon.createResource action '${name}' conflicts with the core controller surface`);
     }
     if (typeof definition.actions?.[name] !== "function") {
-      throw new Error(`Behave.createResource action '${name}' must be a function`);
+      throw new Error(`Behavon.createResource action '${name}' must be a function`);
     }
   }
   const type = Object.freeze({}) as ResourceType<Input, Resource, Reason, Actions>;
@@ -615,7 +615,7 @@ export class FutureCancellationError extends Error {
   declare readonly cause: unknown;
 
   constructor(kind: FutureCancellationKind, cause?: unknown) {
-    super(`Behave Future run was cancelled (${kind})`, { cause });
+    super(`Behavon Future run was cancelled (${kind})`, { cause });
     this.name = "FutureCancellationError";
     this.kind = kind;
     this.cause = cause;
@@ -755,7 +755,7 @@ export type ResourceController<Reason, Actions extends ResourceActions<any>> = R
 
 export class ResourceActionSupersededError extends Error {
   constructor() {
-    super("Behave Resource action was superseded by lifecycle invalidation");
+    super("Behavon Resource action was superseded by lifecycle invalidation");
     this.name = "ResourceActionSupersededError";
   }
 }
@@ -1370,13 +1370,13 @@ let currentTransactionScope: RuntimeTransactionScope | undefined;
 const warnedPlainTransactionState = new WeakSet<StateCell>();
 const warnedPlainTransactionReducer = new WeakSet<ReducerCell>();
 const disposedModel: UnknownModel = () => {
-  throw new Error("Behave cannot evaluate a disposed Model");
+  throw new Error("Behavon cannot evaluate a disposed Model");
 };
 
 function requireTransactionOwner(api: string): RuntimeModelInstance {
   const owner = currentManagedOwner;
   if (owner === undefined || owner.status !== "active") {
-    throw new Error(`Behave.transaction.${api} must run inside a managed callback of a live Model`);
+    throw new Error(`Behavon.transaction.${api} must run inside a managed callback of a live Model`);
   }
   return owner;
 }
@@ -1386,7 +1386,7 @@ function requireOwnedTransactionScope(id: TransactionId, api: string): RuntimeTr
   const owner = requireTransactionOwner(api);
   const scope = transactionScopes.get(identity)?.get(owner);
   if (scope === undefined) {
-    throw new Error(`Behave.transaction.${api} requires a TransactionId started by the current Model instance`);
+    throw new Error(`Behavon.transaction.${api} requires a TransactionId started by the current Model instance`);
   }
   return scope;
 }
@@ -1405,7 +1405,7 @@ function requireCommitTransactionScope(id: TransactionId): RuntimeTransactionSco
   ) return upstream;
   if (owned !== undefined) return owned;
   throw new Error(
-    "Behave.transaction.commit requires a TransactionId started by the current Model instance " +
+    "Behavon.transaction.commit requires a TransactionId started by the current Model instance " +
     "or the current root transaction provenance",
   );
 }
@@ -1519,7 +1519,7 @@ function assertDependencyShape(
   if (expected === undefined || received === undefined) {
     if (expected !== received) {
       throw new Error(
-        `Behave.${api} dependency shape changed in Model#${context.instance.id} at hook index ${context.hookIndex}: ` +
+        `Behavon.${api} dependency shape changed in Model#${context.instance.id} at hook index ${context.hookIndex}: ` +
         `expected ${formatDependencyShape(expected)}, received ${formatDependencyShape(received)}`,
       );
     }
@@ -1527,7 +1527,7 @@ function assertDependencyShape(
   }
   if (expected !== received) {
     throw new Error(
-      `Behave.${api} dependency shape changed in Model#${context.instance.id} at hook index ${context.hookIndex}: ` +
+      `Behavon.${api} dependency shape changed in Model#${context.instance.id} at hook index ${context.hookIndex}: ` +
       `expected array(length ${expected}), received array(length ${received})`,
     );
   }
@@ -1543,24 +1543,24 @@ function sameDependencies(previous: DependencyList, next: DependencyList): boole
 
 function assertNonEmptyName(name: unknown, subject: "endpoint"): asserts name is string {
   if (typeof name !== "string" || name.length === 0) {
-    throw new Error(`Behave ${subject} name must be a non-empty string`);
+    throw new Error(`Behavon ${subject} name must be a non-empty string`);
   }
 }
 
 function assertEndpointName(name: unknown): asserts name is string {
   assertNonEmptyName(name, "endpoint");
   if (reservedEndpointNames.has(name)) {
-    throw new Error(`Behave endpoint name is reserved: ${name}`);
+    throw new Error(`Behavon endpoint name is reserved: ${name}`);
   }
 }
 
 function requireContext(hookName: string): EvaluationContext {
   if (currentContext === undefined) {
-    throw new Error(`Behave.${hookName} must be called while evaluating a Model`);
+    throw new Error(`Behavon.${hookName} must be called while evaluating a Model`);
   }
   if (restrictedHookFrame?.context === currentContext) {
     throw new Error(
-      `Behave.${hookName} cannot be called inside ${restrictedHookFrame.boundary} ` +
+      `Behavon.${hookName} cannot be called inside ${restrictedHookFrame.boundary} ` +
       `while evaluating Model#${currentContext.instance.id}`,
     );
   }
@@ -1586,7 +1586,7 @@ function assertSetterEvaluationOwner(
   const source = currentContext?.instance;
   if (source !== undefined && source !== target) {
     throw new Error(
-      `Behave.${api} setter for target Model#${target.id} cannot be called while evaluating source Model#${source.id}`,
+      `Behavon.${api} setter for target Model#${target.id} cannot be called while evaluating source Model#${source.id}`,
     );
   }
 }
@@ -1595,7 +1595,7 @@ function activeHook(context: EvaluationContext, kind: HookCell["kind"]): HookCel
   const hook = context.baseHooks[context.hookIndex];
   if (hook !== undefined && hook.kind !== kind) {
     throw new Error(
-      `Behave hook order changed in Model#${context.instance.id}: expected ${hook.kind}, received ${kind}`,
+      `Behavon hook order changed in Model#${context.instance.id}: expected ${hook.kind}, received ${kind}`,
     );
   }
   return hook;
@@ -1618,12 +1618,12 @@ function enqueueStateUpdate<Value>(
   const scope = currentTransactionScope;
   if (scope !== undefined && scope.root.status === "started") {
     if (cell.label === undefined) {
-      if (__BEHAVE_DEVELOPMENT__ && !warnedPlainTransactionState.has(cell)) {
+      if (__BEHAVON_DEVELOPMENT__ && !warnedPlainTransactionState.has(cell)) {
         warnedPlainTransactionState.add(cell);
         try {
           console.warn(
-            "Behave.useState setter called inside transaction.run is nontransactional. " +
-            "Use Behave.useLabelState and include its StateId in transaction.start.",
+            "Behavon.useState setter called inside transaction.run is nontransactional. " +
+            "Use Behavon.useLabelState and include its StateId in transaction.start.",
           );
         } catch {
           // A development diagnostic must not replace the setter result.
@@ -1634,7 +1634,7 @@ function enqueueStateUpdate<Value>(
     }
     if (!scope.locks.has(cell)) {
       throw new Error(
-        "Behave.useLabelState setter requires its StateId in the active transaction.start lock list",
+        "Behavon.useLabelState setter requires its StateId in the active transaction.start lock list",
       );
     }
     mutableObserver.stage(scope.root, scope, cell, update);
@@ -1659,11 +1659,11 @@ function enqueueReducerAction(
   }
   const scope = currentTransactionScope;
   if (scope !== undefined && scope.root.status === "started") {
-    if (__BEHAVE_DEVELOPMENT__ && !warnedPlainTransactionReducer.has(cell)) {
+    if (__BEHAVON_DEVELOPMENT__ && !warnedPlainTransactionReducer.has(cell)) {
       warnedPlainTransactionReducer.add(cell);
       try {
         console.warn(
-          "Behave.useReducer dispatch called inside transaction.run is nontransactional. " +
+          "Behavon.useReducer dispatch called inside transaction.run is nontransactional. " +
           "The action is deferred until the transaction root ends.",
         );
       } catch {
@@ -1708,7 +1708,7 @@ function invokeRetainedReducerDispatch(
 function requireLiveMutableCell(target: MutableOperationTarget): MutableCell {
   const cell = target.cell;
   if (cell === undefined) {
-    throw new Error("Behave.useMutable handle requires a live Model instance");
+    throw new Error("Behavon.useMutable handle requires a live Model instance");
   }
   return cell;
 }
@@ -1756,7 +1756,7 @@ function invokeModelInputUpdate(
 ): void {
   const instance = target.instance;
   if (instance === undefined || instance.status === "disposing" || instance.status === "disposed") {
-    throw new Error("Behave.useModel input setter requires a live Model instance");
+    throw new Error("Behavon.useModel input setter requires a live Model instance");
   }
   assertSetterEvaluationOwner("useModel", instance);
   const context = currentContext;
@@ -2072,7 +2072,7 @@ function createRefProxy(instance: RuntimeModelInstance): UntypedModelRef {
     get(_target, property) {
       if (property === "dispose") return instance.disposeFunction;
       if (property === "then" || property === "toJSON" || property === "constructor") return undefined;
-      if (property === Symbol.toStringTag) return "BehaveModelRef";
+      if (property === Symbol.toStringTag) return "BehavonModelRef";
       if (property === inspectionSymbol) return undefined;
       if (typeof property === "symbol") return undefined;
       const exports = exportView(instance);
@@ -2080,6 +2080,7 @@ function createRefProxy(instance: RuntimeModelInstance): UntypedModelRef {
         requireLiveInstance(instance, `public export lookup '${property}'`);
         return exports.get(property);
       }
+      assertSignalExported(instance, property);
       return getEndpointHandle(instance, property).callable;
     },
   }) as UntypedModelRef;
@@ -2092,7 +2093,7 @@ function createDependencyProxy(instance: RuntimeModelInstance): DependencyProxy 
   const proxy = new Proxy(target, {
     get(_target, property) {
       if (property === "then" || property === "toJSON" || property === "constructor") return undefined;
-      if (property === Symbol.toStringTag) return "BehaveDependencyProxy";
+      if (property === Symbol.toStringTag) return "BehavonDependencyProxy";
       if (property === inspectionSymbol) return undefined;
       if (typeof property === "symbol") return undefined;
       const exports = exportView(instance);
@@ -2100,11 +2101,22 @@ function createDependencyProxy(instance: RuntimeModelInstance): DependencyProxy 
         requireLiveInstance(instance, `dependency export lookup '${property}'`);
         return exports.get(property);
       }
+      // A same-name Slot stays connectable; its Signal part cannot be invoked from here.
+      if ((endpointView(instance).get(property)?.slots.length ?? 0) === 0) {
+        assertSignalExported(instance, property);
+      }
       return getEndpointHandle(instance, property, "endpoint").callable;
     },
   }) as DependencyProxy;
   registerInterfaceTarget(proxy as object, instance);
   return proxy;
+}
+
+// Outside a Model, a Signal is reachable only after useExport opened it.
+function assertSignalExported(instance: RuntimeModelInstance, name: string): void {
+  if ((endpointView(instance).get(name)?.signals.length ?? 0) > 0) {
+    throw new Error(`Behavon Model#${instance.id} Signal '${name}' is not exported`);
+  }
 }
 
 function endpointView(instance: RuntimeModelInstance): Map<string, EndpointRecord> {
@@ -2120,7 +2132,7 @@ function exportView(instance: RuntimeModelInstance): Map<string, unknown> {
 function requireLiveInstance(instance: RuntimeModelInstance, operation: string): void {
   const provisional = currentContext?.transaction.drafts.has(instance) ?? false;
   if ((instance.status !== "active" && !provisional) || instance.status === "disposing" || instance.status === "disposed") {
-    throw new Error(`Behave Model#${instance.id} is disposed during ${operation}`);
+    throw new Error(`Behavon Model#${instance.id} is disposed during ${operation}`);
   }
 }
 
@@ -2131,7 +2143,7 @@ function getEndpointHandle(
 ): EndpointHandle {
   requireLiveInstance(instance, `endpoint lookup '${name}'`);
   if (!endpointView(instance).has(name)) {
-    throw new Error(`Behave Model#${instance.id} has no endpoint '${name}'`);
+    throw new Error(`Behavon Model#${instance.id} has no endpoint '${name}'`);
   }
   const cacheKey = `${role}:${name}`;
   const cached = instance.endpointCache.get(cacheKey);
@@ -2139,6 +2151,8 @@ function getEndpointHandle(
   const callable: UnknownCallback = (...args: unknown[]) => {
     if (role === "signal") return dispatchSignal(instance, name, args);
     if (role === "slot") return dispatchSlot(instance, name, args);
+    // "endpoint" handles come from usePort for names that were not exported.
+    assertSignalExported(instance, name);
     return dispatchSignal(instance, name, args);
   };
   const handle = { model: instance, name, role, callable };
@@ -2237,7 +2251,7 @@ function warnEvaluationOperation(
   operation: string,
   key: string,
 ): void {
-  if (!__BEHAVE_DEVELOPMENT__ || currentContext === undefined || typeof console === "undefined") return;
+  if (!__BEHAVON_DEVELOPMENT__ || currentContext === undefined || typeof console === "undefined") return;
   const evaluator = currentContext.instance;
   const warned = evaluationOperationWarnings.get(evaluator) ?? new Set<string>();
   if (warned.has(key)) return;
@@ -2245,8 +2259,8 @@ function warnEvaluationOperation(
   evaluationOperationWarnings.set(evaluator, warned);
   try {
     console.warn(
-      `Behave Model#${evaluator.id} called ${api} ${operation} while evaluating. ` +
-      "Move this operation to Behave.useEffect or invoke it from a managed callback after evaluation.",
+      `Behavon Model#${evaluator.id} called ${api} ${operation} while evaluating. ` +
+      "Move this operation to Behavon.useEffect or invoke it from a managed callback after evaluation.",
     );
   } catch {
     // A development diagnostic must not replace the operation's runtime result.
@@ -2261,9 +2275,9 @@ function dispatchSignal(instance: RuntimeModelInstance, name: string, args: unkn
     warnEvaluationOperation("Signal", `'${name}' on Model#${instance.id}`, `signal:${instance.id}:${name}`);
     requireLiveInstance(instance, `Signal '${name}' dispatch`);
     const endpoint = endpointView(instance).get(name);
-    if (endpoint === undefined) throw new Error(`Behave Model#${instance.id} has no endpoint '${name}'`);
+    if (endpoint === undefined) throw new Error(`Behavon Model#${instance.id} has no endpoint '${name}'`);
     if (endpoint.signals.length === 0) {
-      throw new Error(`Behave Model#${instance.id} endpoint '${name}' has no Signal registration`);
+      throw new Error(`Behavon Model#${instance.id} endpoint '${name}' has no Signal registration`);
     }
     const bodies = endpoint.signals.slice();
     for (const body of bodies) invokeEndpointRaw(instance, body, `Signal '${name}' dispatch`, args);
@@ -2302,9 +2316,9 @@ function dispatchSlot(instance: RuntimeModelInstance, name: string, args: unknow
     warnEvaluationOperation("Slot", `'${name}' on Model#${instance.id}`, `slot:${instance.id}:${name}`);
     requireLiveInstance(instance, `Slot '${name}' dispatch`);
     const endpoint = endpointView(instance).get(name);
-    if (endpoint === undefined) throw new Error(`Behave Model#${instance.id} has no endpoint '${name}'`);
+    if (endpoint === undefined) throw new Error(`Behavon Model#${instance.id} has no endpoint '${name}'`);
     if (endpoint.slots.length === 0) {
-      throw new Error(`Behave Model#${instance.id} endpoint '${name}' has no Slot registration`);
+      throw new Error(`Behavon Model#${instance.id} endpoint '${name}' has no Slot registration`);
     }
     const payload = stripInboundMeta(args);
     const meta = makeVirtualConnectionMeta(instance, name);
@@ -2511,7 +2525,7 @@ function prepareModel(instance: RuntimeModelInstance, input: unknown, transactio
   const existing = transaction.drafts.get(instance);
   if (existing !== undefined) return existing;
   if (instance.status === "disposed" || instance.status === "disposing") {
-    throw new Error(`Behave Model#${instance.id} is disposed during evaluation`);
+    throw new Error(`Behavon Model#${instance.id} is disposed during evaluation`);
   }
 
   const previousContext = currentContext;
@@ -2575,7 +2589,7 @@ function prepareModel(instance: RuntimeModelInstance, input: unknown, transactio
       assertPortDeclarationComplete(draft);
       if (expectedHookCount !== undefined && context.hookIndex !== expectedHookCount) {
         throw new Error(
-          `Behave hook count changed in Model#${instance.id}: expected ${expectedHookCount}, received ${context.hookIndex}`,
+          `Behavon hook count changed in Model#${instance.id}: expected ${expectedHookCount}, received ${context.hookIndex}`,
         );
       }
       if (!context.renderPhaseUpdateRequested) return draft;
@@ -2608,7 +2622,7 @@ function prepareModel(instance: RuntimeModelInstance, input: unknown, transactio
       discardEvaluationAttempt(transaction, checkpoint, retainedHooks);
       if (!canRetry) {
         throw new Error(
-          `Behave Model#${instance.id} exceeded ${renderPhaseEvaluationLimit} render-phase evaluation attempts`,
+          `Behavon Model#${instance.id} exceeded ${renderPhaseEvaluationLimit} render-phase evaluation attempts`,
         );
       }
 
@@ -2621,7 +2635,7 @@ function prepareModel(instance: RuntimeModelInstance, input: unknown, transactio
       stateProgress = nextStateProgress;
       modelProgress = nextModelProgress;
     }
-    throw new Error(`Behave Model#${instance.id} exceeded the render-phase evaluation limit`);
+    throw new Error(`Behavon Model#${instance.id} exceeded the render-phase evaluation limit`);
   } catch (error: unknown) {
     if (transaction.failureOwner === undefined) transaction.failureOwner = instance;
     throw error;
@@ -2640,7 +2654,7 @@ function assertTransactionOwnersCommittable(transaction: EvaluationTransaction):
       )) {
         transaction.failureOwner = draft.instance;
         throw new Error(
-          `Behave.useModel target Model#${hook.target.id} was disposed during evaluation`,
+          `Behavon.useModel target Model#${hook.target.id} was disposed during evaluation`,
         );
       }
     }
@@ -2654,7 +2668,7 @@ function assertModelDraftCommittable(
   if (draft.instance.status === "disposing" || draft.instance.status === "disposed") {
     transaction.failureOwner = draft.instance;
     throw new Error(
-      `Behave Model#${draft.instance.id} was disposed during evaluation and cannot be committed`,
+      `Behavon Model#${draft.instance.id} was disposed during evaluation and cannot be committed`,
     );
   }
 }
@@ -3177,7 +3191,7 @@ function findModelRoot(owner: RuntimeModelInstance): RuntimeModelInstance {
 
 function projectCommitPhaseErrors(errors: readonly unknown[]): unknown {
   if (errors.length === 1) return errors[0];
-  return new AggregateError(errors, "Multiple Behave commit-phase lifecycle errors");
+  return new AggregateError(errors, "Multiple Behavon commit-phase lifecycle errors");
 }
 
 function routeCommitPhaseFailures(failures: readonly CommitPhaseFailure[]): void {
@@ -3277,7 +3291,7 @@ function disposeInstance(
   deferredFinalizations?: Set<RuntimeModelInstance>,
 ): void {
   if (instance.status === "disposed" || instance.status === "disposing") {
-    if (publicCall) throw new Error(`Behave Model#${instance.id} dispose() called more than once`);
+    if (publicCall) throw new Error(`Behavon Model#${instance.id} dispose() called more than once`);
     return;
   }
   rollbackTransactionRootsOwnedBy(instance);
@@ -3386,30 +3400,30 @@ function transactionStart(
   lockTargets: readonly StateId<unknown>[],
 ): void {
   if (currentContext !== undefined) {
-    throw new Error("Behave.transaction.start cannot run while evaluating a Model");
+    throw new Error("Behavon.transaction.start cannot run while evaluating a Model");
   }
   const identity = requireTransactionIdentity(id, "start");
   const owner = requireTransactionOwner("start");
   const ownerScopes = transactionScopes.get(identity) ?? new WeakMap<RuntimeModelInstance, RuntimeTransactionScope>();
   if (ownerScopes.has(owner)) {
-    throw new Error("Behave.transaction.start cannot reuse a TransactionId in the same Model instance");
+    throw new Error("Behavon.transaction.start cannot reuse a TransactionId in the same Model instance");
   }
   if (!Array.isArray(lockTargets)) {
-    throw new Error("Behave.transaction.start requires an array of StateIds");
+    throw new Error("Behavon.transaction.start requires an array of StateIds");
   }
   const cells = new Set<StateCell>();
   for (const target of lockTargets) {
     const label = requireStateIdentity(target, "transaction.start");
     const subject = mutableObserver.labeledSubject(owner, label);
     if (subject === undefined) {
-      throw new Error("Behave.transaction.start StateId is not registered by this Model instance");
+      throw new Error("Behavon.transaction.start StateId is not registered by this Model instance");
     }
     cells.add(subject as StateCell);
   }
 
   const parent = currentTransactionScope;
   if (parent !== undefined && parent.root.status !== "started") {
-    throw new Error("Behave.transaction.start cannot join a completed root transaction");
+    throw new Error("Behavon.transaction.start cannot join a completed root transaction");
   }
   const root: RuntimeTransactionRoot = parent?.root ?? {
     status: "started",
@@ -3420,7 +3434,7 @@ function transactionStart(
   for (const cell of cells) {
     const lockRoot = mutableObserver.lockRoot(cell);
     if (lockRoot !== undefined && lockRoot !== root) {
-      throw new Error("Behave.transaction.start cannot relock a StateId held by another root transaction");
+      throw new Error("Behavon.transaction.start cannot relock a StateId held by another root transaction");
     }
   }
 
@@ -3444,20 +3458,20 @@ function transactionStart(
 
 function transactionRun<Value>(id: TransactionId, body: () => Value): Value {
   if (currentContext !== undefined) {
-    throw new Error("Behave.transaction.run cannot run while evaluating a Model");
+    throw new Error("Behavon.transaction.run cannot run while evaluating a Model");
   }
   const scope = requireOwnedTransactionScope(id, "run");
   if (scope.status !== "started" || scope.root.status !== "started") {
-    throw new Error("Behave.transaction.run requires an active TransactionId");
+    throw new Error("Behavon.transaction.run requires an active TransactionId");
   }
   if (typeof body !== "function") {
-    throw new Error("Behave.transaction.run requires a function body");
+    throw new Error("Behavon.transaction.run requires a function body");
   }
   if (
     currentTransactionScope !== undefined &&
     currentTransactionScope.root !== scope.root
   ) {
-    throw new Error("Behave.transaction.run cannot overlap a different root transaction");
+    throw new Error("Behavon.transaction.run cannot overlap a different root transaction");
   }
   const previous = currentTransactionScope;
   currentTransactionScope = scope;
@@ -3465,7 +3479,7 @@ function transactionRun<Value>(id: TransactionId, body: () => Value): Value {
     const result = invokeUserFunction("transaction.run body", body);
     if (isThenable(result)) {
       rollbackTransactionScope(scope);
-      throw new Error("Behave.transaction.run requires a synchronous body");
+      throw new Error("Behavon.transaction.run requires a synchronous body");
     }
     return result;
   } catch (error: unknown) {
@@ -3485,7 +3499,7 @@ function prepareTransactionalOwners(
   const prepare = (owner: RuntimeModelInstance): void => {
     if (prepared.has(owner)) return;
     if (visiting.has(owner)) {
-      throw new Error("Behave transaction cannot commit a cyclic Model observation graph");
+      throw new Error("Behavon transaction cannot commit a cyclic Model observation graph");
     }
     visiting.add(owner);
     for (const target of observationTargets(owner, evaluation)) {
@@ -3515,7 +3529,7 @@ function commitRuntimeTransactionRoot(root: RuntimeTransactionRoot): void {
     const owner = inspection.owner as RuntimeModelInstance;
     if (owner.status !== "active") {
       rollbackTransactionRoot(root);
-      throw new Error("Behave transaction cannot commit state owned by a disposed Model");
+      throw new Error("Behavon transaction cannot commit state owned by a disposed Model");
     }
     owners.add(owner);
     baselines.set(cell, mutableObserver.queuedUpdateCount(cell));
@@ -3558,11 +3572,11 @@ function commitRuntimeTransactionRoot(root: RuntimeTransactionRoot): void {
 
 function transactionCommit(id: TransactionId): void {
   if (currentContext !== undefined) {
-    throw new Error("Behave.transaction.commit cannot run while evaluating a Model");
+    throw new Error("Behavon.transaction.commit cannot run while evaluating a Model");
   }
   const scope = requireCommitTransactionScope(id);
   if (scope.status !== "started" || scope.root.status !== "started") {
-    throw new Error("Behave.transaction.commit requires an active TransactionId");
+    throw new Error("Behavon.transaction.commit requires an active TransactionId");
   }
   if (scope !== scope.root.outer) {
     scope.status = "committed";
@@ -3572,18 +3586,18 @@ function transactionCommit(id: TransactionId): void {
     (candidate) => candidate !== scope && candidate.status === "started",
   );
   if (unfinished !== undefined) {
-    throw new Error("Behave.transaction.commit cannot complete a root with an active nested transaction");
+    throw new Error("Behavon.transaction.commit cannot complete a root with an active nested transaction");
   }
   commitRuntimeTransactionRoot(scope.root);
 }
 
 function transactionRollback(id: TransactionId): void {
   if (currentContext !== undefined) {
-    throw new Error("Behave.transaction.rollback cannot run while evaluating a Model");
+    throw new Error("Behavon.transaction.rollback cannot run while evaluating a Model");
   }
   const scope = requireOwnedTransactionScope(id, "rollback");
   if (scope.status !== "started" || scope.root.status !== "started") {
-    throw new Error("Behave.transaction.rollback requires an active TransactionId");
+    throw new Error("Behavon.transaction.rollback requires an active TransactionId");
   }
   rollbackTransactionScope(scope);
 }
@@ -3654,10 +3668,10 @@ function useStateInternal<State>(
     cell = existing;
     if (cell.label !== label) {
       if (cell.label !== undefined && label !== undefined) {
-        throw new Error("Behave.useLabelState StateId changed at the same Hook position");
+        throw new Error("Behavon.useLabelState StateId changed at the same Hook position");
       }
       throw new Error(
-        `Behave state Hook changed between ${cell.label === undefined ? "useState" : "useLabelState"} and ${api}`,
+        `Behavon state Hook changed between ${cell.label === undefined ? "useState" : "useLabelState"} and ${api}`,
       );
     }
     if (label !== undefined) mutableObserver.registerLabel(cell, context.instance, label);
@@ -3694,10 +3708,10 @@ export function useReducer<State, InitialArg, ActionArgs extends ReducerActionAr
 ): readonly [State, ReducerDispatch<ActionArgs>] {
   const context = requireContext("useReducer");
   if (typeof reducer !== "function") {
-    throw new Error("Behave.useReducer requires a reducer function");
+    throw new Error("Behavon.useReducer requires a reducer function");
   }
   if (initializer !== undefined && typeof initializer !== "function") {
-    throw new Error("Behave.useReducer initializer must be a function when provided");
+    throw new Error("Behavon.useReducer initializer must be a function when provided");
   }
   const existing = activeHook(context, "reducer") as ReducerCell | undefined;
   let cell: ReducerCell;
@@ -3710,7 +3724,7 @@ export function useReducer<State, InitialArg, ActionArgs extends ReducerActionAr
     } as ReducerOperationTarget);
     const dispatch: ReducerDispatch<ReducerActionArgs> = (...action) => {
       if (action.length > 1) {
-        throw new Error("Behave.useReducer dispatch accepts zero or one action argument");
+        throw new Error("Behavon.useReducer dispatch accepts zero or one action argument");
       }
       invokeRetainedReducerDispatch(operationTarget, action);
     };
@@ -3896,7 +3910,7 @@ function createResourceIdentity<Type>(): Type {
 const futureDiagnosticListeners = new Set<(diagnostic: FutureDiagnostic) => void>();
 export const futureDiagnostics: OccurrenceSource<FutureDiagnostic> = Object.freeze({
   subscribe(listener: (diagnostic: FutureDiagnostic) => void): () => void {
-    if (typeof listener !== "function") throw new Error("Behave.futureDiagnostics.subscribe requires a function");
+    if (typeof listener !== "function") throw new Error("Behavon.futureDiagnostics.subscribe requires a function");
     futureDiagnosticListeners.add(listener);
     return () => futureDiagnosticListeners.delete(listener);
   },
@@ -3909,7 +3923,7 @@ function createFutureChannel<Payload>(target: FutureOperationTarget): FutureOccu
     source: Object.freeze({
       subscribe(listener: (payload: Payload) => void): () => void {
         requireFutureTarget(target, "useFuture occurrence subscription");
-        if (typeof listener !== "function") throw new Error("Behave.useFuture occurrence subscribe requires a function");
+        if (typeof listener !== "function") throw new Error("Behavon.useFuture occurrence subscribe requires a function");
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
@@ -3920,7 +3934,7 @@ function createFutureChannel<Payload>(target: FutureOperationTarget): FutureOccu
 function requireFutureTarget(target: FutureOperationTarget, operation: string): FutureCell {
   const cell = target.cell;
   if (cell === undefined || target.owner === undefined || cell.disposed) {
-    throw new Error(`Behave.useFuture handle requires a live Model instance during ${operation}`);
+    throw new Error(`Behavon.useFuture handle requires a live Model instance during ${operation}`);
   }
   return cell;
 }
@@ -3967,7 +3981,7 @@ function requestFutureTransition(
   value?: unknown,
 ): void {
   if (cell.disposed || cell.operationTarget.owner === undefined) return;
-  if (cell.transition !== undefined) throw new Error("Behave.useFuture attempted overlapping snapshot transitions");
+  if (cell.transition !== undefined) throw new Error("Behavon.useFuture attempted overlapping snapshot transitions");
   const snapshot: FutureSnapshot<unknown> = kind === "pending"
     ? Object.freeze({ status: "pending" })
     : kind === "fulfilled"
@@ -4017,7 +4031,7 @@ function finishFutureUnderlying(cell: FutureCell, run: RuntimeFutureRun, fulfill
   }
   run.valid = false;
   run.phase = "terminal";
-  run.controller?.abort(Object.freeze({ type: "behave-future-terminal-cleanup", run: run.id }));
+  run.controller?.abort(Object.freeze({ type: "behavon-future-terminal-cleanup", run: run.id }));
   requestFutureTransition(cell, run, fulfilled ? "fulfilled" : "rejected", result);
 }
 
@@ -4107,7 +4121,7 @@ function publishFutureTransition(cell: FutureCell, transition: FutureTransition)
       run.valid = false;
       run.phase = "terminal";
       run.controller?.abort(Object.freeze({
-        type: "behave-future-pending-listener-failure",
+        type: "behavon-future-pending-listener-failure",
         run: run.id,
       }));
       requestFutureTransition(cell, run, "rejected", failure);
@@ -4127,9 +4141,9 @@ function publishFutureTransition(cell: FutureCell, transition: FutureTransition)
 
 function warnFutureCommand(cell: FutureCell, operation: "start" | "abort"): void {
   warnEvaluationOperation("useFuture command", `'${operation}'`, `future:${cell.owner.id}:${operation}`);
-  if (!__BEHAVE_DEVELOPMENT__ || currentTransactionScope === undefined || typeof console === "undefined") return;
+  if (!__BEHAVON_DEVELOPMENT__ || currentTransactionScope === undefined || typeof console === "undefined") return;
   try {
-    console.warn(`Behave.useFuture ${operation}() called inside transaction.run is immediate and nontransactional; rollback will not undo it.`);
+    console.warn(`Behavon.useFuture ${operation}() called inside transaction.run is immediate and nontransactional; rollback will not undo it.`);
   } catch {
     // A development diagnostic must not replace the command result.
   }
@@ -4227,13 +4241,13 @@ export function useFuture<Input, Value>(
   options: Readonly<{ concurrency: FutureConcurrency }>,
 ): Future<Input, Value> {
   const context = requireContext("useFuture");
-  if (typeof factory !== "function") throw new Error("Behave.useFuture requires a factory function");
+  if (typeof factory !== "function") throw new Error("Behavon.useFuture requires a factory function");
   if (options?.concurrency !== "serial" && options?.concurrency !== "latest") {
-    throw new Error("Behave.useFuture requires { concurrency: 'serial' | 'latest' }");
+    throw new Error("Behavon.useFuture requires { concurrency: 'serial' | 'latest' }");
   }
   const existing = activeHook(context, "future") as FutureCell | undefined;
   if (existing !== undefined && existing.concurrency !== options.concurrency) {
-    throw new Error("Behave.useFuture concurrency changed at the same Hook position");
+    throw new Error("Behavon.useFuture concurrency changed at the same Hook position");
   }
   const cell = existing ?? createFutureCell(context.instance, factory as FutureFactory<unknown, unknown>, options.concurrency);
   if (existing === undefined) context.transaction.provisionalFutures.add(cell);
@@ -4254,7 +4268,7 @@ function requireResourceTarget(
   const cell = target.cell;
   const owner = target.owner;
   if (cell === undefined || owner === undefined) {
-    throw new Error(`Behave useResource controller is stale during ${operation}`);
+    throw new Error(`Behavon useResource controller is stale during ${operation}`);
   }
   if (owner.status === "active" || owner.status === "constructing") return cell;
   if (
@@ -4270,7 +4284,7 @@ function createResourceChannel(target: ResourceOperationTarget): ResourceOccurre
   const listeners = new Set<(payload: unknown) => void>();
   const source = Object.freeze({
     subscribe(listener: (payload: unknown) => void): () => void {
-      if (typeof listener !== "function") throw new TypeError("Behave Resource occurrence listener must be a function");
+      if (typeof listener !== "function") throw new TypeError("Behavon Resource occurrence listener must be a function");
       requireResourceTarget(target, "useResource occurrence subscription");
       listeners.add(listener);
       let active = true;
@@ -4342,7 +4356,7 @@ function reportResourceCleanupError(
       invokeUserFunction("useResource cleanup error handler", () => handler(error, Object.freeze({ command, reason })));
       return;
     } catch (handlerError: unknown) {
-      error = new AggregateError([error, handlerError], "Behave Resource cleanup diagnostic failed");
+      error = new AggregateError([error, handlerError], "Behavon Resource cleanup diagnostic failed");
     }
   }
   setTimeout(() => { throw error; }, 0);
@@ -4832,7 +4846,7 @@ function trackResourceAction(
 function invokeResourceAction(cell: ResourceCell, name: string, args: unknown[]): unknown {
   warnEvaluationOperation("useResource action", `'${name}'`, `resource:${cell.owner.id}:action:${name}`);
   if (cell.snapshot.phase !== "open" || cell.actionController === undefined) {
-    throw new Error(`Behave Resource action '${name}' requires an open resource`);
+    throw new Error(`Behavon Resource action '${name}' requires an open resource`);
   }
   const token = cell.token;
   const resource = cell.resource;
@@ -4879,7 +4893,7 @@ function createResourceCell(
   input: unknown,
 ): ResourceCell {
   const definition = resourceDefinitions.get(type as object);
-  if (definition === undefined) throw new Error("Behave.useResource requires a ResourceType created by Behave.createResource");
+  if (definition === undefined) throw new Error("Behavon.useResource requires a ResourceType created by Behavon.createResource");
   const cell = {} as ResourceCell;
   const operationTarget = createRetainedOperationTarget(owner, {
     kind: "resourceController" as const,
@@ -4942,7 +4956,7 @@ export function useResource<
   const context = requireContext("useResource");
   const existing = activeHook(context, "resource") as ResourceCell | undefined;
   if (existing !== undefined && existing.type !== type) {
-    throw new Error("Behave.useResource ResourceType changed at the same Hook position");
+    throw new Error("Behavon.useResource ResourceType changed at the same Hook position");
   }
   const cell = existing ?? createResourceCell(context.instance, type, input);
   if (existing === undefined) context.transaction.provisionalResources.add(cell);
@@ -5001,19 +5015,19 @@ function registerPortMember(
 ): RuntimePortMember {
   const descriptor = portDescriptors.get(port);
   if (descriptor === undefined) {
-    throw new Error("Behave Port-aware Hook requires a descriptor created by Behave.createPort");
+    throw new Error("Behavon Port-aware Hook requires a descriptor created by Behavon.createPort");
   }
   const member = descriptor.members.get(name);
   if (member === undefined) {
-    throw new Error(`Behave Port has no declared member '${name}'`);
+    throw new Error(`Behavon Port has no declared member '${name}'`);
   }
   if (member.kind !== expectedKind) {
     throw new Error(
-      `Behave Port member '${name}' is declared as ${member.kind}, not ${expectedKind}`,
+      `Behavon Port member '${name}' is declared as ${member.kind}, not ${expectedKind}`,
     );
   }
   if (context.draft.port !== undefined && context.draft.port !== descriptor) {
-    throw new Error("Behave Model cannot register members from more than one Port declaration");
+    throw new Error("Behavon Model cannot register members from more than one Port declaration");
   }
   context.draft.port = descriptor;
   context.draft.portMembers.add(name);
@@ -5025,11 +5039,11 @@ function assertPortDeclarationComplete(draft: ModelDraft): void {
   if (port === undefined) return;
   for (const [name, member] of port.members) {
     if (!draft.portMembers.has(name)) {
-      throw new Error(`Behave Model did not register declared Port member '${name}'`);
+      throw new Error(`Behavon Model did not register declared Port member '${name}'`);
     }
     if (member.kind === "snapshot") {
       if (!draft.exports.has(name)) {
-        throw new Error(`Behave Model did not export declared Port snapshot '${name}'`);
+        throw new Error(`Behavon Model did not export declared Port snapshot '${name}'`);
       }
       continue;
     }
@@ -5038,18 +5052,22 @@ function assertPortDeclarationComplete(draft: ModelDraft): void {
     const conflicting = member.kind === "signal" ? endpoint?.slots.length : endpoint?.signals.length;
     if ((matching ?? 0) === 0 || (conflicting ?? 0) > 0) {
       throw new Error(
-        `Behave Model did not register Port member '${name}' exclusively as ${member.kind}`,
+        `Behavon Model did not register Port member '${name}' exclusively as ${member.kind}`,
       );
     }
+    if (member.kind === "signal" && !draft.exports.has(name)) {
+      throw new Error(`Behavon Model did not export declared Port Signal '${name}'`);
+    }
   }
-  for (const name of draft.endpoints.keys()) {
-    if (!port.members.has(name)) {
-      throw new Error(`Behave Model registered undeclared Port endpoint '${name}'`);
+  for (const [name, endpoint] of draft.endpoints) {
+    // A Signal outside the Port is internal: it is wired with useConnect and never public.
+    if (!port.members.has(name) && endpoint.slots.length > 0) {
+      throw new Error(`Behavon Model registered undeclared Port endpoint '${name}'`);
     }
   }
   for (const name of draft.exports.keys()) {
     if (!port.members.has(name)) {
-      throw new Error(`Behave Model registered undeclared Port export '${name}'`);
+      throw new Error(`Behavon Model registered undeclared Port export '${name}'`);
     }
   }
 }
@@ -5064,18 +5082,18 @@ function declareEndpoint(
   assertEndpointName(name);
   if (port !== undefined) registerPortMember(context, port, name, role);
   if (context.draft.exports.has(name)) {
-    throw new Error(`Behave public member '${name}' cannot be both an endpoint and an export`);
+    throw new Error(`Behavon public member '${name}' cannot be both an endpoint and an export`);
   }
   const callbackVersion = managedCallbackRecords.get(callback);
   if (callbackVersion === undefined || callbackVersion.provenance !== context.instance.callbackProvenance) {
-    throw new Error(`Behave.use${role === "signal" ? "Signal" : "Slot"} requires a managed callback from the same Model`);
+    throw new Error(`Behavon.use${role === "signal" ? "Signal" : "Slot"} requires a managed callback from the same Model`);
   }
   const existing = activeHook(context, role) as DeclarationCell | undefined;
   if (existing !== undefined && existing.name !== name) {
-    throw new Error(`Behave public endpoint declaration changed from '${existing.name}' to '${name}'`);
+    throw new Error(`Behavon public endpoint declaration changed from '${existing.name}' to '${name}'`);
   }
   if (existing !== undefined && existing.port !== port) {
-    throw new Error(`Behave public endpoint '${name}' changed its Port declaration`);
+    throw new Error(`Behavon public endpoint '${name}' changed its Port declaration`);
   }
   let endpoint = context.draft.endpoints.get(name);
   if (endpoint === undefined) {
@@ -5159,29 +5177,29 @@ function createExportValue(
 ): Readonly<Record<string, unknown>> {
   const candidate = invokeUserFunction("useExport initializer", initialize);
   if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate)) {
-    throw new Error("Behave.useExport initializer must return a non-null plain object");
+    throw new Error("Behavon.useExport initializer must return a non-null plain object");
   }
   const prototype = Object.getPrototypeOf(candidate);
   if (prototype !== Object.prototype && prototype !== null) {
-    throw new Error("Behave.useExport initializer must return an ordinary object or null-prototype object");
+    throw new Error("Behavon.useExport initializer must return an ordinary object or null-prototype object");
   }
   if (Object.getOwnPropertySymbols(candidate).length > 0) {
-    throw new Error("Behave.useExport does not allow symbol properties");
+    throw new Error("Behavon.useExport does not allow symbol properties");
   }
   const copy = Object.create(null) as Record<string, unknown>;
   for (const name of Object.getOwnPropertyNames(candidate)) {
     const descriptor = Object.getOwnPropertyDescriptor(candidate, name) as PropertyDescriptor;
     if (!descriptor.enumerable) {
-      throw new Error(`Behave.useExport property '${name}' must be enumerable`);
+      throw new Error(`Behavon.useExport property '${name}' must be enumerable`);
     }
     if (!("value" in descriptor)) {
-      throw new Error(`Behave.useExport property '${name}' must be a data property`);
+      throw new Error(`Behavon.useExport property '${name}' must be a data property`);
     }
     if (typeof descriptor.value === "function") {
-      throw new Error(`Behave.useExport property '${name}' must not be a function`);
+      throw new Error(`Behavon.useExport property '${name}' must not be a function`);
     }
     if (reservedEndpointNames.has(name)) {
-      throw new Error(`Behave export name is reserved: ${name}`);
+      throw new Error(`Behavon export name is reserved: ${name}`);
     }
     copy[name] = descriptor.value;
   }
@@ -5192,7 +5210,7 @@ type SnapshotPortName<Surface extends object> = {
   [Name in keyof Surface]-?: Surface[Name] extends SnapshotRootId<unknown> ? Name : never;
 }[keyof Surface] & string;
 
-export function useExport<Surface extends object, Name extends SnapshotPortName<Surface>>(
+export function useExport<Surface extends object, Name extends SnapshotPortName<Surface> | SignalPortName<Surface>>(
   port: PortDescriptor<Surface>,
   name: Name,
 ): Surface[Name];
@@ -5213,7 +5231,10 @@ export function useExport(
   const port = typeof portOrInitialize === "function" ? undefined : portOrInitialize;
   const name = port === undefined ? undefined : portName;
   if (port !== undefined && name === undefined) {
-    throw new Error("Behave.useExport Port form requires a declared member name");
+    throw new Error("Behavon.useExport Port form requires a declared member name");
+  }
+  if (port !== undefined && portDescriptors.get(port)?.members.get(name as string)?.kind === "signal") {
+    return exportPortSignal(context, port, name as string);
   }
   const member = port === undefined
     ? undefined
@@ -5223,7 +5244,7 @@ export function useExport(
       >;
   const existing = activeHook(context, "export") as ExportCell | undefined;
   if (existing !== undefined && (existing.port !== port || existing.portName !== name)) {
-    throw new Error("Behave public export changed its Port declaration");
+    throw new Error("Behavon public export changed its Port declaration");
   }
   const initialize = port === undefined
     ? portOrInitialize as () => Readonly<Record<string, unknown>>
@@ -5243,16 +5264,42 @@ export function useExport(
   };
   for (const [name, value] of Object.entries(cell.value)) {
     if (context.draft.exports.has(name)) {
-      throw new Error(`Behave duplicate public export '${name}'`);
+      throw new Error(`Behavon duplicate public export '${name}'`);
     }
     if (context.draft.endpoints.has(name)) {
-      throw new Error(`Behave public member '${name}' cannot be both an endpoint and an export`);
+      throw new Error(`Behavon public member '${name}' cannot be both an endpoint and an export`);
     }
     context.draft.exports.set(name, value);
   }
   context.draft.hooks.push({ kind: "export", cell, value: cell.value });
   context.hookIndex += 1;
   return name === undefined ? cell.value : cell.value[name];
+}
+
+// Opens a Port Signal implemented by useSignal: its handle becomes the public export of that name.
+function exportPortSignal(context: EvaluationContext, port: PortDescriptor<object>, name: string): unknown {
+  registerPortMember(context, port, name, "signal");
+  const existing = activeHook(context, "export") as ExportCell | undefined;
+  if (existing !== undefined && (existing.port !== port || existing.portName !== name)) {
+    throw new Error("Behavon public export changed its Port declaration");
+  }
+  if ((context.draft.endpoints.get(name)?.signals.length ?? 0) === 0) {
+    throw new Error(`Behavon.useExport requires Signal '${name}' to be registered with useSignal first`);
+  }
+  if (context.draft.exports.has(name)) {
+    throw new Error(`Behavon duplicate public export '${name}'`);
+  }
+  const cell = existing ?? {
+    kind: "export" as const,
+    owner: context.instance,
+    value: Object.freeze({ [name]: getEndpointHandle(context.instance, name).callable }),
+    port,
+    portName: name,
+  };
+  context.draft.exports.set(name, cell.value[name]);
+  context.draft.hooks.push({ kind: "export", cell, value: cell.value });
+  context.hookIndex += 1;
+  return cell.value[name];
 }
 
 function observationTargets(
@@ -5274,7 +5321,7 @@ function assertAcyclicModelObservation(
   transaction: EvaluationTransaction,
 ): void {
   if (owner === target) {
-    throw new Error(`Behave.useModel cannot observe its own Model#${owner.id}`);
+    throw new Error(`Behavon.useModel cannot observe its own Model#${owner.id}`);
   }
   const visited = new Set<RuntimeModelInstance>();
   const pending = [target];
@@ -5282,7 +5329,7 @@ function assertAcyclicModelObservation(
     const current = pending.pop() as RuntimeModelInstance;
     if (current === owner) {
       throw new Error(
-        `Behave.useModel observation cycle detected between Model#${owner.id} and Model#${target.id}`,
+        `Behavon.useModel observation cycle detected between Model#${owner.id} and Model#${target.id}`,
       );
     }
     if (visited.has(current)) continue;
@@ -5299,7 +5346,7 @@ export function useModel<Input, Output, Port extends object = object>(
 ): ModelHandle<Input, Output> {
   const context = requireContext("useModel");
   const target = getInterfaceTarget<RuntimeModelInstance>(instanceRef as object);
-  if (target === undefined) throw new Error("Behave.useModel requires a live Model instance");
+  if (target === undefined) throw new Error("Behavon.useModel requires a live Model instance");
   if (
     (target.status === "disposing" || target.status === "disposed") &&
     target.hasTerminalError
@@ -5350,7 +5397,7 @@ function useBoundaryChildInternal<Input, Output>(
   } else {
     cell = existing;
     if (cell.model !== (model as unknown as UnknownModel)) {
-      throw new Error("Behave boundary Child Model changed at a mounted internal position");
+      throw new Error("Behavon boundary Child Model changed at a mounted internal position");
     }
   }
 
@@ -5470,7 +5517,7 @@ export function usePort<Ref extends ModelRefBase>(ref: Ref): DependencyProxy<Dep
 export function usePort(ref: InterfaceTarget): unknown {
   const context = requireContext("usePort");
   const instance = getInterfaceTarget<RuntimeModelInstance>(ref as object);
-  if (instance === undefined) throw new Error("Behave.usePort requires a live Model instance");
+  if (instance === undefined) throw new Error("Behavon.usePort requires a live Model instance");
   requireLiveInstance(instance, "dependency usePort");
   const existing = activeHook(context, "usePort") as UsePortCell | undefined;
   const cell = existing ?? { kind: "usePort" as const, owner: context.instance, target: instance };
@@ -5480,18 +5527,18 @@ export function usePort(ref: InterfaceTarget): unknown {
 }
 
 function resolveEndpointArgument(value: unknown, position: "source" | "destination"): EndpointHandle {
-  if (typeof value !== "function") throw new Error(`Behave.useConnect received an invalid ${position} endpoint`);
+  if (typeof value !== "function") throw new Error(`Behavon.useConnect received an invalid ${position} endpoint`);
   const handle = endpointHandleRecords.get(value);
-  if (handle === undefined) throw new Error(`Behave.useConnect received an invalid ${position} endpoint`);
+  if (handle === undefined) throw new Error(`Behavon.useConnect received an invalid ${position} endpoint`);
   if (position === "source" && handle.role === "slot") {
-    throw new Error("Behave.useConnect source must be a Signal handle");
+    throw new Error("Behavon.useConnect source must be a Signal handle");
   }
   if (position === "destination" && handle.role === "signal") {
-    throw new Error("Behave.useConnect destination must be a Slot handle");
+    throw new Error("Behavon.useConnect destination must be a Slot handle");
   }
   requireLiveInstance(handle.model, `${position} connection endpoint '${handle.name}'`);
   if (!endpointView(handle.model).has(handle.name)) {
-    throw new Error(`Behave.useConnect received a missing ${position} endpoint '${handle.name}'`);
+    throw new Error(`Behavon.useConnect received a missing ${position} endpoint '${handle.name}'`);
   }
   return handle;
 }
@@ -5513,7 +5560,7 @@ function createConnectCell(
   };
   const disconnect = (): void => {
     if (record.status !== "active") {
-      throw new Error(`Behave connection#${record.id} is already disconnected or stale`);
+      throw new Error(`Behavon connection#${record.id} is already disconnected or stale`);
     }
     invalidateConnection(record, "manual");
   };
@@ -5529,11 +5576,11 @@ export function useConnect<Args extends readonly unknown[]>(
   const destinationHandle = resolveEndpointArgument(destination, "destination");
   const sourceRecord = endpointView(sourceHandle.model).get(sourceHandle.name) as EndpointRecord;
   if (sourceRecord.signals.length === 0 && typeof console !== "undefined") {
-    console.warn(`Behave connection source '${sourceHandle.name}' has no Signal registration`);
+    console.warn(`Behavon connection source '${sourceHandle.name}' has no Signal registration`);
   }
   const destinationRecord = endpointView(destinationHandle.model).get(destinationHandle.name) as EndpointRecord;
   if (destinationRecord.slots.length === 0 && typeof console !== "undefined") {
-    console.warn(`Behave connection destination '${destinationHandle.name}' has no Slot registration`);
+    console.warn(`Behavon connection destination '${destinationHandle.name}' has no Slot registration`);
   }
   const existing = activeHook(context, "connect") as ConnectCell | undefined;
   const cell = existing === undefined || existing.record.status === "invalid"
@@ -5555,11 +5602,11 @@ export function useSnapshot<Root extends SnapshotRootId<unknown>>(root: Root): r
 ] {
   const context = requireContext("useSnapshot");
   const rootMetadata = requireSnapshotPayloadToken(root, "useSnapshot");
-  if (!rootMetadata.root) throw new Error("Behave.useSnapshot requires the root snapshot identity");
+  if (!rootMetadata.root) throw new Error("Behavon.useSnapshot requires the root snapshot identity");
   const existing = activeHook(context, "snapshot") as SnapshotCell | undefined;
   if (existing !== undefined && existing.root !== root) {
     const previous = getSnapshotTokenMetadata(existing.root)?.path ?? "unknown";
-    throw new Error(`Behave snapshot declaration changed from '${previous}' to '${rootMetadata.path}'`);
+    throw new Error(`Behavon snapshot declaration changed from '${previous}' to '${rootMetadata.path}'`);
   }
   let cell: SnapshotCell;
   if (existing === undefined) {
@@ -5575,7 +5622,7 @@ export function useSnapshot<Root extends SnapshotRootId<unknown>>(root: Root): r
     const publish = ((...args: readonly unknown[]) => {
       if (cell.owner.status === "disposing" || cell.owner.status === "disposed") return;
       if (args.length !== 1 && args.length !== 2) {
-        throw new Error("Behave.useSnapshot publisher expects exactly 1 or 2 arguments");
+        throw new Error("Behavon.useSnapshot publisher expects exactly 1 or 2 arguments");
       }
       const childPublication = args.length === 2;
       const targetOrUpdate = args[0];
@@ -5585,10 +5632,10 @@ export function useSnapshot<Root extends SnapshotRootId<unknown>>(root: Root): r
       if (childPublication) {
         const targetMetadata = requireSnapshotPayloadToken(targetOrUpdate, "useSnapshot.publish");
         if (targetMetadata.family.root !== cell.root) {
-          throw new Error("Behave.useSnapshot publisher cannot target a different snapshot family");
+          throw new Error("Behavon.useSnapshot publisher cannot target a different snapshot family");
         }
         if (targetOrUpdate === cell.root) {
-          throw new Error("Behave.useSnapshot publisher uses publish(value) for the root snapshot identity");
+          throw new Error("Behavon.useSnapshot publisher uses publish(value) for the root snapshot identity");
         }
         node = getFamilyNode(cell.family, targetOrUpdate as object);
         next = childUpdate;
@@ -5644,7 +5691,7 @@ export function createModel<Input, Output, Port extends object = object>(
 ): ModelInstance<Input, Output, Port> {
   if (currentContext !== undefined) {
     throw new Error(
-      `Behave.createModel cannot create an ownerless Model while evaluating Model#${currentContext.instance.id}`,
+      `Behavon.createModel cannot create an ownerless Model while evaluating Model#${currentContext.instance.id}`,
     );
   }
   const transaction = createTransaction();
@@ -5686,15 +5733,15 @@ export function getSnapshot<Id extends SnapshotId<unknown>>(
 
 export function getInterface(
   target: UntypedModelRef | TypedModelRef<object> | DependencyProxy,
-): BehaveInterfaceDescriptor;
+): BehavonInterfaceDescriptor;
 export function getInterface(
   target: InterfaceTarget,
-): BehaveInterfaceDescriptor {
+): BehavonInterfaceDescriptor {
   if ((typeof target !== "object" && typeof target !== "function") || target === null) {
-    throw new Error("Behave.getInterface requires a live Behave ref or dependency Proxy");
+    throw new Error("Behavon.getInterface requires a live Behavon ref or dependency Proxy");
   }
   const instance = getInterfaceTarget<RuntimeModelInstance>(target as object);
-  if (instance === undefined) throw new Error("Behave.getInterface received a non-Behave target");
+  if (instance === undefined) throw new Error("Behavon.getInterface received a non-Behavon target");
   requireLiveInstance(instance, "interface inspection");
   return {
     endpoints: [...instance.endpoints.values()]
@@ -5707,7 +5754,7 @@ export function getInterface(
   };
 }
 
-const Behave = Object.freeze({
+const Behavon = Object.freeze({
   createId,
   createPort,
   createResource,
@@ -5741,4 +5788,4 @@ const Behave = Object.freeze({
   futureDiagnostics,
 });
 
-export default Behave;
+export default Behavon;

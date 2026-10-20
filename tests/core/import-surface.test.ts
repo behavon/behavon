@@ -1,6 +1,6 @@
 /* eslint-disable behavon-hooks/canonical-api -- test-only probe compares default, namespace, and named export identities as values */
 import { describe, expect, it } from "vitest";
-import Behave, * as BehaveNamespace from "behavon";
+import Behavon, * as BehavonNamespace from "behavon";
 import {
   boundary,
   createId,
@@ -35,7 +35,7 @@ import {
   futureDiagnostics,
 } from "behavon";
 
-describe("React-style Behave import surface", () => {
+describe("React-style Behavon import surface", () => {
   it("exposes one frozen default facade over the exact named export functions", () => {
     const named = {
       createId,
@@ -71,19 +71,19 @@ describe("React-style Behave import surface", () => {
       futureDiagnostics,
     };
 
-    expect(Object.isFrozen(Behave)).toBe(true);
-    expect(Behave).toEqual(named);
+    expect(Object.isFrozen(Behavon)).toBe(true);
+    expect(Behavon).toEqual(named);
     for (const [name, implementation] of Object.entries(named)) {
-      expect(Behave[name as keyof typeof Behave]).toBe(implementation);
-      expect(BehaveNamespace[name as keyof typeof named]).toBe(implementation);
+      expect(Behavon[name as keyof typeof Behavon]).toBe(implementation);
+      expect(BehavonNamespace[name as keyof typeof named]).toBe(implementation);
     }
   });
 
   it("keeps namespace import compatibility alongside the default facade", () => {
-    expect(BehaveNamespace.default).toBe(Behave);
-    expect(BehaveNamespace.createModel).toBe(Behave.createModel);
-    expect(BehaveNamespace.usePort).toBe(Behave.usePort);
-    expect("use" in Behave).toBe(false);
-    expect("use" in BehaveNamespace).toBe(false);
+    expect(BehavonNamespace.default).toBe(Behavon);
+    expect(BehavonNamespace.createModel).toBe(Behavon.createModel);
+    expect(BehavonNamespace.usePort).toBe(Behavon.usePort);
+    expect("use" in Behavon).toBe(false);
+    expect("use" in BehavonNamespace).toBe(false);
   });
 });

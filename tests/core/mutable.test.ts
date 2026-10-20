@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { MutableHandle, Signal } from "behavon";
 import {
   inspectModelInstanceForTests,
   inspectRetainedOperationForTests,
 } from "../../src/internal/model-inspection";
-import { waitFor } from "../helpers";
+import { waitFor, signalOf } from "../helpers";
 
 async function captureScheduledFailure(action: () => void): Promise<unknown> {
   let surfaced: unknown;
@@ -36,14 +36,14 @@ describe("useMutable", () => {
     function Model(initial: number): Readonly<{ mutable: MutableHandle<number>; revision: number }> {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe counts owner reevaluations
       evaluations += 1;
-      const mutable = Behave.useMutable(initial);
-      const [revision, setRevision] = Behave.useState(0);
-      const reevaluate = Behave.useCallback(() => setRevision(current => current + 1), [setRevision]);
-      Behave.useSignal("reevaluate", reevaluate);
+      const mutable = Behavon.useMutable(initial);
+      const [revision, setRevision] = Behavon.useState(0);
+      const reevaluate = Behavon.useCallback(() => setRevision(current => current + 1), [setRevision]);
+      Behavon.useSignal("reevaluate", reevaluate);
       return { mutable, revision };
     }
 
-    const root = Behave.createModel(Model, 1);
+    const root = Behavon.createModel(Model, 1);
     const initialOutput = inspectModelInstanceForTests(root).output as ReturnType<typeof Model>;
     const handle = initialOutput.mutable;
     expect(Object.isFrozen(handle)).toBe(true);
@@ -53,7 +53,7 @@ describe("useMutable", () => {
     expect(handle.get()).toBe(5);
     expect(evaluations).toBe(1);
 
-    root.reevaluate();
+    signalOf(root, "reevaluate")();
     await waitFor(() => evaluations === 2);
     const nextOutput = inspectModelInstanceForTests(root).output as ReturnType<typeof Model>;
     expect(nextOutput.mutable).toBe(handle);
@@ -69,11 +69,11 @@ describe("useMutable", () => {
       return 42;
     };
     function Model(): MutableHandle<typeof initial> {
-      const mutable = Behave.useMutable(initial);
+      const mutable = Behavon.useMutable(initial);
       return mutable;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const handle = inspectModelInstanceForTests(root).output as MutableHandle<typeof initial>;
     expect(initialCalls).toBe(0);
     expect(handle.get()).toBe(initial);
@@ -89,8 +89,8 @@ describe("useMutable", () => {
   it("allows cleanup access, then terminalizes both methods and releases their retained target", () => {
     const cleanupValues: number[] = [];
     function Model(): MutableHandle<number> {
-      const mutable = Behave.useMutable(1);
-      Behave.useEffect(() => () => {
+      const mutable = Behavon.useMutable(1);
+      Behavon.useEffect(() => () => {
         cleanupValues.push(mutable.get());
         mutable.set(2);
         cleanupValues.push(mutable.get());
@@ -98,7 +98,7 @@ describe("useMutable", () => {
       return mutable;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const handle = inspectModelInstanceForTests(root).output as MutableHandle<number>;
     const getTarget = inspectRetainedOperationForTests(handle.get);
     const setTarget = inspectRetainedOperationForTests(handle.set);
@@ -109,7 +109,7 @@ describe("useMutable", () => {
     expect(cleanupValues).toEqual([1, 2]);
     expect(getTarget.cell).toBeUndefined();
     expect((getTarget.owner as { status: string }).status).toBe("disposed");
-    const terminal = "Behave.useMutable handle requires a live Model instance";
+    const terminal = "Behavon.useMutable handle requires a live Model instance";
     expect(() => handle.get()).toThrow(terminal);
     expect(() => handle.set(3)).toThrow(terminal);
   });
@@ -120,41 +120,41 @@ describe("useMutable", () => {
     }
     let cleanupValue: number | undefined;
     function Model(): MutableHandle<number> {
-      const mutable = Behave.useMutable(0);
-      const [failed, setFailed] = Behave.useState(false);
-      Behave.useEffect(() => () => {
+      const mutable = Behavon.useMutable(0);
+      const [failed, setFailed] = Behavon.useState(false);
+      Behavon.useEffect(() => () => {
         cleanupValue = mutable.get();
       }, []);
       if (failed) {
         mutable.set(9);
         throw new Error("evaluation failed after mutable write");
       }
-      const fail = Behave.useCallback(() => setFailed(true), [setFailed]);
-      Behave.useSignal("fail", fail);
+      const fail = Behavon.useCallback(() => setFailed(true), [setFailed]);
+      Behavon.useSignal("fail", fail);
       return mutable;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const handle = inspectModelInstanceForTests(root).output as MutableHandle<number>;
-    const failure = await captureScheduledFailure(() => root.fail());
+    const failure = await captureScheduledFailure(() => signalOf(root, "fail")());
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toBe("evaluation failed after mutable write");
     expect(cleanupValue).toBe(9);
-    expect(() => handle.get()).toThrow("Behave.useMutable handle requires a live Model instance");
+    expect(() => handle.get()).toThrow("Behavon.useMutable handle requires a live Model instance");
   });
 
   it("terminalizes a handle that escaped failed construction", () => {
     let escaped: MutableHandle<number> | undefined;
     function Model(): undefined {
-      const mutable = Behave.useMutable(0);
+      const mutable = Behavon.useMutable(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a failed-construction Hook result
       escaped = mutable;
       throw new Error("construction failed");
     }
 
-    expect(() => Behave.createModel(Model, undefined)).toThrow("construction failed");
-    expect(() => escaped?.get()).toThrow("Behave.useMutable handle requires a live Model instance");
-    expect(() => escaped?.set(1)).toThrow("Behave.useMutable handle requires a live Model instance");
+    expect(() => Behavon.createModel(Model, undefined)).toThrow("construction failed");
+    expect(() => escaped?.get()).toThrow("Behavon.useMutable handle requires a live Model instance");
+    expect(() => escaped?.set(1)).toThrow("Behavon.useMutable handle requires a live Model instance");
   });
 
   it("participates in Hook order diagnostics", async () => {
@@ -162,22 +162,22 @@ describe("useMutable", () => {
       readonly enable: Signal;
     }
     function Model(): undefined {
-      const [enabled, setEnabled] = Behave.useState(false);
+      const [enabled, setEnabled] = Behavon.useState(false);
       if (enabled) {
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/canonical-api -- test-only probe verifies runtime Hook-order rejection
-        const mutable = Behave.useMutable(0);
+        const mutable = Behavon.useMutable(0);
         void mutable;
       }
-      const enable = Behave.useCallback(() => setEnabled(true), [setEnabled]);
-      Behave.useSignal("enable", enable);
+      const enable = Behavon.useCallback(() => setEnabled(true), [setEnabled]);
+      Behavon.useSignal("enable", enable);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    const failure = await captureScheduledFailure(() => root.enable());
+    const root = Behavon.createModel(Model, undefined);
+    const failure = await captureScheduledFailure(() => signalOf(root, "enable")());
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toMatch(
-      /^Behave hook order changed in Model#\d+: expected callback, received mutable$/,
+      /^Behavon hook order changed in Model#\d+: expected callback, received mutable$/,
     );
   });
 });

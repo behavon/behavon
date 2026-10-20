@@ -1,10 +1,10 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
-const Resource = Behave.createResource({ open: () => ({}), close: () => undefined, abort: () => undefined });
+const Resource = Behavon.createResource({ open: () => ({}), close: () => undefined, abort: () => undefined });
 
 export function ConditionalResourceModel(enabled: boolean): string {
   if (enabled) {
-    const [snapshot] = Behave.useResource(Resource, undefined);
+    const [snapshot] = Behavon.useResource(Resource, undefined);
     return snapshot.phase;
   }
   return "closed";

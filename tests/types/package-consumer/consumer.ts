@@ -1,8 +1,8 @@
-import Behave, { createResource, FutureCancellationError, useEffect, useExport, useFuture, useReducer, useResource } from "behavon";
+import Behavon, { createResource, FutureCancellationError, useEffect, useExport, useFuture, useReducer, useResource } from "behavon";
 // @ts-expect-error Packed declarations do not expose the removed dependency Hook name.
 import { use as removedUse } from "behavon";
 import type {
-  BehaveInterfaceDescriptor,
+  BehavonInterfaceDescriptor,
   DependencyProxy,
   BoundaryState,
   Model,
@@ -30,24 +30,24 @@ import type {
 } from "behavon";
 
 export function PackedReactCorrespondingHookTypeFailures(): void {
-  const memo: number = Behave.useMemo(() => 1, []);
+  const memo: number = Behavon.useMemo(() => 1, []);
   /* eslint-disable behavon-hooks/exhaustive-deps -- packed type-only invalid reproductions exercise declaration-level rejection */
   // @ts-expect-error Packed useMemo requires an explicit dependency list.
-  const missingMemoDependencies = Behave.useMemo(() => 1);
+  const missingMemoDependencies = Behavon.useMemo(() => 1);
   // @ts-expect-error Packed useMemo dependencies must be a readonly array.
-  const malformedMemoDependencies = Behave.useMemo(() => 1, "not dependencies");
+  const malformedMemoDependencies = Behavon.useMemo(() => 1, "not dependencies");
   // @ts-expect-error Packed useMemo requires a callable factory.
-  const malformedMemoFactory = Behave.useMemo(1, []);
+  const malformedMemoFactory = Behavon.useMemo(1, []);
   /* eslint-enable behavon-hooks/exhaustive-deps */
 
-  const external: number = Behave.useSyncExternalStore(
+  const external: number = Behavon.useSyncExternalStore(
     () => () => undefined,
     () => 1,
   );
   // @ts-expect-error Packed subscribe must return an unsubscribe function.
-  const malformedSubscribe = Behave.useSyncExternalStore(() => undefined, () => 1);
+  const malformedSubscribe = Behavon.useSyncExternalStore(() => undefined, () => 1);
   // @ts-expect-error Packed getSnapshot must be callable.
-  const malformedSnapshotReader = Behave.useSyncExternalStore(() => () => undefined, 1);
+  const malformedSnapshotReader = Behavon.useSyncExternalStore(() => () => undefined, 1);
 
   // @ts-expect-error Packed Effect setup cannot return a Promise cleanup.
   useEffect(() => Promise.resolve(), []);
@@ -138,7 +138,7 @@ export function usePackedReducerContract() {
   dispatch();
   // @ts-expect-error Packed reducer dispatch rejects more than one action.
   dispatch(1, 2);
-  const [initialized] = Behave.useReducer(
+  const [initialized] = Behavon.useReducer(
     (current: number, action: number) => current + action,
     "3",
     (initial: string) => Number(initial),
@@ -148,7 +148,7 @@ export function usePackedReducerContract() {
 
 void removedUse;
 // @ts-expect-error Packed default facade has no old compatibility member.
-Behave.use;
+Behavon.use;
 
 interface PackagePort {
   snapshotId: SnapshotRootId<number>;
@@ -156,130 +156,130 @@ interface PackagePort {
   receive: Slot<[value: number]>;
 }
 
-const packagePort = Behave.createPort<PackagePort>({
-  snapshotId: Behave.SnapshotType(),
-  changed: Behave.SignalType(),
-  receive: Behave.SlotType(),
+const packagePort = Behavon.createPort<PackagePort>({
+  snapshotId: Behavon.SnapshotType(),
+  changed: Behavon.SignalType(),
+  receive: Behavon.SlotType(),
 });
 const packagePortDescriptor: PortDescriptor<PackagePort> = packagePort;
 
 type PackageUnionPort = { changed: Signal } | { receive: Slot };
 // @ts-expect-error Packed createPort rejects a union Port.
-Behave.createPort<PackageUnionPort>({ changed: Behave.SignalType() });
+Behavon.createPort<PackageUnionPort>({ changed: Behavon.SignalType() });
 interface PackageUnionMemberPort {
   endpoint: Signal | Slot;
 }
 // @ts-expect-error Packed createPort rejects union members.
-Behave.createPort<PackageUnionMemberPort>({ endpoint: Behave.SignalType() });
+Behavon.createPort<PackageUnionMemberPort>({ endpoint: Behavon.SignalType() });
 
 declare const packagePortSymbol: unique symbol;
 interface PackageSymbolKeyPort {
   [packagePortSymbol]: Signal;
 }
 // @ts-expect-error Packed createPort rejects non-string top-level Port keys.
-Behave.createPort<PackageSymbolKeyPort>({ [packagePortSymbol]: Behave.SignalType() });
+Behavon.createPort<PackageSymbolKeyPort>({ [packagePortSymbol]: Behavon.SignalType() });
 
 interface PackageNumberKeyPort {
   0: Signal;
 }
 // @ts-expect-error Packed createPort rejects numeric top-level Port keys.
-Behave.createPort<PackageNumberKeyPort>({ 0: Behave.SignalType() });
+Behavon.createPort<PackageNumberKeyPort>({ 0: Behavon.SignalType() });
 
 interface PackageEmptyNamePort {
   "": Signal;
 }
 // @ts-expect-error Packed createPort rejects an empty unified-namespace member name.
-Behave.createPort<PackageEmptyNamePort>({ "": Behave.SignalType() });
+Behavon.createPort<PackageEmptyNamePort>({ "": Behavon.SignalType() });
 
 interface PackageProtoNamePort {
   __proto__: Signal;
 }
 // @ts-expect-error Packed createPort rejects the unsafe __proto__ member name.
-Behave.createPort<PackageProtoNamePort>({ __proto__: Behave.SignalType() });
+Behavon.createPort<PackageProtoNamePort>({ __proto__: Behavon.SignalType() });
 
 interface PackageEmptyPort {}
 // @ts-expect-error Packed createPort requires a non-empty finite Port interface.
-Behave.createPort<PackageEmptyPort>({});
+Behavon.createPort<PackageEmptyPort>({});
 // @ts-expect-error Packed object cannot associate a descriptor with a Model body.
-Behave.createPort<object>({});
+Behavon.createPort<object>({});
 // @ts-expect-error Packed {} cannot associate a descriptor with a Model body.
-Behave.createPort<{}>({});
+Behavon.createPort<{}>({});
 
 interface PackageCallablePort {
   (value: number): void;
   fire: Signal;
 }
 // @ts-expect-error Packed Ports reject call signatures.
-Behave.createPort<PackageCallablePort>({ fire: Behave.SignalType() });
+Behavon.createPort<PackageCallablePort>({ fire: Behavon.SignalType() });
 
 interface PackageConstructablePort {
   new (value: number): object;
   fire: Signal;
 }
 // @ts-expect-error Packed Ports reject construct signatures.
-Behave.createPort<PackageConstructablePort>({ fire: Behave.SignalType() });
+Behavon.createPort<PackageConstructablePort>({ fire: Behavon.SignalType() });
 
 interface PackageSignalSnapshotPort {
   endpoint: Signal<[value: number]> & SnapshotRootId<number>;
 }
 // @ts-expect-error Packed createPort rejects endpoint/snapshot intersections.
-Behave.createPort<PackageSignalSnapshotPort>({ endpoint: Behave.SignalType() });
+Behavon.createPort<PackageSignalSnapshotPort>({ endpoint: Behavon.SignalType() });
 
 interface PackageAugmentedSignalPort {
   endpoint: Signal<[value: number]> & { label: string };
 }
 // @ts-expect-error Packed createPort rejects augmented endpoint promises.
-Behave.createPort<PackageAugmentedSignalPort>({ endpoint: Behave.SignalType() });
+Behavon.createPort<PackageAugmentedSignalPort>({ endpoint: Behavon.SignalType() });
 
 interface PackageOverloadedSignalPort {
   endpoint: Signal<[value: number]> & Signal<[value: string]>;
 }
 // @ts-expect-error Packed createPort rejects overloaded endpoint promises.
-Behave.createPort<PackageOverloadedSignalPort>({ endpoint: Behave.SignalType() });
+Behavon.createPort<PackageOverloadedSignalPort>({ endpoint: Behavon.SignalType() });
 
 interface PackageIndexedSnapshotPort {
   app: SnapshotRootId<number> & Readonly<Record<string, SnapshotId<number>>>;
 }
 // @ts-expect-error Packed createPort rejects open nested snapshot identities.
-Behave.createPort<PackageIndexedSnapshotPort>({ app: Behave.SnapshotType() });
+Behavon.createPort<PackageIndexedSnapshotPort>({ app: Behavon.SnapshotType() });
 
 declare const packageSnapshotChild: unique symbol;
 interface PackageSymbolSnapshotPort {
   app: SnapshotRootId<number> & { [packageSnapshotChild]: SnapshotId<string> };
 }
 // @ts-expect-error Packed createPort rejects custom symbol snapshot children.
-Behave.createPort<PackageSymbolSnapshotPort>({ app: Behave.SnapshotType() });
+Behavon.createPort<PackageSymbolSnapshotPort>({ app: Behavon.SnapshotType() });
 
 interface PackageReservedMarkerSnapshotPort {
   app: SnapshotRootId<number> & { $: SnapshotId<string> };
 }
-Behave.createPort<PackageReservedMarkerSnapshotPort>({
+Behavon.createPort<PackageReservedMarkerSnapshotPort>({
   // @ts-expect-error Packed snapshot Ports reserve $ for the payload marker.
-  app: { $: Behave.SnapshotType() },
+  app: { $: Behavon.SnapshotType() },
 });
 
 interface PackageProtoSnapshotPort {
   app: SnapshotRootId<number> & { __proto__: SnapshotId<string> };
 }
-Behave.createPort<PackageProtoSnapshotPort>({
+Behavon.createPort<PackageProtoSnapshotPort>({
   // @ts-expect-error Packed snapshot Ports reject recursive __proto__ keys.
-  app: { $: Behave.SnapshotType(), __proto__: Behave.SnapshotType() },
+  app: { $: Behavon.SnapshotType(), __proto__: Behavon.SnapshotType() },
 });
 
 interface PackageCallableSnapshotRootPort {
   app: SnapshotRootId<number> & ((value: number) => string);
 }
-Behave.createPort<PackageCallableSnapshotRootPort>({
+Behavon.createPort<PackageCallableSnapshotRootPort>({
   // @ts-expect-error Packed snapshot roots reject call signatures.
-  app: Behave.SnapshotType(),
+  app: Behavon.SnapshotType(),
 });
 
 interface PackageConstructableSnapshotRootPort {
   app: SnapshotRootId<number> & { new (value: number): object };
 }
-Behave.createPort<PackageConstructableSnapshotRootPort>({
+Behavon.createPort<PackageConstructableSnapshotRootPort>({
   // @ts-expect-error Packed snapshot roots reject construct signatures.
-  app: Behave.SnapshotType(),
+  app: Behavon.SnapshotType(),
 });
 
 type PackageCallableSnapshotBranch = {
@@ -288,11 +288,11 @@ type PackageCallableSnapshotBranch = {
 interface PackageCallableSnapshotBranchPort {
   app: SnapshotRootId<number> & { branch: PackageCallableSnapshotBranch };
 }
-Behave.createPort<PackageCallableSnapshotBranchPort>({
+Behavon.createPort<PackageCallableSnapshotBranchPort>({
   app: {
-    $: Behave.SnapshotType(),
+    $: Behavon.SnapshotType(),
     // @ts-expect-error Packed nested snapshot objects reject call signatures.
-    branch: { child: Behave.SnapshotType() },
+    branch: { child: Behavon.SnapshotType() },
   },
 });
 
@@ -302,22 +302,22 @@ type PackageConstructableSnapshotBranch = {
 interface PackageConstructableSnapshotBranchPort {
   app: SnapshotRootId<number> & { branch: PackageConstructableSnapshotBranch };
 }
-Behave.createPort<PackageConstructableSnapshotBranchPort>({
+Behavon.createPort<PackageConstructableSnapshotBranchPort>({
   app: {
-    $: Behave.SnapshotType(),
+    $: Behavon.SnapshotType(),
     // @ts-expect-error Packed nested snapshot objects reject construct signatures.
-    branch: { child: Behave.SnapshotType() },
+    branch: { child: Behavon.SnapshotType() },
   },
 });
 
 interface PackageNestedRootSnapshotPort {
   app: SnapshotRootId<number> & { child: SnapshotRootId<string> };
 }
-Behave.createPort<PackageNestedRootSnapshotPort>({
+Behavon.createPort<PackageNestedRootSnapshotPort>({
   app: {
-    $: Behave.SnapshotType(),
+    $: Behavon.SnapshotType(),
     // @ts-expect-error Packed recursive snapshot members cannot promise an independent root.
-    child: Behave.SnapshotType(),
+    child: Behavon.SnapshotType(),
   },
 });
 
@@ -325,17 +325,19 @@ interface PackageNumberSnapshotPort {
   app: SnapshotRootId<number> & { 0: SnapshotId<string> };
 }
 // @ts-expect-error Packed createPort rejects numeric snapshot children.
-Behave.createPort<PackageNumberSnapshotPort>({ app: Behave.SnapshotType() });
+Behavon.createPort<PackageNumberSnapshotPort>({ app: Behavon.SnapshotType() });
 
 const PackagePortModel: Model<number, string, PackagePort> = (input) => {
-  Behave.useExport(packagePort, "snapshotId");
-  const changed = Behave.useCallback((value: number) => value, []);
-  Behave.useSignal(packagePort, "changed", changed);
-  const receive = Behave.useCallback((value: number) => value, []);
-  Behave.useSlot(packagePort, "receive", receive);
+  Behavon.useExport(packagePort, "snapshotId");
+  const changed = Behavon.useCallback((value: number) => value, []);
+  Behavon.useSignal(packagePort, "changed", changed);
+  const exportedChanged: Signal<readonly [value: number]> = Behavon.useExport(packagePort, "changed");
+  void exportedChanged;
+  const receive = Behavon.useCallback((value: number) => value, []);
+  Behavon.useSlot(packagePort, "receive", receive);
   return String(input);
 };
-const packagePortInstance: ModelInstance<number, string, PackagePort> = Behave.createModel(
+const packagePortInstance: ModelInstance<number, string, PackagePort> = Behavon.createModel(
   PackagePortModel,
   1,
 );
@@ -349,19 +351,19 @@ export function useNamedExportContract(): number {
 
 export function RejectFunctionExportContract(): undefined {
   // @ts-expect-error Packed public exports reject direct function-valued properties.
-  Behave.useExport(() => ({ command: () => undefined }));
+  Behavon.useExport(() => ({ command: () => undefined }));
   return undefined;
 }
 
 export function useSnapshotIdentityContract() {
-  const snapshots = Behave.createId({
-    $: Behave.SnapshotType<{ readonly version: number }>(),
-    change: Behave.SnapshotType<string>(),
+  const snapshots = Behavon.createId({
+    $: Behavon.SnapshotType<{ readonly version: number }>(),
+    change: Behavon.SnapshotType<string>(),
   });
   const root: SnapshotRootId<{ readonly version: number }> = snapshots;
   const child: SnapshotId<string> = snapshots.change;
-  const direct = Behave.createId(Behave.SnapshotType<number>());
-  const [current, publish] = Behave.useSnapshot(snapshots);
+  const direct = Behavon.createId(Behavon.SnapshotType<number>());
+  const [current, publish] = Behavon.useSnapshot(snapshots);
   // eslint-disable-next-line behavon-hooks/evaluation-purity -- type-only packed signature probe is never executed
   publish({ version: 1 });
   // eslint-disable-next-line behavon-hooks/evaluation-purity -- type-only packed signature probe is never executed
@@ -372,46 +374,46 @@ export function useSnapshotIdentityContract() {
   // @ts-expect-error Built snapshot publishers reject three or more arguments.
   // eslint-disable-next-line behavon-hooks/evaluation-purity -- type-only invalid packed arity probe is never executed
   publish(snapshots.change, "next", "extra");
-  const [directCurrent, directPublish] = Behave.useSnapshot(direct);
+  const [directCurrent, directPublish] = Behavon.useSnapshot(direct);
   // eslint-disable-next-line behavon-hooks/evaluation-purity -- type-only packed root-only signature probe is never executed
   directPublish(1);
-  const directRead: number | undefined = Behave.getSnapshot(direct)();
+  const directRead: number | undefined = Behavon.getSnapshot(direct)();
   // @ts-expect-error Built root-only publishers have no child target overload.
   // eslint-disable-next-line behavon-hooks/evaluation-purity -- type-only invalid packed signature probe is never executed
   directPublish(snapshots.change, "invalid");
   // @ts-expect-error Built child identities cannot own a snapshot family.
-  Behave.useSnapshot(snapshots.change);
+  Behavon.useSnapshot(snapshots.change);
   // @ts-expect-error Built createId roots must declare a payload.
-  Behave.createId({ change: Behave.SnapshotType<string>() });
+  Behavon.createId({ change: Behavon.SnapshotType<string>() });
   // @ts-expect-error Built descriptors validate every child recursively.
-  Behave.createId({ $: Behave.SnapshotType<number>(), invalid: 1 });
+  Behavon.createId({ $: Behavon.SnapshotType<number>(), invalid: 1 });
   // @ts-expect-error Built nested $ declarations require SnapshotType markers.
-  Behave.createId({
-    $: Behave.SnapshotType<number>(),
-    group: { $: "invalid", child: Behave.SnapshotType<string>() },
+  Behavon.createId({
+    $: Behavon.SnapshotType<number>(),
+    group: { $: "invalid", child: Behavon.SnapshotType<string>() },
   });
   return { root, child, current, directCurrent, directRead };
 }
 
-const packageTransactionStates = Behave.createId({
-  count: Behave.StateType<number>(),
+const packageTransactionStates = Behavon.createId({
+  count: Behavon.StateType<number>(),
 });
 const packageStateId: StateId<number> = packageTransactionStates.count;
 
 export function useTransactionContract(): number {
-  const [count, setCount] = Behave.useLabelState(packageStateId, 0);
-  const execute = Behave.useCallback(() => {
-    const id: TransactionId = Behave.createId();
-    Behave.transaction.start(id, [packageStateId]);
-    Behave.transaction.run(id, () => setCount((previous) => previous + 1));
+  const [count, setCount] = Behavon.useLabelState(packageStateId, 0);
+  const execute = Behavon.useCallback(() => {
+    const id: TransactionId = Behavon.createId();
+    Behavon.transaction.start(id, [packageStateId]);
+    Behavon.transaction.run(id, () => setCount((previous) => previous + 1));
     // @ts-expect-error Built transaction.run rejects async bodies.
-    Behave.transaction.run(id, async () => 1); // eslint-disable-line behavon-hooks/evaluation-purity -- type-only invalid synchronous-contract probe
+    Behavon.transaction.run(id, async () => 1); // eslint-disable-line behavon-hooks/evaluation-purity -- type-only invalid synchronous-contract probe
     const thenableBody = (): PromiseLike<number> => Promise.resolve(1);
     // @ts-expect-error Built transaction.run rejects PromiseLike-returning bodies.
-    Behave.transaction.run(id, thenableBody);
-    Behave.transaction.commit(id);
+    Behavon.transaction.run(id, thenableBody);
+    Behavon.transaction.commit(id);
   }, [setCount]);
-  Behave.useSignal("packageTransaction", execute);
+  Behavon.useSignal("packageTransaction", execute);
   return count;
 }
 
@@ -420,7 +422,7 @@ export function useNamedEffectContract(): void {
 }
 
 export function useMutableContract(initial: { readonly value: number }) {
-  const mutable: MutableHandle<{ readonly value: number }> = Behave.useMutable(initial);
+  const mutable: MutableHandle<{ readonly value: number }> = Behavon.useMutable(initial);
   const current: { readonly value: number } = mutable.get();
   mutable.set({ value: current.value + 1 });
   mutable.set(previous => ({ value: previous.value + 1 }));
@@ -432,10 +434,10 @@ export function useMutableContract(initial: { readonly value: number }) {
 }
 
 export function useStateOverloadContract() {
-  const omitted = Behave.useState();
-  const explicit = Behave.useState<number>();
-  const initialized = Behave.useState(1);
-  const lazy = Behave.useState(() => "ready");
+  const omitted = Behavon.useState();
+  const explicit = Behavon.useState<number>();
+  const initialized = Behavon.useState(1);
+  const lazy = Behavon.useState(() => "ready");
   const exactOmitted: readonly [undefined, StateSetter<undefined>] = omitted;
   const exactExplicit: readonly [number | undefined, StateSetter<number | undefined>] = explicit;
   const exactInitialized: readonly [number, StateSetter<number>] = initialized;
@@ -464,10 +466,10 @@ function CallbackFunctionShapeContract() {
   const callOnly = function (this: { readonly base: number }, increment: number): string {
     return String(this.base + increment);
   };
-  const managedCallOnly = Behave.useCallback(callOnly, []);
-  const managedClass = Behave.useCallback(CallbackConstructed, []);
-  const managedConstructOnly = Behave.useCallback(constructOnlyCallback, []);
-  const managedHybrid = Behave.useCallback(hybridCallback, []);
+  const managedCallOnly = Behavon.useCallback(callOnly, []);
+  const managedClass = Behavon.useCallback(CallbackConstructed, []);
+  const managedConstructOnly = Behavon.useCallback(constructOnlyCallback, []);
+  const managedHybrid = Behavon.useCallback(hybridCallback, []);
   const exactCallOnly: typeof callOnly = managedCallOnly;
   const exactClass: typeof CallbackConstructed = managedClass;
   const exactConstructOnly: ConstructOnlyCallback = managedConstructOnly;
@@ -529,13 +531,13 @@ export function callDetailedDependency(dependency: DependencyProxy<ConsumerEndpo
 }
 
 export function useConnectDetailedDependency(dependency: DependencyProxy<ConsumerEndpoints>) {
-  const disconnect = Behave.useConnect(dependency.changed, dependency.receive);
+  const disconnect = Behavon.useConnect(dependency.changed, dependency.receive);
   return disconnect;
 }
 
 export function useConnectDetailedDualRole(dependency: DependencyProxy<ConsumerEndpoints>) {
-  Behave.useConnect(dependency.relay, dependency.receive);
-  const disconnect = Behave.useConnect(dependency.changed, dependency.relay);
+  Behavon.useConnect(dependency.relay, dependency.receive);
+  const disconnect = Behavon.useConnect(dependency.changed, dependency.relay);
   return disconnect;
 }
 
@@ -573,7 +575,7 @@ detailedDependency.dispose;
 detailedDependency.then;
 // @ts-expect-error Runtime-reserved names are never endpoint capabilities.
 detailedDependency.toJSON;
-// @ts-expect-error The inherited Object constructor is not a Behave endpoint capability.
+// @ts-expect-error The inherited Object constructor is not a Behavon endpoint capability.
 const constructorEndpoint: Signal = detailedDependency.constructor;
 void constructorEndpoint;
 // @ts-expect-error Runtime dependency Proxies do not expose symbol endpoints.
@@ -612,7 +614,7 @@ const typedSymbolResult: undefined = typedRef[symbolEndpoint]();
 const typedUnchecked: any = typedRef.unchecked;
 const typedImpossible: never = typedRef.impossible;
 const typedDisposeResult: void = typedRef.dispose();
-const typedDescriptor: BehaveInterfaceDescriptor = Behave.getInterface(typedRef);
+const typedDescriptor: BehavonInterfaceDescriptor = Behavon.getInterface(typedRef);
 void typedSignalResult;
 void typedRelayResult;
 void typedVoidResult;
@@ -649,13 +651,13 @@ void anyTypedMember;
 void indexedTypedMember;
 
 export function useTypedRef(): unknown {
-  const dependency: DependencyProxy<ConsumerEndpoints> = Behave.usePort(typedRef);
+  const dependency: DependencyProxy<ConsumerEndpoints> = Behavon.usePort(typedRef);
   const changed: Signal<readonly [value: number]> = dependency.changed;
   const receive = dependency.receive;
   // @ts-expect-error Built usePort(typedRef) preserves Needs instead of reopening dynamic endpoints.
   dependency.runtimeEndpoint;
   // @ts-expect-error A built typed external view is not a Model input/output capability.
-  const [invalidOutput, invalidSetter] = Behave.useModel(typedRef);
+  const [invalidOutput, invalidSetter] = Behavon.useModel(typedRef);
   void dependency;
   void changed;
   void receive;
@@ -667,52 +669,52 @@ declare const detailedModelHandle: ModelHandle<number, number>;
 detailedModelHandle[1]("wrong input");
 
 export function useDependency(ref: UntypedModelRef): DependencyProxy {
-  const dependency = Behave.usePort(ref);
+  const dependency = Behavon.usePort(ref);
   return dependency;
 }
 
 export function useSchemaLessDependency(ref: UntypedModelRef) {
-  const dependency = Behave.usePort(ref);
+  const dependency = Behavon.usePort(ref);
   return dependency;
 }
 
 export function useConnectSchemaLessDependencies(sourceRef: UntypedModelRef, destinationRef: UntypedModelRef) {
-  const sourceDependency = Behave.usePort(sourceRef);
-  const destinationDependency = Behave.usePort(destinationRef);
+  const sourceDependency = Behavon.usePort(sourceRef);
+  const destinationDependency = Behavon.usePort(destinationRef);
   const source = sourceDependency.source;
   const destination = destinationDependency.destination;
-  const disconnect = Behave.useConnect(source, destination);
+  const disconnect = Behavon.useConnect(source, destination);
   return disconnect;
 }
 
 export function useInferredModelHandle(instance: ModelInstance<number, number>) {
-  const handle: ModelHandle<number, number> = Behave.useModel(instance);
+  const handle: ModelHandle<number, number> = Behavon.useModel(instance);
   return handle;
 }
 
 export function createInferredBoundaryModel(): Model<number, BoundaryState<number>> {
-  return Behave.boundary(Child);
+  return Behavon.boundary(Child);
 }
 
 export function createSchemaLessRoot(input: number): UntypedModelRef {
-  const ref = Behave.createModel(Child, input);
+  const ref = Behavon.createModel(Child, input);
   ref.dynamicSignal(input);
   return ref;
 }
 
 export function createRoot(input: number): UntypedModelRef {
-  return Behave.createModel(Child, input);
+  return Behavon.createModel(Child, input);
 }
 
-const createdInstance = Behave.createModel(Child, 1);
+const createdInstance = Behavon.createModel(Child, 1);
 const createdUntypedRef: UntypedModelRef = createdInstance;
 const assertedCreatedTypedRef = createdInstance as TypedModelRef<ConsumerEndpoints>;
 void createdUntypedRef;
 void assertedCreatedTypedRef;
 
 export function useAssemblyTypedRef(ref: typeof assertedCreatedTypedRef): undefined {
-  const dependency = Behave.usePort(ref);
-  Behave.useEffect(() => {
+  const dependency = Behavon.usePort(ref);
+  Behavon.useEffect(() => {
     dependency.changed(1);
     // @ts-expect-error Built assembly typed usePort preserves the Signal payload contract.
     dependency.changed("wrong payload");
@@ -725,20 +727,20 @@ export function useAssemblyTypedRef(ref: typeof assertedCreatedTypedRef): undefi
 export function useDetailedModelHandle(
   instance: ModelInstance<number, number>,
 ): ModelHandle<number, number> {
-  const handle = Behave.useModel(instance);
+  const handle = Behavon.useModel(instance);
   return handle;
 }
 
 export function useEffectWithoutDependencies() {
-  Behave.useEffect(() => undefined);
+  Behavon.useEffect(() => undefined);
 }
 
 export function useInspectTypedDependency(ref: UntypedModelRef) {
-  const dependency = Behave.usePort(ref);
-  return Behave.getInterface(dependency);
+  const dependency = Behavon.usePort(ref);
+  return Behavon.getInterface(dependency);
 }
 
-export const inspectTarget = Behave.getInterface;
+export const inspectTarget = Behavon.getInterface;
 
 interface CallbackReceiver {
   readonly base: number;
@@ -748,7 +750,7 @@ export function useCallbackWithReceiver() {
   const original = function (this: CallbackReceiver, increment: number, suffix?: string): string {
     return `${this.base + increment}${suffix ?? ""}`;
   };
-  const managed = Behave.useCallback(original, []);
+  const managed = Behavon.useCallback(original, []);
   const exact: typeof original = managed;
   const result: string = managed.call({ base: 40 }, 2, "!");
   void exact;
@@ -761,8 +763,8 @@ export function useCallbackWithReceiver() {
 
 declare const plainFunction: (...args: readonly unknown[]) => undefined;
 function InvalidConnectionContract(): undefined {
-  // @ts-expect-error Ordinary functions are not Behave endpoint capabilities.
-  Behave.useConnect(plainFunction, plainFunction);
+  // @ts-expect-error Ordinary functions are not Behavon endpoint capabilities.
+  Behavon.useConnect(plainFunction, plainFunction);
   return undefined;
 }
 void InvalidConnectionContract;
@@ -772,13 +774,13 @@ function RemovedTypedRelationshipOverloads(
   instance: ModelInstance<number, number>,
 ) {
   // @ts-expect-error Built declarations expose only schema-free usePort(ref).
-  const removedTypedUse = Behave.usePort<ConsumerEndpoints>(ref);
+  const removedTypedUse = Behavon.usePort<ConsumerEndpoints>(ref);
   // @ts-expect-error Built declarations expose only schema-free getInterface(target).
-  const removedTypedGetInterface = Behave.getInterface<ConsumerEndpoints>(ref);
+  const removedTypedGetInterface = Behavon.getInterface<ConsumerEndpoints>(ref);
   // @ts-expect-error A schema-less ModelInstance cannot be reclassified as a Port instance by useModel.
-  const [removedOutput, removedSetter] = Behave.useModel<number, number, ConsumerEndpoints>(instance);
+  const [removedOutput, removedSetter] = Behavon.useModel<number, number, ConsumerEndpoints>(instance);
   // @ts-expect-error Built declarations require a live UntypedModelRef and reject null.
-  const removedNullableUse = Behave.usePort(null);
+  const removedNullableUse = Behavon.usePort(null);
   const typedEndpoint = removedTypedUse.changed;
   const nullableEndpoint = removedNullableUse.changed;
   return {
@@ -795,4 +797,4 @@ void RemovedTypedRelationshipOverloads;
 import type { ModelRef } from "behavon";
 
 // @ts-expect-error The built package exposes only the hard-renamed createModel API.
-Behave.createModelRoot;
+Behavon.createModelRoot;

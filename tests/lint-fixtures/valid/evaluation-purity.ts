@@ -1,28 +1,28 @@
-import Behave, { transaction } from "behavon";
+import Behavon, { transaction } from "behavon";
 import type { UntypedModelRef } from "behavon";
 
 const externalTrace: number[] = [];
 const externalPrimitive = 1;
-const deferredSnapshot = Behave.createId(Behave.SnapshotType<number>());
-const deferredTransactionStates = Behave.createId({
-  value: Behave.StateType<number>(),
+const deferredSnapshot = Behavon.createId(Behavon.SnapshotType<number>());
+const deferredTransactionStates = Behavon.createId({
+  value: Behavon.StateType<number>(),
 });
 
 export function MutableDuringEvaluationModel(input: number): number {
-  const mutable = Behave.useMutable(input);
+  const mutable = Behavon.useMutable(input);
   mutable.set(current => current + 1);
   return mutable.get();
 }
 
 export function DeferredTransactionModel(): number {
-  const [value, setValue] = Behave.useLabelState(deferredTransactionStates.value, 0);
-  const execute = Behave.useCallback(() => {
-    const id = Behave.createId();
-    Behave.transaction.start(id, [deferredTransactionStates.value]);
+  const [value, setValue] = Behavon.useLabelState(deferredTransactionStates.value, 0);
+  const execute = Behavon.useCallback(() => {
+    const id = Behavon.createId();
+    Behavon.transaction.start(id, [deferredTransactionStates.value]);
     transaction.run(id, () => setValue((previous) => previous + 1));
     transaction.commit(id);
   }, [setValue]);
-  Behave.useSignal("transaction", execute);
+  Behavon.useSignal("transaction", execute);
   return value;
 }
 
@@ -38,8 +38,8 @@ export function DeferredOperationModel(input: {
   readonly dependency: UntypedModelRef;
   readonly object: { value: number };
 }): undefined {
-  const dependency = Behave.usePort(input.dependency);
-  const [state] = Behave.useState({ value: 0 });
+  const dependency = Behavon.usePort(input.dependency);
+  const [state] = Behavon.useState({ value: 0 });
   let local = externalPrimitive;
   local += 1;
   let rebound = input.object;
@@ -54,7 +54,7 @@ export function DeferredOperationModel(input: {
   map.delete("missing");
   set.add(rebound.value);
   set.delete(-1);
-  const callback = Behave.useCallback(() => {
+  const callback = Behavon.useCallback(() => {
     externalTrace.push(state.value);
     dependency.set(state.value);
   }, [dependency, state]);
@@ -62,7 +62,7 @@ export function DeferredOperationModel(input: {
   reboundEndpoint = () => undefined;
   reboundEndpoint();
   const boundEndpoint = dependency.set.bind(undefined);
-  Behave.useEffect(() => {
+  Behavon.useEffect(() => {
     externalTrace.push(state.value);
     const endpoint = dependency.push;
     dependency.set(state.value);
@@ -72,7 +72,7 @@ export function DeferredOperationModel(input: {
     dependency.delete.apply(undefined, ["value"]);
     boundEndpoint(state.value);
   }, [boundEndpoint, dependency, input, state]);
-  Behave.useSignal("run", callback);
+  Behavon.useSignal("run", callback);
   return undefined;
 }
 
@@ -86,12 +86,12 @@ export function ShadowedGlobalsModel(): number {
 
 export function ReboundImmutableModel(input: { value: number }): number {
   let state: { value: number };
-  [state] = Behave.useState({ value: 0 });
+  [state] = Behavon.useState({ value: 0 });
   state = { value: input.value };
   state.value += 1;
   input = { value: state.value };
   input.value += 1;
-  let callback = Behave.useCallback(() => externalTrace.push(state.value), [state]);
+  let callback = Behavon.useCallback(() => externalTrace.push(state.value), [state]);
   callback = () => input.value;
   callback();
   return input.value;
@@ -117,7 +117,7 @@ function usefullyNamedHelper(): void {
 export function CommandAndLocalHelperModel(input: {
   command: { push(value: number): void; set(key: string, value: number): void };
 }): number {
-  const command = Behave.useMemo(() => ({
+  const command = Behavon.useMemo(() => ({
     push(_value: number): void {},
     set(_key: string, _value: number): void {},
   }), []);
@@ -133,10 +133,10 @@ export function CommandAndLocalHelperModel(input: {
 }
 
 export function DeferredCallOperationModel(): undefined {
-  const [, publish] = Behave.useSnapshot(deferredSnapshot);
-  const body = Behave.useCallback(() => undefined, []);
-  const signal = Behave.useSignal("deferred.call", body);
-  Behave.useEffect(() => {
+  const [, publish] = Behavon.useSnapshot(deferredSnapshot);
+  const body = Behavon.useCallback(() => undefined, []);
+  const signal = Behavon.useSignal("deferred.call", body);
+  Behavon.useEffect(() => {
     publish.call(undefined, 1);
     signal.apply(undefined, []);
     Object.assign(externalCommand, { untouched: true });
@@ -146,7 +146,7 @@ export function DeferredCallOperationModel(): undefined {
 
 export function ReboundMemberHookResultModel(): number {
   const box: { state?: { value: number } } = {};
-  box.state = Behave.useMemo(() => ({ value: 0 }), []);
+  box.state = Behavon.useMemo(() => ({ value: 0 }), []);
   box.state = { value: 1 };
   box.state.value += 1;
   return box.state.value;
@@ -180,7 +180,7 @@ function ReplacementPureModel(): number {
 
 let latestModel: typeof OriginalImpureModel = OriginalImpureModel;
 latestModel = ReplacementPureModel;
-export const reboundModelInstance = Behave.createModel(latestModel, undefined);
+export const reboundModelInstance = Behavon.createModel(latestModel, undefined);
 
 interface CommandShape {
   push(value: number): void;
@@ -199,7 +199,7 @@ export function AlternateShapeControlModel({
   arrayOrCommand: ArrayOrCommand;
   mapOrCommand: MapOrCommand;
 }): number {
-  const [value] = Behave.useState(0);
+  const [value] = Behavon.useState(0);
   command.push(value);
   command.set("value", value);
   arrayOrCommand.push(value);
@@ -233,11 +233,11 @@ function invokeReboundOperation(operation: () => unknown): void {
 }
 
 export function AlternateOperationControlModel(): undefined {
-  const body = Behave.useCallback(() => undefined, []);
-  const signal = Behave.useSignal("alternate.control", body);
+  const body = Behavon.useCallback(() => undefined, []);
+  const signal = Behavon.useSignal("alternate.control", body);
   const box: { signal?: () => unknown } = {};
   box.signal = signal;
-  const originalCallback = Behave.useCallback(() => {
+  const originalCallback = Behavon.useCallback(() => {
     externalTrace[0] = 3;
   }, []);
   const callbackBox: { callback: () => unknown } = { callback: originalCallback };
@@ -246,7 +246,7 @@ export function AlternateOperationControlModel(): undefined {
   callbackSlots[0] = () => undefined;
   callbackBox.callback();
   callbackSlots[0]();
-  Behave.useEffect(() => {
+  Behavon.useEffect(() => {
     box.signal!();
     box.signal!.call(undefined);
     invokeDeferredOperation(signal);

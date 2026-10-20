@@ -31,11 +31,11 @@ function assertDescriptorObject(
   api = "createId",
 ): asserts value is Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`Behave.${api} descriptor node '${path}' must be SnapshotType() or a plain object`);
+    throw new Error(`Behavon.${api} descriptor node '${path}' must be SnapshotType() or a plain object`);
   }
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) {
-    throw new Error(`Behave.${api} descriptor node '${path}' must be a plain object`);
+    throw new Error(`Behavon.${api} descriptor node '${path}' must be a plain object`);
   }
 }
 
@@ -44,19 +44,19 @@ export function assertSnapshotIdentityDescriptor(descriptor: unknown, api: strin
   const visit = (node: unknown, path: string, root: boolean): void => {
     if (isMarker(node)) return;
     assertDescriptorObject(node, path, api);
-    if (ancestors.has(node)) throw new Error(`Behave.${api} descriptor contains a cycle at '${path}'`);
+    if (ancestors.has(node)) throw new Error(`Behavon.${api} descriptor contains a cycle at '${path}'`);
     ancestors.add(node);
     const properties = Object.getOwnPropertyDescriptors(node);
     for (const key of Reflect.ownKeys(node)) {
       if (typeof key !== "string") {
-        throw new Error(`Behave.${api} descriptor node '${path}' only accepts JSON string keys`);
+        throw new Error(`Behavon.${api} descriptor node '${path}' only accepts JSON string keys`);
       }
       if (key === "__proto__") {
-        throw new Error(`Behave.${api} descriptor property '${path}.${key}' is reserved`);
+        throw new Error(`Behavon.${api} descriptor property '${path}.${key}' is reserved`);
       }
       const property = properties[key] as PropertyDescriptor;
       if (!property.enumerable || !("value" in property)) {
-        throw new Error(`Behave.${api} descriptor property '${path}.${key}' must be an enumerable data property`);
+        throw new Error(`Behavon.${api} descriptor property '${path}.${key}' must be an enumerable data property`);
       }
     }
     const markerProperty = Object.prototype.hasOwnProperty.call(properties, "$")
@@ -64,11 +64,11 @@ export function assertSnapshotIdentityDescriptor(descriptor: unknown, api: strin
       : undefined;
     const marker = markerProperty === undefined ? undefined : markerProperty.value;
     if (markerProperty !== undefined && !isMarker(marker)) {
-      throw new Error(`Behave.${api} descriptor '${path}.$' must be SnapshotType()`);
+      throw new Error(`Behavon.${api} descriptor '${path}.$' must be SnapshotType()`);
     }
     if (root && !isMarker(marker)) {
       throw new Error(
-        `Behave.${api} root descriptor must declare a payload with SnapshotType() or '$'`,
+        `Behavon.${api} root descriptor must declare a payload with SnapshotType() or '$'`,
       );
     }
     for (const [key, property] of Object.entries(properties)) {
@@ -94,17 +94,17 @@ export function createSnapshotIdentity(descriptor: unknown): object {
       return Object.freeze(token);
     }
     assertDescriptorObject(node, path);
-    if (ancestors.has(node)) throw new Error(`Behave.createId descriptor contains a cycle at '${path}'`);
+    if (ancestors.has(node)) throw new Error(`Behavon.createId descriptor contains a cycle at '${path}'`);
     ancestors.add(node);
     const token = Object.create(null) as Record<string, object>;
     const descriptors = Object.getOwnPropertyDescriptors(node);
     for (const key of Reflect.ownKeys(node)) {
       if (typeof key !== "string") {
-        throw new Error(`Behave.createId descriptor node '${path}' only accepts JSON string keys`);
+        throw new Error(`Behavon.createId descriptor node '${path}' only accepts JSON string keys`);
       }
       const property = descriptors[key] as PropertyDescriptor;
       if (!property.enumerable || !("value" in property)) {
-        throw new Error(`Behave.createId descriptor property '${path}.${key}' must be an enumerable data property`);
+        throw new Error(`Behavon.createId descriptor property '${path}.${key}' must be an enumerable data property`);
       }
     }
     const markerProperty = Object.prototype.hasOwnProperty.call(descriptors, "$")
@@ -112,7 +112,7 @@ export function createSnapshotIdentity(descriptor: unknown): object {
       : undefined;
     const marker = markerProperty === undefined ? undefined : markerProperty.value;
     if (markerProperty !== undefined && !isMarker(marker)) {
-      throw new Error(`Behave.createId descriptor '${path}.$' must be SnapshotType()`);
+      throw new Error(`Behavon.createId descriptor '${path}.$' must be SnapshotType()`);
     }
     if (isMarker(marker)) {
       payloads.push(token);
@@ -134,7 +134,7 @@ export function createSnapshotIdentity(descriptor: unknown): object {
 
   const root = build(descriptor, label, true);
   if (!payloads.includes(root)) {
-    throw new Error("Behave.createId root descriptor must declare a payload with SnapshotType() or '$'");
+    throw new Error("Behavon.createId root descriptor must declare a payload with SnapshotType() or '$'");
   }
   const family: SnapshotFamilyMetadata = Object.freeze({
     root,
@@ -163,13 +163,13 @@ export function getSnapshotTokenMetadata(value: unknown): SnapshotTokenMetadata 
 
 export function requireSnapshotPayloadToken(value: unknown, api: string): SnapshotTokenMetadata {
   const token = getSnapshotTokenMetadata(value);
-  if (token === undefined) throw new Error(`Behave.${api} requires an identity created by Behave.createId`);
-  if (!token.payload) throw new Error(`Behave.${api} requires a payload-bearing snapshot identity`);
+  if (token === undefined) throw new Error(`Behavon.${api} requires an identity created by Behavon.createId`);
+  if (!token.payload) throw new Error(`Behavon.${api} requires a payload-bearing snapshot identity`);
   return token;
 }
 
 export function requireSnapshotRootToken(value: unknown, api: string): SnapshotTokenMetadata {
   const token = requireSnapshotPayloadToken(value, api);
-  if (!token.root) throw new Error(`Behave.${api} requires the root snapshot identity`);
+  if (!token.root) throw new Error(`Behavon.${api} requires the root snapshot identity`);
   return token;
 }

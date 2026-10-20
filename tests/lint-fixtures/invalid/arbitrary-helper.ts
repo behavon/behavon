@@ -1,7 +1,7 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
 function readStateFromArbitraryHelper(): number {
-  return Behave.useState(0)[0];
+  return Behavon.useState(0)[0];
 }
 
 export function HelperCallerModel(): number {

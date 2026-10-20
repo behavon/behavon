@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { BoundaryState, ModelInstance, StateSetter } from "behavon";
 import { inspectModelInstanceForTests } from "../../src/internal/model-inspection";
 import { waitFor } from "../helpers";
@@ -12,10 +12,10 @@ function observeBoundary<Input, Output>(instance: ModelInstance<Input, BoundaryS
     // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
     evaluations += 1;
     // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-    [state, setInput] = Behave.useModel(instance);
+    [state, setInput] = Behavon.useModel(instance);
     return undefined;
   }
-  const observer = Behave.createModel(Observer, undefined);
+  const observer = Behavon.createModel(Observer, undefined);
   return {
     get state() {
       return state as BoundaryState<Output>;
@@ -42,15 +42,15 @@ describe("boundary Model composition", () => {
       throw failure;
     }
 
-    const SafeBroken = Behave.boundary(Broken);
+    const SafeBroken = Behavon.boundary(Broken);
     expect(evaluations).toBe(0);
 
-    const instance = Behave.createModel(SafeBroken, undefined);
+    const instance = Behavon.createModel(SafeBroken, undefined);
     const observed = observeBoundary(instance);
     expect(evaluations).toBe(1);
     expect(observed.state).toMatchObject({ status: "failed", error: failure });
     expect(inspectModelInstanceForTests(instance).status).toBe("active");
-    expect(Behave.getInterface(instance).endpoints).toEqual([]);
+    expect(Behavon.getInterface(instance).endpoints).toEqual([]);
 
     observed.dispose();
     instance.dispose();
@@ -62,7 +62,7 @@ describe("boundary Model composition", () => {
     function Child(input: string | null): Readonly<{ input: string | null; identity: number }> {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       inputs.push(input);
-      const [identity] = Behave.useState(() => {
+      const [identity] = Behavon.useState(() => {
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
         identities += 1;
         return identities;
@@ -70,7 +70,7 @@ describe("boundary Model composition", () => {
       return { input, identity };
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), null);
+    const instance = Behavon.createModel(Behavon.boundary(Child), null);
     const observed = observeBoundary(instance);
     expect(observed.state).toEqual({ status: "active", output: { input: null, identity: 1 } });
 
@@ -95,7 +95,7 @@ describe("boundary Model composition", () => {
       return input ?? "null";
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), "fail");
+    const instance = Behavon.createModel(Behavon.boundary(Child), "fail");
     const observed = observeBoundary(instance);
     expect(observed.state.status).toBe("failed");
     const reset = observed.state.status === "failed" ? observed.state.reset : () => undefined;
@@ -122,7 +122,7 @@ describe("boundary Model composition", () => {
       return input;
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), -1);
+    const instance = Behavon.createModel(Behavon.boundary(Child), -1);
     const originalOuter = instance;
     const observed = observeBoundary(instance);
     expect(observed.state.status).toBe("failed");
@@ -165,7 +165,7 @@ describe("boundary Model composition", () => {
       return output;
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), 1);
+    const instance = Behavon.createModel(Behavon.boundary(Child), 1);
     const observed = observeBoundary(instance);
     const firstState = observed.state;
     expect(observed.evaluations).toBe(1);
@@ -182,13 +182,13 @@ describe("boundary Model composition", () => {
   it("publishes an autonomous Child state commit through the outer Boundary instance", async () => {
     let setChildState: StateSetter<number> | undefined;
     function Child(initial: number): number {
-      const [value, setValue] = Behave.useState(initial);
+      const [value, setValue] = Behavon.useState(initial);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setChildState = setValue;
       return value;
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), 0);
+    const instance = Behavon.createModel(Behavon.boundary(Child), 0);
     const observed = observeBoundary(instance);
     expect(observed.state).toEqual({ status: "active", output: 0 });
 
@@ -207,13 +207,13 @@ describe("boundary Model composition", () => {
     function Child(): typeof output {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       childEvaluations += 1;
-      const [, setValue] = Behave.useState(0);
+      const [, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setChildState = setValue;
       return output;
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), undefined);
+    const instance = Behavon.createModel(Behavon.boundary(Child), undefined);
     const observed = observeBoundary(instance);
     const initialState = observed.state;
     expect(observed.evaluations).toBe(1);
@@ -235,11 +235,11 @@ describe("boundary Model composition", () => {
       return () => listeners.delete(listener);
     };
     function Child(): number {
-      const snapshot = Behave.useSyncExternalStore(subscribe, () => value);
+      const snapshot = Behavon.useSyncExternalStore(subscribe, () => value);
       return snapshot;
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), undefined);
+    const instance = Behavon.createModel(Behavon.boundary(Child), undefined);
     const observed = observeBoundary(instance);
     expect(observed.state).toEqual({ status: "active", output: 0 });
 
@@ -259,11 +259,11 @@ describe("boundary Model composition", () => {
       return () => listeners.delete(listener);
     };
     function Child(): number {
-      const snapshot = Behave.useSyncExternalStore(subscribe, () => value);
+      const snapshot = Behavon.useSyncExternalStore(subscribe, () => value);
       return snapshot;
     }
 
-    const instance = Behave.createModel(Behave.boundary(Behave.boundary(Child)), undefined);
+    const instance = Behavon.createModel(Behavon.boundary(Behavon.boundary(Child)), undefined);
     const observed = observeBoundary(instance);
     expect(observed.state).toEqual({
       status: "active",
@@ -286,14 +286,14 @@ describe("boundary Model composition", () => {
     const failure = new Error("nested evaluation");
     let setFail: StateSetter<boolean> | undefined;
     function Child(): string {
-      const [fail, updateFail] = Behave.useState(false);
+      const [fail, updateFail] = Behavon.useState(false);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setFail = updateFail;
       if (fail) throw failure;
       return "ok";
     }
 
-    const instance = Behave.createModel(Behave.boundary(Behave.boundary(Child)), undefined);
+    const instance = Behavon.createModel(Behavon.boundary(Behavon.boundary(Child)), undefined);
     const observed = observeBoundary(instance);
     expect(observed.state).toEqual({
       status: "active",
@@ -316,16 +316,16 @@ describe("boundary Model composition", () => {
     const failure = new Error("nested effect setup");
     let setFail: StateSetter<boolean> | undefined;
     function Child(): string {
-      const [fail, updateFail] = Behave.useState(false);
+      const [fail, updateFail] = Behavon.useState(false);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setFail = updateFail;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         if (fail) throw failure;
       }, [fail]);
       return "ok";
     }
 
-    const instance = Behave.createModel(Behave.boundary(Behave.boundary(Child)), undefined);
+    const instance = Behavon.createModel(Behavon.boundary(Behavon.boundary(Child)), undefined);
     const observed = observeBoundary(instance);
     (setFail as StateSetter<boolean>)(true);
     await waitFor(() =>
@@ -343,16 +343,16 @@ describe("boundary Model composition", () => {
     const first = new Error("first setup");
     const second = new Error("second setup");
     function Child(): string {
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         throw first;
       }, []);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         throw second;
       }, []);
       return "committed";
     }
 
-    const instance = Behave.createModel(Behave.boundary(Behave.boundary(Child)), undefined);
+    const instance = Behavon.createModel(Behavon.boundary(Behavon.boundary(Child)), undefined);
     const observed = observeBoundary(instance);
     await waitFor(() =>
       observed.state.status === "active" && observed.state.output.status === "failed"
@@ -378,7 +378,7 @@ describe("boundary Model composition", () => {
       return "recovered";
     }
 
-    const instance = Behave.createModel(Behave.boundary(Behave.boundary(Child)), undefined);
+    const instance = Behavon.createModel(Behavon.boundary(Behavon.boundary(Child)), undefined);
     const observed = observeBoundary(instance);
     expect(observed.state.status).toBe("active");
     if (observed.state.status !== "active" || observed.state.output.status !== "failed") {
@@ -409,7 +409,7 @@ describe("boundary Model composition", () => {
       return input;
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), -1);
+    const instance = Behavon.createModel(Behavon.boundary(Child), -1);
     const observed = observeBoundary(instance);
     if (observed.state.status !== "failed") throw new Error("Expected initial failure");
     const reset = observed.state.reset;
@@ -432,8 +432,8 @@ describe("boundary Model composition", () => {
     function Broken(): never {
       throw undefined;
     }
-    const Nested = Behave.boundary(Behave.boundary(Broken));
-    const instance = Behave.createModel(Nested, undefined);
+    const Nested = Behavon.boundary(Behavon.boundary(Broken));
+    const instance = Behavon.createModel(Nested, undefined);
     const observed = observeBoundary(instance);
 
     expect(observed.state.status).toBe("active");
@@ -448,13 +448,13 @@ describe("boundary Model composition", () => {
   it("contains post-commit failure and cascades outer disposal to the active Child", async () => {
     const failure = new Error("effect setup");
     function BrokenEffect(): undefined {
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         throw failure;
       }, []);
       return undefined;
     }
 
-    const failedInstance = Behave.createModel(Behave.boundary(BrokenEffect), undefined);
+    const failedInstance = Behavon.createModel(Behavon.boundary(BrokenEffect), undefined);
     const failedObservation = observeBoundary(failedInstance);
     await waitFor(() => failedObservation.state.status === "failed");
     expect(failedObservation.state).toMatchObject({ status: "failed", error: failure });
@@ -463,12 +463,12 @@ describe("boundary Model composition", () => {
 
     let cleanups = 0;
     function ActiveEffect(): undefined {
-      Behave.useEffect(() => () => {
+      Behavon.useEffect(() => () => {
         cleanups += 1;
       }, []);
       return undefined;
     }
-    const activeInstance = Behave.createModel(Behave.boundary(ActiveEffect), undefined);
+    const activeInstance = Behavon.createModel(Behavon.boundary(ActiveEffect), undefined);
     activeInstance.dispose();
     expect(cleanups).toBe(1);
   });

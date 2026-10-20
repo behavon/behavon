@@ -1,4 +1,4 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { UntypedModelRef } from "behavon";
 
 const collected: unknown[] = [];
@@ -6,9 +6,9 @@ const collected: unknown[] = [];
 function consume(_value: unknown): void {}
 
 export function InlineHookResultModel(dependency: UntypedModelRef): undefined {
-  const state = Behave.useState(0)[0];
-  const endpoint = Behave.usePort(dependency).fire;
-  collected.push(Behave.useMemo(() => state, [state]));
-  consume(Behave.useCallback(() => endpoint, [endpoint]));
+  const state = Behavon.useState(0)[0];
+  const endpoint = Behavon.usePort(dependency).fire;
+  collected.push(Behavon.useMemo(() => state, [state]));
+  consume(Behavon.useCallback(() => endpoint, [endpoint]));
   return undefined;
 }

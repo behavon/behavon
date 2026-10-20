@@ -1,4 +1,4 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 import { createPort, createPort as cp } from "behavon";
 import type { BoundaryState, Model, PortDescriptor, Signal } from "behavon";
 import {
@@ -20,13 +20,13 @@ class UnrelatedFactory {
 
 void UnrelatedFactory;
 
-const staticPort = Behave.createPort<StaticPort>({
-  fire: Behave.SignalType(),
+const staticPort = Behavon.createPort<StaticPort>({
+  fire: Behavon.SignalType(),
 });
 
 function useStaticPort(): void {
-  const fire = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(staticPort, "fire", fire);
+  const fire = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(staticPort, "fire", fire);
 }
 
 const StaticPortModel: Model<undefined, undefined, StaticPort> = () => {
@@ -39,26 +39,26 @@ type StaticPortAlias = StaticPort;
 type StaticPortModelAlias = Model<undefined, undefined, StaticPort>;
 
 const AliasPortModel: StaticPortModelAlias = () => {
-  const fire = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(staticPortAlias, "fire", fire);
+  const fire = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(staticPortAlias, "fire", fire);
   return undefined;
 };
 
 function useProvidedPort(port: PortDescriptor<StaticPort>): void {
-  const fire = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(port, "fire", fire);
+  const fire = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(port, "fire", fire);
 }
 
-const providedPort = Behave.createPort<StaticPortAlias>({
-  fire: Behave.SignalType(),
+const providedPort = Behavon.createPort<StaticPortAlias>({
+  fire: Behavon.SignalType(),
 });
 
 const namedPort = createPort<StaticPort>({
-  fire: Behave.SignalType(),
+  fire: Behavon.SignalType(),
 });
 
 const aliasedNamedPort = cp<StaticPort>({
-  fire: Behave.SignalType(),
+  fire: Behavon.SignalType(),
 });
 
 void aliasedNamedPort;
@@ -69,28 +69,28 @@ const ParameterPortModel: Model<undefined, undefined, StaticPort> = () => {
 };
 
 const AssertedPortModel = (() => {
-  const fire = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(providedPort, "fire", fire);
+  const fire = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(providedPort, "fire", fire);
   return undefined;
 }) as Model<undefined, undefined, StaticPortAlias>;
 
 const RedundantSatisfiesModel: Model<undefined, undefined, StaticPort> = (() => {
-  const fire = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(staticPort, "fire", fire);
+  const fire = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(staticPort, "fire", fire);
   return undefined;
 }) satisfies Model<undefined, undefined, StaticPort>;
 
 const NamedPortModel: Model<undefined, undefined, StaticPort> = () => {
-  const fire = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(namedPort, "fire", fire);
+  const fire = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(namedPort, "fire", fire);
   return undefined;
 };
 
 const ImportedPortModel: Model<undefined, undefined, ImportedPort> = () => {
-  const fire = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(importedPort, "fire", fire);
-  const reset = Behave.useCallback(() => undefined, []);
-  Behave.useSignal(sameImportedPort, "reset", reset);
+  const fire = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(importedPort, "fire", fire);
+  const reset = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal(sameImportedPort, "reset", reset);
   return undefined;
 };
 
@@ -105,12 +105,12 @@ function StaticModel(): undefined {
 }
 
 function SchemaLessModel(): undefined {
-  const legacy = Behave.useCallback(() => undefined, []);
-  Behave.useSignal("legacy", legacy);
+  const legacy = Behavon.useCallback(() => undefined, []);
+  Behavon.useSignal("legacy", legacy);
   return undefined;
 }
 
-const StaticBoundaryModel = Behave.boundary(StaticModel);
+const StaticBoundaryModel = Behavon.boundary(StaticModel);
 const StaticModels = { Nested: StaticModel };
 
 export const ContextualPortModels: {
@@ -118,13 +118,13 @@ export const ContextualPortModels: {
   Method: Model<undefined, undefined, StaticPort>;
 } = {
   Property: () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
   Method() {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 };
@@ -133,8 +133,8 @@ export const PreservingContextualSatisfies: {
   Provider: Model<undefined, undefined, StaticPort>;
 } = ({
   Provider: () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 }) satisfies {
@@ -148,13 +148,13 @@ interface ContextualPortModelInterface {
 
 export const InterfaceContextualPortModels: ContextualPortModelInterface = {
   Property: () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
   Method() {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 };
@@ -168,16 +168,16 @@ type IntersectedComposedPortModels = BaseComposedPortModels & {};
 
 export const ExtendedContextualPortModels: ExtendedComposedPortModels = {
   Provider: () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 };
 
 export const IntersectedContextualPortModels: IntersectedComposedPortModels = {
   Provider: () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 };
@@ -186,16 +186,16 @@ export const ContextualPortTuple: [
   Model<undefined, undefined, StaticPort>,
 ] = [
   () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 ];
 
 export const ContextualPortArray: Model<undefined, undefined, StaticPort>[] = [
   () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 ];
@@ -206,8 +206,8 @@ type StaticReadonlyPortTuple = readonly [
 
 export const ContextualReadonlyPortTuple: StaticReadonlyPortTuple = [
   () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 ];
@@ -216,16 +216,16 @@ export const ContextualReadonlyPortArray: ReadonlyArray<
   Model<undefined, undefined, StaticPort>
 > = [
   () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 ];
 
 export const PreservingReadonlyPortTuple: StaticReadonlyPortTuple = ([
   () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 ]) satisfies StaticReadonlyPortTuple;
@@ -234,53 +234,53 @@ export const PreservingReadonlyPortArray: ReadonlyArray<
   Model<undefined, undefined, StaticPort>
 > = ([
   () => {
-    const fire = Behave.useCallback(() => undefined, []);
-    Behave.useSignal(staticPort, "fire", fire);
+    const fire = Behavon.useCallback(() => undefined, []);
+    Behavon.useSignal(staticPort, "fire", fire);
     return undefined;
   },
 ]) satisfies ReadonlyArray<Model<undefined, undefined, StaticPort>>;
 
 export function createStaticModels(): void {
-  const direct = Behave.createModel(StaticModel, undefined);
-  const schemaLess = Behave.createModel(SchemaLessModel, undefined);
-  const bounded = Behave.createModel(StaticBoundaryModel, undefined);
-  const member = Behave.createModel(StaticModels.Nested, undefined);
-  const contextualProperty = Behave.createModel(ContextualPortModels.Property, undefined);
-  const contextualMethod = Behave.createModel(ContextualPortModels.Method, undefined);
-  const preservingContextual = Behave.createModel(
+  const direct = Behavon.createModel(StaticModel, undefined);
+  const schemaLess = Behavon.createModel(SchemaLessModel, undefined);
+  const bounded = Behavon.createModel(StaticBoundaryModel, undefined);
+  const member = Behavon.createModel(StaticModels.Nested, undefined);
+  const contextualProperty = Behavon.createModel(ContextualPortModels.Property, undefined);
+  const contextualMethod = Behavon.createModel(ContextualPortModels.Method, undefined);
+  const preservingContextual = Behavon.createModel(
     PreservingContextualSatisfies.Provider,
     undefined,
   );
-  const interfaceProperty = Behave.createModel(
+  const interfaceProperty = Behavon.createModel(
     InterfaceContextualPortModels.Property,
     undefined,
   );
-  const interfaceMethod = Behave.createModel(
+  const interfaceMethod = Behavon.createModel(
     InterfaceContextualPortModels.Method,
     undefined,
   );
-  const extendedProperty = Behave.createModel(
+  const extendedProperty = Behavon.createModel(
     ExtendedContextualPortModels.Provider,
     undefined,
   );
-  const intersectedProperty = Behave.createModel(
+  const intersectedProperty = Behavon.createModel(
     IntersectedContextualPortModels.Provider,
     undefined,
   );
-  const tupleModel = Behave.createModel(ContextualPortTuple[0], undefined);
-  const arrayModel = Behave.createModel(ContextualPortArray[0], undefined);
-  const readonlyTupleModel = Behave.createModel(ContextualReadonlyPortTuple[0], undefined);
-  const readonlyArrayModel = Behave.createModel(ContextualReadonlyPortArray[0], undefined);
-  const preservingReadonlyTuple = Behave.createModel(PreservingReadonlyPortTuple[0], undefined);
-  const preservingReadonlyArray = Behave.createModel(PreservingReadonlyPortArray[0], undefined);
-  const port = Behave.createModel(StaticPortModel, undefined);
-  const aliasPort = Behave.createModel(AliasPortModel, undefined);
-  const parameterPort = Behave.createModel(ParameterPortModel, undefined);
-  const assertedPort = Behave.createModel(AssertedPortModel, undefined);
-  const redundantSatisfies = Behave.createModel(RedundantSatisfiesModel, undefined);
-  const namedPortInstance = Behave.createModel(NamedPortModel, undefined);
-  const imported = Behave.createModel(ImportedPortModel, undefined);
-  const opaqueImportedHook = Behave.createModel(OpaqueImportedHookModel, undefined);
+  const tupleModel = Behavon.createModel(ContextualPortTuple[0], undefined);
+  const arrayModel = Behavon.createModel(ContextualPortArray[0], undefined);
+  const readonlyTupleModel = Behavon.createModel(ContextualReadonlyPortTuple[0], undefined);
+  const readonlyArrayModel = Behavon.createModel(ContextualReadonlyPortArray[0], undefined);
+  const preservingReadonlyTuple = Behavon.createModel(PreservingReadonlyPortTuple[0], undefined);
+  const preservingReadonlyArray = Behavon.createModel(PreservingReadonlyPortArray[0], undefined);
+  const port = Behavon.createModel(StaticPortModel, undefined);
+  const aliasPort = Behavon.createModel(AliasPortModel, undefined);
+  const parameterPort = Behavon.createModel(ParameterPortModel, undefined);
+  const assertedPort = Behavon.createModel(AssertedPortModel, undefined);
+  const redundantSatisfies = Behavon.createModel(RedundantSatisfiesModel, undefined);
+  const namedPortInstance = Behavon.createModel(NamedPortModel, undefined);
+  const imported = Behavon.createModel(ImportedPortModel, undefined);
+  const opaqueImportedHook = Behavon.createModel(OpaqueImportedHookModel, undefined);
   direct.dispose();
   schemaLess.dispose();
   bounded.dispose();
@@ -308,26 +308,26 @@ export function createStaticModels(): void {
   opaqueImportedHook.dispose();
 }
 
-const StaticPortBoundary = Behave.boundary(StaticPortModel);
+const StaticPortBoundary = Behavon.boundary(StaticPortModel);
 type SchemaLessBoundaryModel = Model<undefined, BoundaryState<undefined>>;
 
 const StaticPortBoundaryAlias: SchemaLessBoundaryModel = StaticPortBoundary;
 const StaticPortBoundaryObject: { Outer: SchemaLessBoundaryModel } = {
-  Outer: Behave.boundary(StaticPortModel),
+  Outer: Behavon.boundary(StaticPortModel),
 };
 const StaticPortBoundaryTuple: readonly [SchemaLessBoundaryModel] = [
-  Behave.boundary(StaticPortModel),
+  Behavon.boundary(StaticPortModel),
 ];
 
 export function createStaticPortBoundary(): void {
-  const boundary = Behave.createModel(StaticPortBoundary, undefined);
-  const alias = Behave.createModel(StaticPortBoundaryAlias, undefined);
-  const object = Behave.createModel(StaticPortBoundaryObject.Outer, undefined);
-  const tuple = Behave.createModel(StaticPortBoundaryTuple[0], undefined);
+  const boundary = Behavon.createModel(StaticPortBoundary, undefined);
+  const alias = Behavon.createModel(StaticPortBoundaryAlias, undefined);
+  const object = Behavon.createModel(StaticPortBoundaryObject.Outer, undefined);
+  const tuple = Behavon.createModel(StaticPortBoundaryTuple[0], undefined);
   boundary.dispose();
   alias.dispose();
   object.dispose();
   tuple.dispose();
 }
 
-export default Behave.boundary(StaticPortModel) as SchemaLessBoundaryModel;
+export default Behavon.boundary(StaticPortModel) as SchemaLessBoundaryModel;

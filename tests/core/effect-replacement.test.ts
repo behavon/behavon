@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { Signal, Slot, UntypedModelRef } from "behavon";
 import { inspectSnapshotChannelForTests } from "../../src/internal/snapshot-channels";
-import { uniqueChannel, waitFor } from "../helpers";
+import { uniqueChannel, waitFor, signalOf } from "../helpers";
 
 async function captureScheduledFailure(action: () => void): Promise<unknown> {
   let surfaced: unknown;
@@ -30,17 +30,17 @@ describe("Effect replacement failure bookkeeping", () => {
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
-      const [version, setValue] = Behave.useState(0);
+      const [version, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setVersion = setValue;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`setup:${version}`);
         return () => trace.push(`cleanup:${version}`);
       }, [version]);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     setVersion?.(1);
     await waitFor(() => trace.includes("setup:1"));
     expect(trace).toEqual(["setup:0", "cleanup:0", "setup:1"]);
@@ -56,10 +56,10 @@ describe("Effect replacement failure bookkeeping", () => {
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
-      const [version, setValue] = Behave.useState(0);
+      const [version, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setVersion = setValue;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         setupCalls += 1;
         return () => {
           cleanupCalls += 1;
@@ -70,7 +70,7 @@ describe("Effect replacement failure bookkeeping", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const surfaced = await captureScheduledFailure(() => setVersion?.(1));
     expect(surfaced).toBeInstanceOf(AggregateError);
     expect((surfaced as AggregateError).errors).toEqual([cleanupFailure, replacementTerminalCleanupFailure]);
@@ -85,13 +85,13 @@ describe("Effect replacement failure bookkeeping", () => {
     let advance: (() => void) | undefined;
 
     function Model(): undefined {
-      const [version, setValue] = Behave.useState(0);
-      const [, setEpoch] = Behave.useState(0);
+      const [version, setValue] = Behavon.useState(0);
+      const [, setEpoch] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setVersion = setValue;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       advance = () => setEpoch((epoch) => epoch + 1);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`setup:${version}`);
         if (version === 1) throw setupFailure;
         return () => trace.push(`cleanup:${version}`);
@@ -99,7 +99,7 @@ describe("Effect replacement failure bookkeeping", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const surfaced = await captureScheduledFailure(() => setVersion?.(1));
     expect(surfaced).toBe(setupFailure);
     expect(trace).toEqual(["setup:0", "cleanup:0", "setup:1"]);
@@ -116,21 +116,21 @@ describe("Effect replacement failure bookkeeping", () => {
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
-      const [version, setValue] = Behave.useState(0);
+      const [version, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setVersion = setValue;
       const subscribe = version === 0
         ? (_listener: () => void) => () => undefined
         : (_listener: () => void) => { throw subscribeFailure; };
-      Behave.useSyncExternalStore(subscribe, () => version);
-      Behave.useEffect(() => {
+      Behavon.useSyncExternalStore(subscribe, () => version);
+      Behavon.useEffect(() => {
         trace.push(`setup:${version}`);
         return () => trace.push(`cleanup:${version}`);
       }, [version]);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const surfaced = await captureScheduledFailure(() => setVersion?.(1));
     expect(surfaced).toBe(subscribeFailure);
     expect(trace).toEqual(["setup:0", "cleanup:0", "setup:1", "cleanup:1"]);
@@ -143,21 +143,21 @@ describe("Effect replacement failure bookkeeping", () => {
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
-      const [version, setValue] = Behave.useState(0);
+      const [version, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setVersion = setValue;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`first setup:${version}`);
         if (version === 1) throw setupFailure;
       }, [version]);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`second setup:${version}`);
         return () => trace.push(`second cleanup:${version}`);
       }, [version]);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const surfaced = await captureScheduledFailure(() => setVersion?.(1));
     expect(surfaced).toBe(setupFailure);
     expect(trace).toEqual([
@@ -177,10 +177,10 @@ describe("Effect replacement failure bookkeeping", () => {
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
-      const [version, setValue] = Behave.useState(0);
+      const [version, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setVersion = setValue;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`setup:${version}`);
         return () => {
           trace.push(`cleanup:${version}`);
@@ -190,7 +190,7 @@ describe("Effect replacement failure bookkeeping", () => {
       return undefined;
     }
 
-    root = Behave.createModel(Model, undefined);
+    root = Behavon.createModel(Model, undefined);
     setVersion?.(1);
     await waitFor(() => trace.includes("cleanup:0"));
     expect(trace).toEqual(["setup:0", "cleanup:0"]);
@@ -202,10 +202,10 @@ describe("Effect replacement failure bookkeeping", () => {
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
-      const [version, setValue] = Behave.useState(0);
+      const [version, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setVersion = setValue;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`setup:${version}`);
         if (version === 1) root?.dispose();
         return () => trace.push(`cleanup:${version}`);
@@ -213,7 +213,7 @@ describe("Effect replacement failure bookkeeping", () => {
       return undefined;
     }
 
-    root = Behave.createModel(Model, undefined);
+    root = Behavon.createModel(Model, undefined);
     setVersion?.(1);
     await waitFor(() => trace.includes("cleanup:1"));
     expect(trace).toEqual(["setup:0", "cleanup:0", "setup:1", "cleanup:1"]);
@@ -225,10 +225,10 @@ describe("Effect replacement failure bookkeeping", () => {
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
-      const [version, setValue] = Behave.useState(0);
+      const [version, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setVersion = setValue;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         if (version === 1) root?.dispose();
         return () => {
           if (version === 1) throw cleanupFailure;
@@ -237,7 +237,7 @@ describe("Effect replacement failure bookkeeping", () => {
       return undefined;
     }
 
-    root = Behave.createModel(Model, undefined);
+    root = Behavon.createModel(Model, undefined);
     const surfaced = await captureScheduledFailure(() => setVersion?.(1));
     expect(surfaced).toBe(cleanupFailure);
   });
@@ -248,18 +248,18 @@ describe("Effect replacement failure bookkeeping", () => {
     const trace: string[] = [];
 
     function Model(): undefined {
-      Behave.useEffect(() => () => {
+      Behavon.useEffect(() => () => {
         trace.push("first");
         throw firstFailure;
       }, []);
-      Behave.useEffect(() => () => {
+      Behavon.useEffect(() => () => {
         trace.push("second");
         throw secondFailure;
       }, []);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(() => root.dispose()).toThrow(firstFailure);
     expect(trace).toEqual(["first", "second"]);
     expect(() => root.dispose()).toThrow(/dispose\(\) called more than once/);
@@ -289,41 +289,41 @@ describe("Effect failure root terminality", () => {
     };
 
     function Keeper(): undefined {
-      Behave.useSnapshot(channel);
-      const alive = Behave.useCallback(() => {
+      Behavon.useSnapshot(channel);
+      const alive = Behavon.useCallback(() => {
         independentCalls += 1;
       }, []);
-      Behave.useSignal("alive", alive);
+      Behavon.useSignal("alive", alive);
       return undefined;
     }
 
-    const keeper = Behave.createModel(Keeper, undefined);
+    const keeper = Behavon.createModel(Keeper, undefined);
 
     function Failing(): undefined {
-      const [phase, setPhase] = Behave.useState(0);
-      const [, publish] = Behave.useSnapshot(channel);
+      const [phase, setPhase] = Behavon.useState(0);
+      const [, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       triggerSetter = () => setPhase(1);
-      Behave.useSyncExternalStore(subscribe, () => phase);
-      Behave.useEffect(() => {
+      Behavon.useSyncExternalStore(subscribe, () => phase);
+      Behavon.useEffect(() => {
         if (phase === 1) throw setupFailure;
       }, [phase]);
-      Behave.useEffect(() => () => {
+      Behavon.useEffect(() => () => {
         throw terminalCleanupFailure;
       }, []);
-      const trigger = Behave.useCallback(() => {
+      const trigger = Behavon.useCallback(() => {
         publish(7);
         setPhase(1);
       }, [publish, setPhase]);
-      Behave.useSignal("trigger", trigger);
+      Behavon.useSignal("trigger", trigger);
       return undefined;
     }
 
-    const root = Behave.createModel(Failing, undefined);
-    const retainedTrigger = root.trigger;
-    const surfaced = await captureScheduledFailure(() => root.trigger());
+    const root = Behavon.createModel(Failing, undefined);
+    const retainedTrigger = signalOf(root, "trigger");
+    const surfaced = await captureScheduledFailure(() => signalOf(root, "trigger")());
 
     expect(surfaced).toBeInstanceOf(AggregateError);
     expect((surfaced as AggregateError).errors).toEqual([setupFailure, terminalCleanupFailure]);
@@ -331,14 +331,14 @@ describe("Effect failure root terminality", () => {
     expect(inspectSnapshotChannelForTests(channel)?.current).toBe(7);
     expect(() => root.trigger()).toThrow(/disposed/);
     expect(() => retainedTrigger()).toThrow(/disposed/);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
     triggerSetter?.();
     externalListener?.();
     await Promise.resolve();
     expect(evaluations).toBe(2);
     expect(() => root.dispose()).toThrow(/dispose\(\) called more than once/);
 
-    keeper.alive();
+    signalOf(keeper, "alive")();
     expect(independentCalls).toBe(1);
     keeper.dispose();
   });
@@ -350,23 +350,23 @@ describe("Effect failure root terminality", () => {
     let independentCalls = 0;
 
     function Independent(): undefined {
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         independentCalls += 1;
       }, []);
       return undefined;
     }
 
-    const independent = Behave.createModel(Independent, undefined);
+    const independent = Behavon.createModel(Independent, undefined);
 
     function Child(): undefined {
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         () => () => {
           unsubscribeCalls += 1;
           throw unsubscribeFailure;
         },
         () => 0,
       );
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         throw effectFailure;
       }, []);
       return undefined;
@@ -374,7 +374,7 @@ describe("Effect failure root terminality", () => {
 
     let surfaced: unknown;
     try {
-      Behave.createModel(Child, undefined);
+      Behavon.createModel(Child, undefined);
     } catch (error: unknown) {
       surfaced = error;
     }

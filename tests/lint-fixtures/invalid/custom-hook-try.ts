@@ -1,7 +1,7 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
 function useCounter(): number {
-  const [value] = Behave.useState(0);
+  const [value] = Behavon.useState(0);
   return value;
 }
 

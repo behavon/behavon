@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import { waitFor } from "../helpers";
 
 async function settle(): Promise<void> {
@@ -43,14 +43,14 @@ describe("external-store subscription replacement ownership", () => {
     };
 
     function Model(): undefined {
-      const [changed, setChanged] = Behave.useState(false);
-      Behave.useSyncExternalStore(changed ? newSubscribe : oldSubscribe, () => 0);
+      const [changed, setChanged] = Behavon.useState(false);
+      Behavon.useSyncExternalStore(changed ? newSubscribe : oldSubscribe, () => 0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       replace = () => setChanged(true);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(await captureScheduledFailure(() => replace?.())).toBe(failure);
     expect(trace).toEqual(["old subscribe", "old unsubscribe", "new subscribe"]);
     expect(() => root.dispose()).toThrow(/dispose\(\) called more than once/);
@@ -74,14 +74,14 @@ describe("external-store subscription replacement ownership", () => {
     };
 
     function Model(): undefined {
-      const [changed, setChanged] = Behave.useState(false);
-      Behave.useSyncExternalStore(changed ? newSubscribe : oldSubscribe, () => 0);
+      const [changed, setChanged] = Behavon.useState(false);
+      Behavon.useSyncExternalStore(changed ? newSubscribe : oldSubscribe, () => 0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       replace = () => setChanged(true);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(await captureScheduledFailure(() => replace?.())).toBe(failure);
     expect(trace).toEqual([
       "old subscribe",
@@ -123,8 +123,8 @@ describe("external-store subscription replacement ownership", () => {
     };
 
     function Model(): undefined {
-      const [changed, setChanged] = Behave.useState(false);
-      const observedValue = Behave.useSyncExternalStore(
+      const [changed, setChanged] = Behavon.useState(false);
+      const observedValue = Behavon.useSyncExternalStore(
         changed ? newSubscribe : oldSubscribe,
         changed ? nextSnapshot : () => value,
       );
@@ -135,7 +135,7 @@ describe("external-store subscription replacement ownership", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     replace?.();
     await waitFor(() => reads >= 3);
     expect(oldCleanupCalls).toBe(1);
@@ -170,14 +170,14 @@ describe("external-store subscription replacement ownership", () => {
     function Model(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
-      const [changed, setChanged] = Behave.useState(false);
-      Behave.useSyncExternalStore(subscribe, changed ? secondGetter : firstGetter);
+      const [changed, setChanged] = Behavon.useState(false);
+      Behavon.useSyncExternalStore(subscribe, changed ? secondGetter : firstGetter);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       changeGetter = () => setChanged(true);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     changeGetter?.();
     await waitFor(() => evaluations === 2);
     expect(subscribeCalls).toBe(1);
@@ -234,8 +234,8 @@ describe("external-store subscription replacement ownership", () => {
     function Model(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
-      const [useReplacement, setUseReplacement] = Behave.useState(false);
-      const observedValue = Behave.useSyncExternalStore(
+      const [useReplacement, setUseReplacement] = Behavon.useState(false);
+      const observedValue = Behavon.useSyncExternalStore(
         useReplacement ? newSubscribe : oldSubscribe,
         useReplacement ? newGetter : () => snapshot,
       );
@@ -246,7 +246,7 @@ describe("external-store subscription replacement ownership", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     replace?.();
     await waitFor(() => evaluations === 3);
     expect(newReads).toBe(3);

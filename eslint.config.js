@@ -67,6 +67,11 @@ export default [
     true,
   ),
   {
+    // Documentation examples follow the configuration that docs/lint.md gives end users.
+    files: ["tests/docs/.generated/**/*.ts", "tests/docs/.generated/**/*.tsx"],
+    rules: staticModelDefinitionRules,
+  },
+  {
     files: [
       "tests/lint-fixtures/valid/static-model-definition.ts",
       "tests/lint-fixtures/invalid/static-model-definition.ts",

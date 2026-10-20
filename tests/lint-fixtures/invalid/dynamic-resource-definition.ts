@@ -1,7 +1,7 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
 export function makeResource() {
-  return Behave.createResource({
+  return Behavon.createResource({
     open: () => ({}),
     close: () => undefined,
     abort: () => undefined,

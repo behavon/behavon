@@ -1,8 +1,8 @@
 /* eslint-disable behavon-hooks/canonical-api, behavon-hooks/evaluation-purity -- test-only probes retain and intentionally discard Hook results */
 import { describe, expect, it, vi } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { ModelInstance, Signal, TypedModelRef } from "behavon";
-import { waitFor } from "../helpers";
+import { waitFor, signalOf } from "../helpers";
 import {
   inspectModelInstanceForTests,
   observeModelInstanceCreationForTests,
@@ -38,25 +38,25 @@ describe("Model public exports", () => {
     const initialize = vi.fn(() => ({ identity: Object.freeze({ token: 1 }) }));
     let dependencyIdentity: object | undefined;
     function Target(): number {
-      const exported = Behave.useExport(initialize);
-      const [value, setValue] = Behave.useState(1);
-      const set = Behave.useCallback((next: number) => setValue(next), [setValue]);
-      Behave.useSignal("set", set);
+      const exported = Behavon.useExport(initialize);
+      const [value, setValue] = Behavon.useState(1);
+      const set = Behavon.useCallback((next: number) => setValue(next), [setValue]);
+      Behavon.useSignal("set", set);
       expect(Object.isFrozen(exported)).toBe(true);
       return value;
     }
-    const target = Behave.createModel(Target, undefined) as ModelInstance<undefined, number> &
+    const target = Behavon.createModel(Target, undefined) as ModelInstance<undefined, number> &
       TypedModelRef<ExportedSurface>;
     function Consumer(): undefined {
-      const dependency = Behave.usePort(target);
+      const dependency = Behavon.usePort(target);
       dependencyIdentity = dependency.identity;
       return undefined;
     }
-    const consumer = Behave.createModel(Consumer, undefined);
+    const consumer = Behavon.createModel(Consumer, undefined);
     expect(initialize).toHaveBeenCalledTimes(1);
     expect(dependencyIdentity).toBe(target.identity);
     expect(target.identity).toEqual({ token: 1 });
-    target.set(2);
+    signalOf(target, "set")(2);
     expect(initialize).toHaveBeenCalledTimes(1);
     expect(target.identity).toBe(dependencyIdentity);
     consumer.dispose();
@@ -66,18 +66,18 @@ describe("Model public exports", () => {
 
   it("keeps exports separate from the committed Model output observed by useModel", async () => {
     function Target(input: number): number {
-      Behave.useExport(() => ({ identity: Object.freeze({ kind: "export" }) }));
+      Behavon.useExport(() => ({ identity: Object.freeze({ kind: "export" }) }));
       return input * 2;
     }
-    const target = Behave.createModel(Target, 2) as ModelInstance<number, number> &
+    const target = Behavon.createModel(Target, 2) as ModelInstance<number, number> &
       TypedModelRef<{ readonly identity: object }>;
     let output = 0;
     let setInput: ((next: number) => void) | undefined;
     function Observer(): undefined {
-      [output, setInput] = Behave.useModel(target);
+      [output, setInput] = Behavon.useModel(target);
       return undefined;
     }
-    const observer = Behave.createModel(Observer, undefined);
+    const observer = Behavon.createModel(Observer, undefined);
     const identity = target.identity;
     expect(output).toBe(4);
     setInput?.(3);
@@ -92,8 +92,8 @@ describe("Model public exports", () => {
     let candidate: object | undefined;
     const stop = observeModelInstanceCreationForTests((ref) => { candidate = ref; });
     try {
-      expect(() => Behave.createModel(function FailingConstruction(): undefined {
-        const exported = Behave.useExport(() => ({ identity: Object.freeze({}) }));
+      expect(() => Behavon.createModel(function FailingConstruction(): undefined {
+        const exported = Behavon.useExport(() => ({ identity: Object.freeze({}) }));
         void exported.identity;
         throw new Error("construction failed");
       }, undefined)).toThrow("construction failed");
@@ -106,20 +106,20 @@ describe("Model public exports", () => {
 
     const initialize = vi.fn(() => ({ identity: Object.freeze({ stable: true }) }));
     function StableThenFail(): undefined {
-      const exported = Behave.useExport(initialize);
-      const [fail, setFail] = Behave.useState(false);
-      const failNow = Behave.useCallback(() => setFail(true), [setFail]);
-      Behave.useSignal("fail", failNow);
+      const exported = Behavon.useExport(initialize);
+      const [fail, setFail] = Behavon.useState(false);
+      const failNow = Behavon.useCallback(() => setFail(true), [setFail]);
+      Behavon.useSignal("fail", failNow);
       void exported.identity;
       if (fail) throw new Error("reevaluation failed");
       return undefined;
     }
-    const model = Behave.createModel(StableThenFail, undefined) as TypedModelRef<{
+    const model = Behavon.createModel(StableThenFail, undefined) as TypedModelRef<{
       readonly identity: object;
       readonly fail: Signal;
     }>; 
     const identity = model.identity;
-    expect(await captureScheduledFailure(() => model.fail())).toEqual(new Error("reevaluation failed"));
+    expect(await captureScheduledFailure(() => signalOf(model, "fail")())).toEqual(new Error("reevaluation failed"));
     expect(initialize).toHaveBeenCalledTimes(1);
     expect(() => model.identity).toThrow(/disposed/);
     expect(identity).toEqual({ stable: true });
@@ -139,78 +139,78 @@ describe("Model public exports", () => {
     ];
     for (const [label, initialize] of cases) {
       function Invalid(): undefined {
-        Behave.useExport(initialize as () => Readonly<Record<string, unknown>>);
+        Behavon.useExport(initialize as () => Readonly<Record<string, unknown>>);
         return undefined;
       }
-      expect(() => Behave.createModel(Invalid, undefined), label).toThrow();
+      expect(() => Behavon.createModel(Invalid, undefined), label).toThrow();
     }
 
     function Duplicate(): undefined {
-      const first = Behave.useExport(() => ({ value: 1 }));
-      const second = Behave.useExport(() => ({ value: 2 }));
+      const first = Behavon.useExport(() => ({ value: 1 }));
+      const second = Behavon.useExport(() => ({ value: 2 }));
       void first;
       void second;
       return undefined;
     }
-    expect(() => Behave.createModel(Duplicate, undefined)).toThrow(/duplicate public export 'value'/);
+    expect(() => Behavon.createModel(Duplicate, undefined)).toThrow(/duplicate public export 'value'/);
 
     function EndpointFirst(): undefined {
-      const body = Behave.useCallback(() => undefined, []);
-      Behave.useSignal("value", body);
-      const exported = Behave.useExport(() => ({ value: 1 }));
+      const body = Behavon.useCallback(() => undefined, []);
+      Behavon.useSignal("value", body);
+      const exported = Behavon.useExport(() => ({ value: 1 }));
       void exported;
       return undefined;
     }
     function ExportFirst(): undefined {
-      const exported = Behave.useExport(() => ({ value: 1 }));
-      const body = Behave.useCallback(() => undefined, []);
-      Behave.useSignal("value", body);
+      const exported = Behavon.useExport(() => ({ value: 1 }));
+      const body = Behavon.useCallback(() => undefined, []);
+      Behavon.useSignal("value", body);
       void exported;
       return undefined;
     }
-    expect(() => Behave.createModel(EndpointFirst, undefined)).toThrow(/both an endpoint and an export/);
-    expect(() => Behave.createModel(ExportFirst, undefined)).toThrow(/both an endpoint and an export/);
+    expect(() => Behavon.createModel(EndpointFirst, undefined)).toThrow(/both an endpoint and an export/);
+    expect(() => Behavon.createModel(ExportFirst, undefined)).toThrow(/both an endpoint and an export/);
   });
 
   it("runs the lazy initializer in a restricted user-function frame exactly once", () => {
     function NestedHook(): undefined {
-      const exported = Behave.useExport(() => {
+      const exported = Behavon.useExport(() => {
         // eslint-disable-next-line react-hooks/rules-of-hooks -- test-only nested Hook runtime probe
-        Behave.useState(0);
+        Behavon.useState(0);
         return { value: 1 };
       });
       void exported.value;
       return undefined;
     }
-    expect(() => Behave.createModel(NestedHook, undefined)).toThrow(
-      /Behave\.useState cannot be called inside useExport initializer/,
+    expect(() => Behavon.createModel(NestedHook, undefined)).toThrow(
+      /Behavon\.useState cannot be called inside useExport initializer/,
     );
   });
 
   it("retains the first export through render-phase retries and keeps reflection endpoint-only", () => {
     const initialize = vi.fn(() => ({ first: Object.freeze({}), second: 2 }));
     function Retry(): number {
-      const exported = Behave.useExport(initialize);
-      const [value, setValue] = Behave.useState(0);
+      const exported = Behavon.useExport(initialize);
+      const [value, setValue] = Behavon.useState(0);
       if (value === 0) setValue(1);
       return exported.second + value;
     }
-    const model = Behave.createModel(Retry, undefined) as ModelInstance<undefined, number> &
+    const model = Behavon.createModel(Retry, undefined) as ModelInstance<undefined, number> &
       TypedModelRef<{ readonly first: object; readonly second: number }>;
     expect(initialize).toHaveBeenCalledTimes(1);
     expect(model.second).toBe(2);
-    expect(Behave.getInterface(model)).toEqual({ endpoints: [] });
+    expect(Behavon.getInterface(model)).toEqual({ endpoints: [] });
     model.dispose();
   });
 
   it("does not automatically proxy Boundary Child exports onto the outer ref", () => {
     function Child(): undefined {
-      const exported = Behave.useExport(() => ({ childIdentity: Object.freeze({}) }));
+      const exported = Behavon.useExport(() => ({ childIdentity: Object.freeze({}) }));
       void exported.childIdentity;
       return undefined;
     }
-    const Wrapped = Behave.boundary(Child);
-    const outer = Behave.createModel(Wrapped, undefined);
+    const Wrapped = Behavon.boundary(Child);
+    const outer = Behavon.createModel(Wrapped, undefined);
     expect(() => outer.childIdentity).toThrow(/has no endpoint 'childIdentity'/);
     outer.dispose();
   });
@@ -221,8 +221,8 @@ describe("Model public exports", () => {
     let dependency: { readonly identity: object } | undefined;
     const cleanupFailures: unknown[] = [];
     function Target(): undefined {
-      Behave.useExport(() => ({ identity: Object.freeze({}) }));
-      Behave.useEffect(() => () => {
+      Behavon.useExport(() => ({ identity: Object.freeze({}) }));
+      Behavon.useEffect(() => () => {
         try {
           target.identity;
         } catch (error: unknown) {
@@ -236,13 +236,13 @@ describe("Model public exports", () => {
       }, []);
       return undefined;
     }
-    const instance = Behave.createModel(Target, undefined);
+    const instance = Behavon.createModel(Target, undefined);
     target = instance as TypedModelRef<Surface>;
     function Consumer(): undefined {
-      dependency = Behave.usePort(target);
+      dependency = Behavon.usePort(target);
       return undefined;
     }
-    const consumer = Behave.createModel(Consumer, undefined);
+    const consumer = Behavon.createModel(Consumer, undefined);
     instance.dispose();
     expect(cleanupFailures).toHaveLength(2);
     for (const failure of cleanupFailures) expect(String(failure)).toMatch(/disposed during .*export lookup 'identity'/);

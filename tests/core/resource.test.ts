@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import Behave, { ResourceActionSupersededError } from "behavon";
+import Behavon, { ResourceActionSupersededError } from "behavon";
 import type { ResourceAbortSignal } from "behavon";
 import { inspectModelInstanceForTests, inspectRetainedOperationForTests } from "../../src/internal/model-inspection";
 import { waitFor } from "../helpers";
@@ -20,7 +20,7 @@ function deferred<Value>() {
 
 describe("useResource", () => {
   it("exposes a small immutable snapshot and a stable frozen controller", async () => {
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({ value: 1 }),
       close: () => undefined,
       abort: () => undefined,
@@ -29,10 +29,10 @@ describe("useResource", () => {
       },
     });
     function Model(input: number) {
-      const [snapshot, controller] = Behave.useResource(Resource, input);
+      const [snapshot, controller] = Behavon.useResource(Resource, input);
       return { snapshot, controller };
     }
-    const root = Behave.createModel(Model, 1);
+    const root = Behavon.createModel(Model, 1);
     const initial = outputOf<ReturnType<typeof Model>>(root);
     expect(initial.snapshot).toEqual({ phase: "closed", closedBy: "initial" });
     expect(Object.isFrozen(initial.snapshot)).toBe(true);
@@ -54,9 +54,9 @@ describe("useResource", () => {
   it("coalesces duplicate opening work while retaining per-call requests", async () => {
     const opening = deferred<{ id: number }>();
     const open = vi.fn(() => opening.promise);
-    const Resource = Behave.createResource({ open, close: () => undefined, abort: () => undefined });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    const Resource = Behavon.createResource({ open, close: () => undefined, abort: () => undefined });
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     const requested: unknown[] = [];
     const started: unknown[] = [];
@@ -81,9 +81,9 @@ describe("useResource", () => {
 
   it("keeps the original opening operation alive when a coalesced request listener throws", async () => {
     const opening = deferred<object>();
-    const Resource = Behave.createResource({ open: () => opening.promise, close: () => undefined, abort: () => undefined });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    const Resource = Behavon.createResource({ open: () => opening.promise, close: () => undefined, abort: () => undefined });
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     let requests = 0;
     const failure = new Error("second request failed");
@@ -100,9 +100,9 @@ describe("useResource", () => {
     const opening = deferred<object>();
     const close = vi.fn();
     const failure = new Error("queued close request failed");
-    const Resource = Behave.createResource({ open: () => opening.promise, close, abort: () => undefined });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    const Resource = Behavon.createResource({ open: () => opening.promise, close, abort: () => undefined });
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.closeRequested.subscribe(() => { throw failure; });
     controller.open();
@@ -115,9 +115,9 @@ describe("useResource", () => {
 
   it("lets a reentrant abort during openRequested prevent driver start", () => {
     const open = vi.fn(() => ({}));
-    const Resource = Behave.createResource({ open, close: () => undefined, abort: () => undefined });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    const Resource = Behavon.createResource({ open, close: () => undefined, abort: () => undefined });
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.openRequested.subscribe(() => { controller.abort("cancelled"); });
     const request = controller.open();
@@ -130,9 +130,9 @@ describe("useResource", () => {
     for (const occurrence of ["closeRequested", "closeStarted"] as const) {
       const close = vi.fn();
       const abort = vi.fn();
-      const Resource = Behave.createResource({ open: () => ({}), close, abort });
-      function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-      const root = Behave.createModel(Model, undefined);
+      const Resource = Behavon.createResource({ open: () => ({}), close, abort });
+      function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+      const root = Behavon.createModel(Model, undefined);
       const controller = outputOf<ReturnType<typeof Model>>(root)[1];
       controller.open();
       controller[occurrence].subscribe(() => { controller.abort(occurrence); });
@@ -152,9 +152,9 @@ describe("useResource", () => {
   it("preserves an abortRequested listener failure after completing invalidation", async () => {
     const failure = new Error("abort listener failed");
     const abort = vi.fn();
-    const Resource = Behave.createResource({ open: () => ({}), close: () => undefined, abort });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    const Resource = Behavon.createResource({ open: () => ({}), close: () => undefined, abort });
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     controller.abortRequested.subscribe(() => { throw failure; });
@@ -171,14 +171,14 @@ describe("useResource", () => {
   it("projects close failure to closed without reviving capability", async () => {
     const failure = new Error("close failed");
     const cleanup = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({ value: 1 }),
       close: () => { throw failure; },
       abort: cleanup,
       actions: { read: ({ resource }: { resource: { value: number }; signal: ResourceAbortSignal }) => resource.value },
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     const close = controller.close("shutdown");
@@ -197,13 +197,13 @@ describe("useResource", () => {
     const throwingClose = Object.defineProperty({}, "then", { get() { throw closeFailure; } }) as PromiseLike<void>;
     let openCalls = 0;
     const abort = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ++openCalls === 1 ? throwingOpen : {},
       close: () => throwingClose,
       abort,
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     const failedOpen = controller.open();
     expect(failedOpen.getResult()).toEqual({ status: "failed", error: openFailure });
@@ -222,13 +222,13 @@ describe("useResource", () => {
     const newResource = { id: 2 };
     let openCalls = 0;
     const abort = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ++openCalls === 1 ? oldResource : newResource,
       close: () => { throw closeFailure; },
       abort,
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     controller.closeFailed.subscribe(() => {
@@ -247,14 +247,14 @@ describe("useResource", () => {
     const secondQuery = deferred<number>();
     let next = firstQuery;
     const close = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({}),
       close,
       abort: () => undefined,
       actions: { query: () => (next = next === firstQuery ? firstQuery : secondQuery).promise },
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     const pending = controller.query();
@@ -279,7 +279,7 @@ describe("useResource", () => {
     const trace: string[] = [];
     const close = vi.fn(() => { trace.push("close"); });
     let requestClose!: () => unknown;
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({}),
       close,
       abort: () => undefined,
@@ -304,8 +304,8 @@ describe("useResource", () => {
         },
       },
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     requestClose = () => controller.close();
 
@@ -332,7 +332,7 @@ describe("useResource", () => {
       const pending = deferred<number>();
       const close = vi.fn();
       let terminate!: (reason: string) => void;
-      const Resource = Behave.createResource({
+      const Resource = Behavon.createResource({
         open: ({ terminated }: { terminated(reason: string): void }) => {
           terminate = terminated;
           return {};
@@ -341,8 +341,8 @@ describe("useResource", () => {
         abort: () => undefined,
         actions: { query: () => pending.promise },
       });
-      function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-      const root = Behave.createModel(Model, undefined);
+      function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+      const root = Behavon.createModel(Model, undefined);
       const controller = outputOf<ReturnType<typeof Model>>(root)[1];
 
       controller.open();
@@ -365,7 +365,7 @@ describe("useResource", () => {
 
   it("passes an undefined resource payload to managed actions and normal close", () => {
     const close = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => undefined,
       close,
       abort: () => undefined,
@@ -373,8 +373,8 @@ describe("useResource", () => {
         read: ({ resource }: { resource: undefined; signal: ResourceAbortSignal }) => resource,
       },
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
 
     expect(controller.open().getResult()).toEqual({ status: "succeeded", outcome: "opened" });
@@ -388,7 +388,7 @@ describe("useResource", () => {
     const failure = new Error("action then getter failed");
     const syncValue = { value: 1, then: 1 };
     const close = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({}),
       close,
       abort: () => undefined,
@@ -397,8 +397,8 @@ describe("useResource", () => {
         read: () => syncValue,
       },
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     const pending = controller.broken();
@@ -418,7 +418,7 @@ describe("useResource", () => {
 
   it("maps native termination once and ignores stale termination after abort", async () => {
     let terminate!: (reason: string) => void;
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: ({ terminated }: { terminated(reason: string): void }) => {
         terminate = terminated;
         return {};
@@ -426,8 +426,8 @@ describe("useResource", () => {
       close: () => undefined,
       abort: () => undefined,
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     const lost: unknown[] = [];
     controller.lost.subscribe(value => lost.push(value));
@@ -446,13 +446,13 @@ describe("useResource", () => {
   it("queues and coalesces close during opening while the first reason owns the operation", async () => {
     const opening = deferred<object>();
     const close = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => opening.promise,
       close: ({ reason }: { resource: object; reason?: string }) => { close(reason); },
       abort: () => undefined,
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     const closeStarted: unknown[] = [];
     controller.closeStarted.subscribe(value => closeStarted.push(value));
@@ -476,9 +476,9 @@ describe("useResource", () => {
   it("coalesces repeated queued opens behind one async close without orphaning the first request", async () => {
     const closing = deferred<void>();
     const open = vi.fn(() => ({}));
-    const Resource = Behave.createResource({ open, close: () => closing.promise, abort: () => undefined });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    const Resource = Behavon.createResource({ open, close: () => closing.promise, abort: () => undefined });
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     controller.close();
@@ -502,13 +502,13 @@ describe("useResource", () => {
     const secondOpen = deferred<object>();
     let openCalls = 0;
     let closeCalls = 0;
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ++openCalls === 1 ? {} : secondOpen.promise,
       close: () => ++closeCalls === 1 ? firstClose.promise : undefined,
       abort: () => undefined,
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     let nestedClose: ReturnType<typeof controller.close> | undefined;
     controller.closed.subscribe(() => {
@@ -533,13 +533,13 @@ describe("useResource", () => {
     const secondOpen = deferred<object>();
     const close = vi.fn();
     let openCalls = 0;
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ++openCalls === 1 ? firstOpen.promise : secondOpen.promise,
       close,
       abort: () => undefined,
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     let nestedClose: ReturnType<typeof controller.close> | undefined;
     controller.openFailed.subscribe(() => {
@@ -561,13 +561,13 @@ describe("useResource", () => {
     const secondOpen = deferred<object>();
     let openCalls = 0;
     let closeCalls = 0;
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ++openCalls === 1 ? {} : secondOpen.promise,
       close: () => ++closeCalls === 1 ? firstClose.promise : undefined,
       abort: () => undefined,
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     let nestedClose: ReturnType<typeof controller.close> | undefined;
     controller.closeFailed.subscribe(() => {
@@ -588,9 +588,9 @@ describe("useResource", () => {
   it("lets a terminal close listener abort the queued reopen before it starts", async () => {
     const closing = deferred<void>();
     const open = vi.fn(() => ({}));
-    const Resource = Behave.createResource({ open, close: () => closing.promise, abort: () => undefined });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    const Resource = Behavon.createResource({ open, close: () => closing.promise, abort: () => undefined });
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     controller.close();
@@ -609,13 +609,13 @@ describe("useResource", () => {
 
   it("does not duplicate abort cleanup or overwrite the closed reason", async () => {
     const abort = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({}),
       close: () => undefined,
       abort,
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     const first = controller.abort("first");
@@ -633,9 +633,9 @@ describe("useResource", () => {
     const opening = deferred<object>();
     const late = { id: "late" };
     const abort = vi.fn();
-    const Resource = Behave.createResource({ open: () => opening.promise, close: () => undefined, abort });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    const Resource = Behavon.createResource({ open: () => opening.promise, close: () => undefined, abort });
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     controller.abort("cancel");
@@ -650,7 +650,7 @@ describe("useResource", () => {
   it("routes asynchronous abort cleanup failure to the static diagnostic", async () => {
     const failure = new Error("cleanup failed");
     const cleanupErrors: unknown[] = [];
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({}),
       close: () => undefined,
       abort: () => Promise.reject(failure),
@@ -658,8 +658,8 @@ describe("useResource", () => {
         cleanupErrors.push([error, context.command]);
       },
     });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.open();
     controller.abort();
@@ -670,17 +670,17 @@ describe("useResource", () => {
 
   it("uses the latest committed input without starting work on input-only changes", async () => {
     const inputs: number[] = [];
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: ({ input }: { input: number }) => { inputs.push(input); return {}; },
       close: () => undefined,
       abort: () => undefined,
     });
     function Model(initial: number) {
-      const [input, setInput] = Behave.useState(initial);
-      const resource = Behave.useResource(Resource, input);
+      const [input, setInput] = Behavon.useState(initial);
+      const resource = Behavon.useResource(Resource, input);
       return { input, resource, setInput };
     }
-    const root = Behave.createModel(Model, 1);
+    const root = Behavon.createModel(Model, 1);
     const first = outputOf<ReturnType<typeof Model>>(root);
     first.setInput(2);
     await waitFor(() => outputOf<ReturnType<typeof Model>>(root).input === 2);
@@ -692,22 +692,22 @@ describe("useResource", () => {
 
   it("retains one provisional Resource through a render-phase retry until commit", () => {
     const abort = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({}),
       close: () => undefined,
       abort,
     });
     const controllers: object[] = [];
     function Model() {
-      const [attempt, setAttempt] = Behave.useState(0);
-      const resource = Behave.useResource(Resource, undefined);
+      const [attempt, setAttempt] = Behavon.useState(0);
+      const resource = Behavon.useResource(Resource, undefined);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records provisional identity across retry
       controllers.push(resource[1]);
       if (attempt === 0) setAttempt(1);
       return { attempt, resource };
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const output = outputOf<ReturnType<typeof Model>>(root);
     expect(output.attempt).toBe(1);
     expect(controllers).toHaveLength(2);
@@ -722,20 +722,20 @@ describe("useResource", () => {
 
   it("allows Effect cleanup to abort exactly once before terminal controller detachment", () => {
     const abort = vi.fn();
-    const Resource = Behave.createResource({ open: () => ({}), close: () => undefined, abort });
+    const Resource = Behavon.createResource({ open: () => ({}), close: () => undefined, abort });
     let escaped!: ReturnType<typeof Model>;
     function Model() {
-      const value = Behave.useResource(Resource, undefined);
+      const value = Behavon.useResource(Resource, undefined);
       const controller = value[1];
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a controller to inspect terminal detachment
       escaped = value;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         controller.open();
         return () => { controller.abort("effect cleanup"); };
       }, [controller]);
       return value;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const target = inspectRetainedOperationForTests(escaped[1].open);
     root.dispose();
     expect(abort).toHaveBeenCalledTimes(1);
@@ -748,17 +748,17 @@ describe("useResource", () => {
   it("still automatically invalidates a resource when an Effect cleanup throws", () => {
     const failure = new Error("effect cleanup failed");
     const abort = vi.fn();
-    const Resource = Behave.createResource({ open: () => ({}), close: () => undefined, abort });
+    const Resource = Behavon.createResource({ open: () => ({}), close: () => undefined, abort });
     function Model() {
-      const value = Behave.useResource(Resource, undefined);
+      const value = Behavon.useResource(Resource, undefined);
       const controller = value[1];
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         controller.open();
         return () => { throw failure; };
       }, [controller]);
       return value;
     }
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(() => root.dispose()).toThrow(failure);
     expect(abort).toHaveBeenCalledTimes(1);
   });
@@ -766,9 +766,9 @@ describe("useResource", () => {
   it("propagates a started-listener failure without leaving a phantom opening lifecycle", async () => {
     const failure = new Error("listener failed");
     const open = vi.fn(() => ({}));
-    const Resource = Behave.createResource({ open, close: () => undefined, abort: () => undefined });
-    function Model() { const value = Behave.useResource(Resource, undefined); return value; }
-    const root = Behave.createModel(Model, undefined);
+    const Resource = Behavon.createResource({ open, close: () => undefined, abort: () => undefined });
+    function Model() { const value = Behavon.useResource(Resource, undefined); return value; }
+    const root = Behavon.createModel(Model, undefined);
     const controller = outputOf<ReturnType<typeof Model>>(root)[1];
     controller.openStarted.subscribe(() => { throw failure; });
     expect(() => controller.open()).toThrow(failure);
@@ -781,7 +781,7 @@ describe("useResource", () => {
   it("aborts a provisional resource when construction fails after an invalid evaluation-time command", () => {
     const failure = new Error("construction failed");
     const abort = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({}),
       close: () => undefined,
       abort,
@@ -789,14 +789,14 @@ describe("useResource", () => {
     let escaped: { open(): unknown } | undefined;
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     function Broken(): never {
-      const value = Behave.useResource(Resource, undefined);
+      const value = Behavon.useResource(Resource, undefined);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- invalid reproduction verifies provisional lifecycle cleanup
       value[1].open();
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a failed-construction controller
       escaped = value[1];
       throw failure;
     }
-    expect(() => Behave.createModel(Broken, undefined)).toThrow(failure);
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
     expect(abort).toHaveBeenCalledTimes(1);
     expect(() => escaped?.open()).toThrow(/stale during useResource open/);
     expect(warning).toHaveBeenCalledTimes(1);
@@ -806,7 +806,7 @@ describe("useResource", () => {
   it("aborts a provisional resource discarded by a containing Boundary", () => {
     const failure = new Error("child construction failed");
     const abort = vi.fn();
-    const Resource = Behave.createResource({
+    const Resource = Behavon.createResource({
       open: () => ({}),
       close: () => undefined,
       abort,
@@ -814,7 +814,7 @@ describe("useResource", () => {
     let escaped: { open(): unknown } | undefined;
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     function Broken(): never {
-      const value = Behave.useResource(Resource, undefined);
+      const value = Behavon.useResource(Resource, undefined);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- invalid reproduction verifies Boundary branch rollback
       value[1].open();
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains the discarded controller
@@ -822,7 +822,7 @@ describe("useResource", () => {
       throw failure;
     }
 
-    const root = Behave.createModel(Behave.boundary(Broken), undefined);
+    const root = Behavon.createModel(Behavon.boundary(Broken), undefined);
     expect(outputOf<{ status: string; error?: unknown }>(root)).toMatchObject({ status: "failed", error: failure });
     expect(abort).toHaveBeenCalledTimes(1);
     expect(() => escaped?.open()).toThrow(/stale during useResource open/);

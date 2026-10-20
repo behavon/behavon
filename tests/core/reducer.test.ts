@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { Model, ModelInstance, ReducerDispatch, Signal, StateSetter } from "behavon";
 import { inspectModelInstanceForTests, inspectRetainedOperationForTests } from "../../src/internal/model-inspection";
 import { inspectMutableStateForTests, type MutableStateSubject } from "../../src/internal/mutable-observer";
@@ -33,32 +33,32 @@ describe("useReducer", () => {
   it("rejects malformed reducer, initializer, and multi-action dispatch calls", () => {
     function InvalidReducer(): undefined {
       // eslint-disable-next-line behavon-hooks/canonical-api -- test-only invalid reproduction exercises the runtime guard before result use
-      Behave.useReducer(null as never, 0);
+      Behavon.useReducer(null as never, 0);
       return undefined;
     }
-    expect(() => Behave.createModel(InvalidReducer, undefined)).toThrow(
-      "Behave.useReducer requires a reducer function",
+    expect(() => Behavon.createModel(InvalidReducer, undefined)).toThrow(
+      "Behavon.useReducer requires a reducer function",
     );
 
     function InvalidInitializer(): undefined {
       // eslint-disable-next-line behavon-hooks/canonical-api -- test-only invalid reproduction exercises the runtime guard before result use
-      Behave.useReducer((state: number) => state, 0, 1 as never);
+      Behavon.useReducer((state: number) => state, 0, 1 as never);
       return undefined;
     }
-    expect(() => Behave.createModel(InvalidInitializer, undefined)).toThrow(
-      "Behave.useReducer initializer must be a function when provided",
+    expect(() => Behavon.createModel(InvalidInitializer, undefined)).toThrow(
+      "Behavon.useReducer initializer must be a function when provided",
     );
 
     let dispatch: ReducerDispatch<[number]> | undefined;
     function Counter(): number {
-      const [value, next] = Behave.useReducer((state: number, action: number) => state + action, 0);
+      const [value, next] = Behavon.useReducer((state: number, action: number) => state + action, 0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains dispatch for a cast-invalid call
       dispatch = next;
       return value;
     }
-    const owner = Behave.createModel(Counter, undefined);
+    const owner = Behavon.createModel(Counter, undefined);
     expect(() => (dispatch as (...actions: number[]) => void)(1, 2)).toThrow(
-      "Behave.useReducer dispatch accepts zero or one action argument",
+      "Behavon.useReducer dispatch accepts zero or one action argument",
     );
     expect(outputOf<number>(owner)).toBe(0);
     owner.dispose();
@@ -67,14 +67,14 @@ describe("useReducer", () => {
   it("preserves initializer error identity before publishing a Model", () => {
     const failure = new Error("initializer failed");
     function Broken(): number {
-      const [value] = Behave.useReducer(
+      const [value] = Behavon.useReducer(
         (state: number, action: number) => state + action,
         0,
         () => { throw failure; },
       );
       return value;
     }
-    expect(() => Behave.createModel(Broken, undefined)).toThrow(failure);
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
   });
 
   it("releases a failed-construction reducer cell and rejects Hooks in its initializer", () => {
@@ -82,31 +82,31 @@ describe("useReducer", () => {
     let escapedDispatch: ReducerDispatch<[number]> | undefined;
     let provisionalCell: MutableStateSubject | undefined;
     function Broken(): never {
-      const [, dispatch] = Behave.useReducer((state: number, action: number) => state + action, 0);
+      const [, dispatch] = Behavon.useReducer((state: number, action: number) => state + action, 0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains provisional reducer authority
       escapedDispatch = dispatch;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains provisional reducer cell
       provisionalCell = inspectRetainedOperationForTests(dispatch).cell as MutableStateSubject;
       throw failure;
     }
-    expect(() => Behave.createModel(Broken, undefined)).toThrow(failure);
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
     expect(inspectMutableStateForTests(provisionalCell as MutableStateSubject).status).toBe("released");
     expect(inspectRetainedOperationForTests(escapedDispatch as Function).cell).toBeUndefined();
     expect(() => escapedDispatch?.(1)).not.toThrow();
 
     function InvalidInitializer(): number {
-      const [value] = Behave.useReducer(
+      const [value] = Behavon.useReducer(
         (state: number, action: number) => state + action,
         0,
         () => {
           // eslint-disable-next-line behavon-hooks/canonical-api, react-hooks/rules-of-hooks -- test-only invalid reproduction verifies initializer Hook rejection
-          Behave.useState(0);
+          Behavon.useState(0);
           return 0;
         },
       );
       return value;
     }
-    expect(() => Behave.createModel(InvalidInitializer, undefined)).toThrow(
+    expect(() => Behavon.createModel(InvalidInitializer, undefined)).toThrow(
       /useState cannot be called inside useReducer initializer/,
     );
   });
@@ -118,7 +118,7 @@ describe("useReducer", () => {
     const identities: Function[] = [];
 
     function Counter(): number {
-      const [count, next] = Behave.useReducer(
+      const [count, next] = Behavon.useReducer(
         (state: number, action: number) => state + action,
         "2",
         (value) => {
@@ -134,7 +134,7 @@ describe("useReducer", () => {
       return count;
     }
 
-    const instance = Behave.createModel(Counter, undefined);
+    const instance = Behavon.createModel(Counter, undefined);
     returns.push(dispatch?.(3), dispatch?.(4));
     await waitFor(() => outputOf<number>(instance as object) === 9);
     expect(initializations).toBe(1);
@@ -147,8 +147,8 @@ describe("useReducer", () => {
     let tick: ReducerDispatch<[]> | undefined;
     let send: ReducerDispatch<[() => number]> | undefined;
     function Model(): readonly [number, number] {
-      const [count, next] = Behave.useReducer((state: number) => state + 1, 0);
-      const [functionValue, nextFunction] = Behave.useReducer(
+      const [count, next] = Behavon.useReducer((state: number) => state + 1, 0);
+      const [functionValue, nextFunction] = Behavon.useReducer(
         (_state: number, action: () => number) => action(),
         0,
       );
@@ -156,7 +156,7 @@ describe("useReducer", () => {
       [tick, send] = [next, nextFunction];
       return [count, functionValue];
     }
-    const instance = Behave.createModel(Model, undefined);
+    const instance = Behavon.createModel(Model, undefined);
     tick?.();
     send?.(() => 7);
     await waitFor(() => outputOf<readonly [number, number]>(instance as object)[1] === 7);
@@ -169,7 +169,7 @@ describe("useReducer", () => {
     let dispatch: ReducerDispatch<[number]> | undefined;
     let evaluations = 0;
     function Model(): number {
-      const [value, next] = Behave.useReducer(
+      const [value, next] = Behavon.useReducer(
         (state: number, action: number) => state + action * mode,
         0,
       );
@@ -179,7 +179,7 @@ describe("useReducer", () => {
       dispatch = next;
       return value;
     }
-    const instance = Behave.createModel(Model, undefined);
+    const instance = Behavon.createModel(Model, undefined);
     mode = 2;
     dispatch?.(3);
     await waitFor(() => outputOf<number>(instance as object) === 6);
@@ -197,7 +197,7 @@ describe("useReducer", () => {
     const seen: number[] = [];
     const identities: Array<readonly [number, number]> = [];
     function Model(): number {
-      const [value, next] = Behave.useReducer(
+      const [value, next] = Behavon.useReducer(
         (state: number, action: number) => state + action,
         0,
         (initial) => {
@@ -217,7 +217,7 @@ describe("useReducer", () => {
       if (value < 2) next(1);
       return value;
     }
-    const instance = Behave.createModel(Model, undefined);
+    const instance = Behavon.createModel(Model, undefined);
     const cell = inspectRetainedOperationForTests(dispatch as Function).cell as MutableStateSubject;
     expect(seen).toEqual([0, 1, 2]);
     expect(initializations).toBe(1);
@@ -240,46 +240,46 @@ describe("useReducer", () => {
     let stateToReducer = false;
     let rerenderStateOwner: StateSetter<number> | undefined;
     function StateThenReducer(): number {
-      const [tick, setTick] = Behave.useState(0);
+      const [tick, setTick] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only invalid reproduction retains a rerender trigger
       rerenderStateOwner = setTick;
       if (stateToReducer) {
         // eslint-disable-next-line react-hooks/rules-of-hooks -- test-only invalid reproduction changes a mounted Hook kind
-        const [value] = Behave.useReducer((state: number) => state, 0);
+        const [value] = Behavon.useReducer((state: number) => state, 0);
         return value + tick;
       }
       // eslint-disable-next-line react-hooks/rules-of-hooks -- test-only invalid reproduction changes a mounted Hook kind
-      const [value] = Behave.useState(0);
+      const [value] = Behavon.useState(0);
       return value + tick;
     }
 
-    const stateOwner = Behave.createModel(StateThenReducer, undefined);
+    const stateOwner = Behavon.createModel(StateThenReducer, undefined);
     stateToReducer = true;
     expect(await captureScheduledFailure(() => rerenderStateOwner?.((value) => value + 1))).toMatchObject({
-      message: expect.stringMatching(/Behave hook order changed in Model#\d+: expected state, received reducer/),
+      message: expect.stringMatching(/Behavon hook order changed in Model#\d+: expected state, received reducer/),
     });
     expect(inspectModelInstanceForTests(stateOwner as object).status).toBe("disposed");
 
     let reducerToState = false;
     let rerenderReducerOwner: StateSetter<number> | undefined;
     function ReducerThenState(): number {
-      const [tick, setTick] = Behave.useState(0);
+      const [tick, setTick] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only invalid reproduction retains a rerender trigger
       rerenderReducerOwner = setTick;
       if (reducerToState) {
         // eslint-disable-next-line react-hooks/rules-of-hooks -- test-only invalid reproduction changes a mounted Hook kind
-        const [value] = Behave.useState(0);
+        const [value] = Behavon.useState(0);
         return value + tick;
       }
       // eslint-disable-next-line react-hooks/rules-of-hooks -- test-only invalid reproduction changes a mounted Hook kind
-      const [value] = Behave.useReducer((state: number) => state, 0);
+      const [value] = Behavon.useReducer((state: number) => state, 0);
       return value + tick;
     }
 
-    const reducerOwner = Behave.createModel(ReducerThenState, undefined);
+    const reducerOwner = Behavon.createModel(ReducerThenState, undefined);
     reducerToState = true;
     expect(await captureScheduledFailure(() => rerenderReducerOwner?.((value) => value + 1))).toMatchObject({
-      message: expect.stringMatching(/Behave hook order changed in Model#\d+: expected reducer, received state/),
+      message: expect.stringMatching(/Behavon hook order changed in Model#\d+: expected reducer, received state/),
     });
     expect(inspectModelInstanceForTests(reducerOwner as object).status).toBe("disposed");
   });
@@ -289,7 +289,7 @@ describe("useReducer", () => {
     let dispatch: ReducerDispatch<["prefix" | "suffix"]> | undefined;
     let cell: MutableStateSubject | undefined;
     function Model(): number {
-      const [value, next] = Behave.useReducer((state: number, action: "prefix" | "suffix") => {
+      const [value, next] = Behavon.useReducer((state: number, action: "prefix" | "suffix") => {
         if (action === "prefix") {
           dispatch?.("suffix");
           throw failure;
@@ -302,7 +302,7 @@ describe("useReducer", () => {
       cell = inspectRetainedOperationForTests(next).cell as MutableStateSubject;
       return value;
     }
-    const instance = Behave.createModel(Model, undefined);
+    const instance = Behavon.createModel(Model, undefined);
     expect(await captureScheduledFailure(() => dispatch?.("prefix"))).toBe(failure);
     expect(inspectModelInstanceForTests(instance as object).status).toBe("disposed");
     expect(inspectMutableStateForTests(cell as MutableStateSubject)).toMatchObject({
@@ -316,41 +316,41 @@ describe("useReducer", () => {
   it("stops a non-converging render-phase reducer after 25 attempts", () => {
     let attempts = 0;
     function Loop(): never {
-      const [, dispatch] = Behave.useReducer((state: number) => state + 1, 0);
+      const [, dispatch] = Behavon.useReducer((state: number) => state + 1, 0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe counts bounded retry attempts
       attempts += 1;
       dispatch();
       throw new Error("unreachable candidate");
     }
-    expect(() => Behave.createModel(Loop, undefined)).toThrow(/unreachable candidate/);
+    expect(() => Behavon.createModel(Loop, undefined)).toThrow(/unreachable candidate/);
     expect(attempts).toBe(1);
 
     attempts = 0;
     function PureLoop(): number {
-      const [value, dispatch] = Behave.useReducer((state: number) => state + 1, 0);
+      const [value, dispatch] = Behavon.useReducer((state: number) => state + 1, 0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe counts bounded retry attempts
       attempts += 1;
       dispatch();
       return value;
     }
-    expect(() => Behave.createModel(PureLoop, undefined)).toThrow(/exceeded 25 render-phase evaluation attempts/);
+    expect(() => Behavon.createModel(PureLoop, undefined)).toThrow(/exceeded 25 render-phase evaluation attempts/);
     expect(attempts).toBe(25);
   });
 
   it("rejects cross-owner reducer dispatch during evaluation without terminating the target", () => {
     let dispatch: ReducerDispatch<[number]> | undefined;
     function Target(): number {
-      const [value, next] = Behave.useReducer((state: number, action: number) => state + action, 0);
+      const [value, next] = Behavon.useReducer((state: number, action: number) => state + action, 0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe shares dispatch for cross-owner runtime validation
       dispatch = next;
       return value;
     }
-    const target = Behave.createModel(Target, undefined);
+    const target = Behavon.createModel(Target, undefined);
     function InvalidSource(): undefined {
       dispatch?.(1);
       return undefined;
     }
-    expect(() => Behave.createModel(InvalidSource, undefined)).toThrow(/useReducer setter for target Model#.*cannot be called/);
+    expect(() => Behavon.createModel(InvalidSource, undefined)).toThrow(/useReducer setter for target Model#.*cannot be called/);
     expect(outputOf<number>(target as object)).toBe(0);
     dispatch?.(2);
     target.dispose();
@@ -360,17 +360,17 @@ describe("useReducer", () => {
     const failure = new Error("reducer failed");
     let dispatch: ReducerDispatch<["fail" | "hook"]> | undefined;
     function Model(): number {
-      const [value, next] = Behave.useReducer((state: number, action: "fail" | "hook") => {
+      const [value, next] = Behavon.useReducer((state: number, action: "fail" | "hook") => {
         if (action === "fail") throw failure;
         // eslint-disable-next-line behavon-hooks/canonical-api, react-hooks/rules-of-hooks -- test-only invalid reproduction verifies runtime nested-Hook rejection
-        Behave.useState(0);
+        Behavon.useState(0);
         return state;
       }, 0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains dispatch
       dispatch = next;
       return value;
     }
-    const first = Behave.createModel(Model, undefined);
+    const first = Behavon.createModel(Model, undefined);
     let surfaced: unknown;
     const original = globalThis.setTimeout;
     globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
@@ -389,7 +389,7 @@ describe("useReducer", () => {
     }
     expect(surfaced).toBe(failure);
 
-    const second = Behave.createModel(Model, undefined);
+    const second = Behavon.createModel(Model, undefined);
     surfaced = undefined;
     globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
       try {
@@ -414,7 +414,7 @@ describe("useReducer", () => {
     const failure = new Error("contained reducer failure");
     let dispatch: ReducerDispatch<["fail"]> | undefined;
     function Child(): number {
-      const [value, next] = Behave.useReducer((state: number, action: "fail") => {
+      const [value, next] = Behavon.useReducer((state: number, action: "fail") => {
         if (action === "fail") throw failure;
         return state;
       }, 0);
@@ -422,7 +422,7 @@ describe("useReducer", () => {
       dispatch = next;
       return value;
     }
-    const boundary = Behave.createModel(Behave.boundary(Child), undefined);
+    const boundary = Behavon.createModel(Behavon.boundary(Child), undefined);
     dispatch?.("fail");
     await waitFor(() => (
       outputOf<{ readonly status: string }>(boundary as object).status === "failed"
@@ -435,24 +435,25 @@ describe("useReducer", () => {
 
   it("defers transaction-run dispatch across both commit and rollback with one development warning", async () => {
     interface Port { execute: Signal<[rollback: boolean]> }
-    const port = Behave.createPort<Port>({ execute: Behave.SignalType() });
+    const port = Behavon.createPort<Port>({ execute: Behavon.SignalType() });
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const Model = () => {
-      const [value, dispatch] = Behave.useReducer((state: number, action: number) => state + action, 0);
-      const execute = Behave.useCallback((rollback: boolean) => {
-        const id = Behave.createId();
-        Behave.transaction.start(id, []);
-        Behave.transaction.run(id, () => {
+      const [value, dispatch] = Behavon.useReducer((state: number, action: number) => state + action, 0);
+      const execute = Behavon.useCallback((rollback: boolean) => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, []);
+        Behavon.transaction.run(id, () => {
           dispatch(1);
           dispatch(2);
         });
-        if (rollback) Behave.transaction.rollback(id);
-        else Behave.transaction.commit(id);
+        if (rollback) Behavon.transaction.rollback(id);
+        else Behavon.transaction.commit(id);
       }, [dispatch]);
-      Behave.useSignal(port, "execute", execute);
+      Behavon.useSignal(port, "execute", execute);
+      Behavon.useExport(port, "execute");
       return value;
     };
-    const instance = Behave.createModel(Model, undefined);
+    const instance = Behavon.createModel(Model, undefined);
     instance.execute(true);
     await waitFor(() => outputOf<number>(instance as object) === 3);
     instance.execute(false);
@@ -467,41 +468,43 @@ describe("useReducer", () => {
     const failure = new Error("transaction reducer evaluation failed");
     interface TargetPort { add: Signal<[amount: number]> }
     interface FailingPort { execute: Signal }
-    const targetPort = Behave.createPort<TargetPort>({ add: Behave.SignalType() });
-    const failingPort = Behave.createPort<FailingPort>({ execute: Behave.SignalType() });
-    const stateIds = Behave.createId({ failed: Behave.StateType<boolean>() });
+    const targetPort = Behavon.createPort<TargetPort>({ add: Behavon.SignalType() });
+    const failingPort = Behavon.createPort<FailingPort>({ execute: Behavon.SignalType() });
+    const stateIds = Behavon.createId({ failed: Behavon.StateType<boolean>() });
 
     const Target: Model<undefined, number, TargetPort> = () => {
-      const [value, dispatch] = Behave.useReducer(
+      const [value, dispatch] = Behavon.useReducer(
         (state: number, amount: number) => state + amount,
         0,
       );
-      const add = Behave.useCallback((amount: number) => dispatch(amount), [dispatch]);
-      Behave.useSignal(targetPort, "add", add);
+      const add = Behavon.useCallback((amount: number) => dispatch(amount), [dispatch]);
+      Behavon.useSignal(targetPort, "add", add);
+      Behavon.useExport(targetPort, "add");
       return value;
     };
     const Failing: Model<{
       target: ModelInstance<undefined, number, TargetPort>;
     }, boolean, FailingPort> = (input) => {
-      const [failed, setFailed] = Behave.useLabelState(stateIds.failed, false);
+      const [failed, setFailed] = Behavon.useLabelState(stateIds.failed, false);
       if (failed) throw failure;
       const target = input.target;
-      const execute = Behave.useCallback(() => {
-        const id = Behave.createId();
-        Behave.transaction.start(id, [stateIds.failed]);
-        Behave.transaction.run(id, () => {
+      const execute = Behavon.useCallback(() => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, [stateIds.failed]);
+        Behavon.transaction.run(id, () => {
           setFailed(true);
           target.add(7);
         });
-        Behave.transaction.commit(id);
+        Behavon.transaction.commit(id);
       }, [setFailed, target]);
-      Behave.useSignal(failingPort, "execute", execute);
+      Behavon.useSignal(failingPort, "execute", execute);
+      Behavon.useExport(failingPort, "execute");
       return failed;
     };
 
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    const target = Behave.createModel(Target, undefined);
-    const failing = Behave.createModel(Failing, { target });
+    const target = Behavon.createModel(Target, undefined);
+    const failing = Behavon.createModel(Failing, { target });
     expect(() => failing.execute()).toThrow(failure);
     await waitFor(() => outputOf<number>(target as object) === 7);
     expect(outputOf<number>(target as object)).toBe(7);
@@ -513,8 +516,8 @@ describe("useReducer", () => {
     let selfDispatch: ReducerDispatch<[number]> | undefined;
     let selfCell: MutableStateSubject | undefined;
     const Self: Model<undefined, number, FailingPort> = () => {
-      const [failed, setFailed] = Behave.useLabelState(stateIds.failed, false);
-      const [value, dispatch] = Behave.useReducer(
+      const [failed, setFailed] = Behavon.useLabelState(stateIds.failed, false);
+      const [value, dispatch] = Behavon.useReducer(
         (state: number, amount: number) => state + amount,
         0,
       );
@@ -523,19 +526,20 @@ describe("useReducer", () => {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains terminal reducer cell
       selfCell = inspectRetainedOperationForTests(dispatch).cell as MutableStateSubject;
       if (failed) throw selfFailure;
-      const execute = Behave.useCallback(() => {
-        const id = Behave.createId();
-        Behave.transaction.start(id, [stateIds.failed]);
-        Behave.transaction.run(id, () => {
+      const execute = Behavon.useCallback(() => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, [stateIds.failed]);
+        Behavon.transaction.run(id, () => {
           setFailed(true);
           dispatch(1);
         });
-        Behave.transaction.commit(id);
+        Behavon.transaction.commit(id);
       }, [dispatch, setFailed]);
-      Behave.useSignal(failingPort, "execute", execute);
+      Behavon.useSignal(failingPort, "execute", execute);
+      Behavon.useExport(failingPort, "execute");
       return value;
     };
-    const self = Behave.createModel(Self, undefined);
+    const self = Behavon.createModel(Self, undefined);
     expect(() => self.execute()).toThrow(selfFailure);
     await Promise.resolve();
     await Promise.resolve();

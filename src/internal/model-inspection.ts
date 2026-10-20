@@ -50,7 +50,7 @@ export function inspectRetainedOperationForTests(
   operation: Function,
 ): RetainedOperationInspection {
   const target = retainedOperationTargets.get(operation);
-  if (target === undefined) throw new Error("Unknown Behave retained operation inspection target");
+  if (target === undefined) throw new Error("Unknown Behavon retained operation inspection target");
   return target as RetainedOperationInspection;
 }
 
@@ -60,7 +60,7 @@ export function notifyModelInstanceCreationForTests(target: object): void {
 
 export function inspectModelInstanceForTests(target: object): ModelInstanceInspection {
   const instance = interfaceTargets.get(target);
-  if (instance === undefined) throw new Error("Unknown Behave Model instance inspection target");
+  if (instance === undefined) throw new Error("Unknown Behavon Model instance inspection target");
   return instance as unknown as ModelInstanceInspection;
 }
 

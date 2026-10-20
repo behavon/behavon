@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { BoundaryState, ModelInstance, Signal, StateSetter } from "behavon";
 import {
   inspectModelInstanceForTests,
@@ -57,10 +57,10 @@ function observeBoundary<Input, Output>(instance: ModelInstance<Input, BoundaryS
   let setInput: StateSetter<Input> | undefined;
   function Observer(): undefined {
     // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-    [state, setInput] = Behave.useModel(instance);
+    [state, setInput] = Behavon.useModel(instance);
     return undefined;
   }
-  const observer = Behave.createModel(Observer, undefined);
+  const observer = Behavon.createModel(Observer, undefined);
   return {
     get state() {
       return state as BoundaryState<Output>;
@@ -89,30 +89,30 @@ describe("disposed ModelInstance terminal graph release", () => {
     let retainedCallback: (() => object) | undefined;
 
     function Peer(): undefined {
-      const alive = Behave.useCallback(() => undefined, []);
-      Behave.useSignal("alive", alive);
+      const alive = Behavon.useCallback(() => undefined, []);
+      Behavon.useSignal("alive", alive);
       return undefined;
     }
-    const peer = Behave.createModel(Peer, undefined);
+    const peer = Behavon.createModel(Peer, undefined);
 
     function Model(modelInput: object): object {
-      const [, setValue] = Behave.useState(state);
+      const [, setValue] = Behavon.useState(state);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setter = setValue;
       // eslint-disable-next-line behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only terminal scrub probe intentionally retains an outer dependency in an otherwise unused memo cell
-      Behave.useMemo(() => dependency, [dependency]);
+      Behavon.useMemo(() => dependency, [dependency]);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      retainedCallback = Behave.useCallback(() => modelInput, [modelInput]);
+      retainedCallback = Behavon.useCallback(() => modelInput, [modelInput]);
       // eslint-disable-next-line behavon-hooks/canonical-api -- This release probe intentionally retains an otherwise unused dependency Hook cell.
-      Behave.usePort(peer);
-      Behave.useSnapshot(channel);
+      Behavon.usePort(peer);
+      Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only terminal scrub probe intentionally retains an outer dependency in an Effect cell
-      Behave.useEffect(() => () => void dependency, [dependency]);
-      Behave.useSignal("ping", retainedCallback);
+      Behavon.useEffect(() => () => void dependency, [dependency]);
+      Behavon.useSignal("ping", retainedCallback);
       return output;
     }
 
-    const root = Behave.createModel(Model, input);
+    const root = Behavon.createModel(Model, input);
     const disposeOnly = root.dispose;
     const before = inspectModelInstanceForTests(root as object);
     expect(before.model).toBe(Model);
@@ -132,10 +132,10 @@ describe("disposed ModelInstance terminal graph release", () => {
     expectReleased(root as object, Model);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
     expect(retainedCallback?.()).toBe(input);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed during interface inspection/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed during interface inspection/);
     expect(() => root.ping()).toThrow(/disposed during endpoint lookup 'ping'/);
     expect(() => disposeOnly()).toThrow(/dispose\(\) called more than once/);
-    expect(() => Behave.getInterface(peer)).not.toThrow();
+    expect(() => Behavon.getInterface(peer)).not.toThrow();
     peer.dispose();
   });
 
@@ -146,11 +146,11 @@ describe("disposed ModelInstance terminal graph release", () => {
 
     function Broken(): never {
       // eslint-disable-next-line behavon-hooks/canonical-api -- failed-construction probe intentionally retains payload in a state cell
-      Behave.useState({ retained: true });
+      Behavon.useState({ retained: true });
       throw failure;
     }
     try {
-      expect(() => Behave.createModel(Broken, undefined)).toThrow(failure);
+      expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
     } finally {
       stopObserving();
     }
@@ -166,13 +166,13 @@ describe("disposed ModelInstance terminal graph release", () => {
 
     function Child(input: number): number {
       // eslint-disable-next-line behavon-hooks/canonical-api -- contained-failure probe intentionally retains input in a state cell
-      Behave.useState({ payload: input });
+      Behavon.useState({ payload: input });
       if (input === 2) throw failure;
       return input;
     }
     let instance: ModelInstance<number, BoundaryState<number>>;
     try {
-      instance = Behave.createModel(Behave.boundary(Child), 1);
+      instance = Behavon.createModel(Behavon.boundary(Child), 1);
     } finally {
       stopObserving();
     }
@@ -183,7 +183,7 @@ describe("disposed ModelInstance terminal graph release", () => {
     await waitFor(() => observed.state.status === "failed");
     expect(observed.state.status === "failed" ? observed.state.error : undefined).toBe(failure);
     expectReleased(firstChild as object, Child);
-    expect(() => Behave.getInterface(instance)).not.toThrow();
+    expect(() => Behavon.getInterface(instance)).not.toThrow();
     observed.dispose();
     instance.dispose();
   });
@@ -191,18 +191,18 @@ describe("disposed ModelInstance terminal graph release", () => {
   it("finalizes a root after explicit cleanup failure and scheduled commit-phase failure", async () => {
     const disposeFailure = new Error("explicit cleanup failed");
     function ExplicitFailure(): undefined {
-      Behave.useEffect(() => () => {
+      Behavon.useEffect(() => () => {
         throw disposeFailure;
       }, []);
       return undefined;
     }
-    const explicitRoot = Behave.createModel(ExplicitFailure, undefined);
+    const explicitRoot = Behavon.createModel(ExplicitFailure, undefined);
     expect(() => explicitRoot.dispose()).toThrow(disposeFailure);
     expectReleased(explicitRoot as object, ExplicitFailure);
 
     const unsubscribeFailure = new Error("explicit unsubscribe failed");
     function ExplicitUnsubscribeFailure(): undefined {
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         () => () => {
           throw unsubscribeFailure;
         },
@@ -210,22 +210,22 @@ describe("disposed ModelInstance terminal graph release", () => {
       );
       return undefined;
     }
-    const unsubscribeRoot = Behave.createModel(ExplicitUnsubscribeFailure, undefined);
+    const unsubscribeRoot = Behavon.createModel(ExplicitUnsubscribeFailure, undefined);
     expect(() => unsubscribeRoot.dispose()).toThrow(unsubscribeFailure);
     expectReleased(unsubscribeRoot as object, ExplicitUnsubscribeFailure);
 
     const setupFailure = new Error("scheduled setup failed");
     let fail: (() => void) | undefined;
     function ScheduledFailure(): undefined {
-      const [phase, setPhase] = Behave.useState(0);
+      const [phase, setPhase] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      fail = Behave.useCallback(() => setPhase(1), [setPhase]);
-      Behave.useEffect(() => {
+      fail = Behavon.useCallback(() => setPhase(1), [setPhase]);
+      Behavon.useEffect(() => {
         if (phase === 1) throw setupFailure;
       }, [phase]);
       return undefined;
     }
-    const scheduledRoot = Behave.createModel(ScheduledFailure, undefined);
+    const scheduledRoot = Behavon.createModel(ScheduledFailure, undefined);
     expect(await captureScheduledFailure(() => fail?.())).toBe(setupFailure);
     expectReleased(scheduledRoot as object, ScheduledFailure);
   });
@@ -240,19 +240,19 @@ describe("retained Model operation terminal graph release", () => {
     function Child(input: number): number {
       return input;
     }
-    const child = Behave.createModel(Child, 0);
+    const child = Behavon.createModel(Child, 0);
     function Model(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       renderCount += 1;
-      const [, setState] = Behave.useState(0);
+      const [, setState] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-      [, modelSetter] = Behave.useModel(child);
+      [, modelSetter] = Behavon.useModel(child);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       stateSetter = setState;
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const firstStateSetter = stateSetter as StateSetter<number>;
     expect(inspectRetainedOperationForTests(firstStateSetter).cell).toBeDefined();
     firstStateSetter(1);
@@ -268,7 +268,7 @@ describe("retained Model operation terminal graph release", () => {
       firstStateSetter(3);
       return undefined;
     }
-    expect(() => Behave.createModel(CrossOwner, undefined)).toThrow(
+    expect(() => Behavon.createModel(CrossOwner, undefined)).toThrow(
       /useState setter for target Model#\d+ cannot be called while evaluating source Model#\d+/,
     );
     child.dispose();
@@ -283,12 +283,12 @@ describe("retained Model operation terminal graph release", () => {
     let failedChildSetter: StateSetter<{ retainedByFailedChild: boolean }> | undefined;
 
     function Broken(_input: number): never {
-      const [, setValue] = Behave.useState({ retainedByFailedChild: true });
+      const [, setValue] = Behavon.useState({ retainedByFailedChild: true });
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       failedChildSetter = setValue;
       throw failure;
     }
-    const instance = Behave.createModel(Behave.boundary(Broken), 1);
+    const instance = Behavon.createModel(Behavon.boundary(Broken), 1);
     const observed = observeBoundary(instance);
     expect(observed.state.status).toBe("failed");
     const reset = (observed.state as Extract<BoundaryState<never>, { status: "failed" }>).reset;
@@ -308,7 +308,7 @@ describe("retained Model operation terminal graph release", () => {
     const cleanupFailure = new Error("unsubscribe failed");
 
     function Model(): undefined {
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         (nextListener) => {
           listener = nextListener;
           return () => {
@@ -324,7 +324,7 @@ describe("retained Model operation terminal graph release", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const retained = listener as () => void;
     expect(inspectRetainedOperationForTests(retained).cell).toBeDefined();
     expect(() => root.dispose()).toThrow(cleanupFailure);
@@ -338,18 +338,18 @@ describe("retained Model operation terminal graph release", () => {
     const constructionFailure = new Error("construction failed after setter escaped");
     let escapedSetter: StateSetter<{ payload: boolean }> | undefined;
     function BrokenConstruction(): never {
-      const [, setValue] = Behave.useState({ payload: true });
+      const [, setValue] = Behavon.useState({ payload: true });
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       escapedSetter = setValue;
       throw constructionFailure;
     }
-    expect(() => Behave.createModel(BrokenConstruction, undefined)).toThrow(constructionFailure);
+    expect(() => Behavon.createModel(BrokenConstruction, undefined)).toThrow(constructionFailure);
     expectRetainedOperationReleased(escapedSetter as Function, "stateSetter");
 
     const subscribeFailure = new Error("subscribe failed after listener escaped");
     let escapedListener: (() => void) | undefined;
     function BrokenSubscription(): undefined {
-      Behave.useSyncExternalStore(
+      Behavon.useSyncExternalStore(
         (listener) => {
           escapedListener = listener;
           throw subscribeFailure;
@@ -358,7 +358,7 @@ describe("retained Model operation terminal graph release", () => {
       );
       return undefined;
     }
-    expect(() => Behave.createModel(BrokenSubscription, undefined)).toThrow(subscribeFailure);
+    expect(() => Behavon.createModel(BrokenSubscription, undefined)).toThrow(subscribeFailure);
     expectRetainedOperationReleased(escapedListener as Function, "externalStoreListener");
     expect(() => escapedListener?.()).not.toThrow();
   });
@@ -368,13 +368,13 @@ describe("retained Model operation terminal graph release", () => {
     let childSetter: StateSetter<{ input: number }> | undefined;
 
     function Child(input: number): number {
-      const [, setValue] = Behave.useState({ input });
+      const [, setValue] = Behavon.useState({ input });
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       childSetter = setValue;
       if (input === 2) throw failure;
       return input;
     }
-    const instance = Behave.createModel(Behave.boundary(Child), 1);
+    const instance = Behavon.createModel(Behavon.boundary(Child), 1);
     const observed = observeBoundary(instance);
     const retained = childSetter as StateSetter<{ input: number }>;
     observed.setInput(2);

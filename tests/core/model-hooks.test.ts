@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { Signal, Slot, UntypedModelRef } from "behavon";
 import { inspectSnapshotChannelForTests } from "../../src/internal/snapshot-channels";
-import { uniqueChannel, waitFor, waitForSnapshot } from "../helpers";
+import { uniqueChannel, waitFor, waitForSnapshot, signalOf } from "../helpers";
 
 async function captureScheduledFailure(action: () => void): Promise<unknown> {
   let surfaced: unknown;
@@ -26,17 +26,17 @@ async function captureScheduledFailure(action: () => void): Promise<unknown> {
 
 describe("Model construction and React-corresponding hooks", () => {
   it("exports createModel without a createModelRoot compatibility alias", () => {
-    expect(typeof Behave.createModel).toBe("function");
+    expect(typeof Behavon.createModel).toBe("function");
     expect(
-      (Behave as unknown as Readonly<Record<string, unknown>>).createModelRoot,
+      (Behavon as unknown as Readonly<Record<string, unknown>>).createModelRoot,
     ).toBeUndefined();
   });
 
   it("rejects Model hooks outside an active Model evaluation", () => {
-    expect(() => Behave.useState(0)).toThrow();
-    expect(() => Behave.useMemo(() => 1, [])).toThrow();
-    expect(() => Behave.useCallback(() => undefined, [])).toThrow();
-    expect(() => Behave.useEffect(() => undefined, [])).toThrow();
+    expect(() => Behavon.useState(0)).toThrow();
+    expect(() => Behavon.useMemo(() => 1, [])).toThrow();
+    expect(() => Behavon.useCallback(() => undefined, [])).toThrow();
+    expect(() => Behavon.useEffect(() => undefined, [])).toThrow();
   });
 
   it("evaluates a root synchronously with the exact initial input", () => {
@@ -49,7 +49,7 @@ describe("Model construction and React-corresponding hooks", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Root, input);
+    const root = Behavon.createModel(Root, input);
     expect(received).toBe(input);
     root.dispose();
   });
@@ -62,7 +62,7 @@ describe("Model construction and React-corresponding hooks", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Root, null);
+    const root = Behavon.createModel(Root, null);
     expect(received).toEqual([null]);
     root.dispose();
   });
@@ -72,21 +72,21 @@ describe("Model construction and React-corresponding hooks", () => {
     const failure = new Error("construction failed");
 
     function Broken(): never {
-      const callback = Behave.useCallback(() => undefined, []);
-      Behave.useSignal("leaked", callback);
-      Behave.useSnapshot(channel);
+      const callback = Behavon.useCallback(() => undefined, []);
+      Behavon.useSignal("leaked", callback);
+      Behavon.useSnapshot(channel);
       throw failure;
     }
 
-    expect(() => Behave.createModel(Broken, undefined)).toThrow(failure);
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
 
     function Replacement(): undefined {
-      Behave.useSnapshot(channel);
+      Behavon.useSnapshot(channel);
       return undefined;
     }
 
-    const replacement = Behave.createModel(Replacement, undefined);
-    expect(Behave.getSnapshot(channel)()).toBeUndefined();
+    const replacement = Behavon.createModel(Replacement, undefined);
+    expect(Behavon.getSnapshot(channel)()).toBeUndefined();
     replacement.dispose();
   });
 
@@ -107,38 +107,38 @@ describe("Model construction and React-corresponding hooks", () => {
     }
 
     function Model(): Snapshot {
-      const [count, setCount] = Behave.useState(() => 0);
-      const [, publish] = Behave.useSnapshot(channel);
-      const doubled = Behave.useMemo(() => {
+      const [count, setCount] = Behavon.useState(() => 0);
+      const [, publish] = Behavon.useSnapshot(channel);
+      const doubled = Behavon.useMemo(() => {
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
         memoRuns += 1;
         return count * 2;
       }, [count]);
-      const stable = Behave.useCallback(() => undefined, []);
+      const stable = Behavon.useCallback(() => undefined, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       callbackIdentities.push(stable);
-      const incrementTwice = Behave.useCallback(() => {
+      const incrementTwice = Behavon.useCallback(() => {
         setCount((previous) => previous + 1);
         setCount((previous) => previous + 1);
       }, [setCount]);
-      const publishAgain = Behave.useCallback(() => setCount((previous) => previous), [setCount]);
-      Behave.useSignal("incrementTwice", incrementTwice);
-      Behave.useSignal("publishAgain", publishAgain);
-      const snapshot = Behave.useMemo(() => ({ count, doubled, callback: stable }), [count, doubled, stable]);
-      Behave.useEffect(() => {
+      const publishAgain = Behavon.useCallback(() => setCount((previous) => previous), [setCount]);
+      Behavon.useSignal("incrementTwice", incrementTwice);
+      Behavon.useSignal("publishAgain", publishAgain);
+      const snapshot = Behavon.useMemo(() => ({ count, doubled, callback: stable }), [count, doubled, stable]);
+      Behavon.useEffect(() => {
         publish(snapshot);
       }, [publish, snapshot]);
       return snapshot;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     await waitForSnapshot<Snapshot>(channel, (value) => value?.count === 0);
-    root.incrementTwice();
+    signalOf(root, "incrementTwice")();
     const snapshot = await waitForSnapshot<Snapshot>(channel, (value) => value?.count === 2);
     expect(snapshot).toMatchObject({ count: 2, doubled: 4 });
     expect(callbackIdentities.at(-1)).toBe(callbackIdentities[0]);
     expect(memoRuns).toBe(2);
-    root.publishAgain();
+    signalOf(root, "publishAgain")();
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(memoRuns).toBe(2);
     root.dispose();
@@ -149,18 +149,18 @@ describe("Model construction and React-corresponding hooks", () => {
     const evaluations: number[] = [];
 
     function Model(): number {
-      const [value, setValue] = Behave.useState(0);
-      const [, publish] = Behave.useSnapshot(channel);
+      const [value, setValue] = Behavon.useState(0);
+      const [, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations.push(value);
       if (value === 0) setValue(1);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         publish(value);
       }, [publish, value]);
       return value;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     await waitForSnapshot<number>(channel, (value) => value === 1);
     expect(evaluations).toEqual([0, 1]);
     root.dispose();
@@ -171,22 +171,22 @@ describe("Model construction and React-corresponding hooks", () => {
     let setChildInput: ((input: { readonly value: number }) => void) | undefined;
 
     function Child(input: { readonly value: number }): undefined {
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         log.push(`setup:${input.value}`);
         return () => log.push(`cleanup:${input.value}`);
       }, [input.value]);
       return undefined;
     }
 
-    const child = Behave.createModel(Child, { value: 1 });
+    const child = Behavon.createModel(Child, { value: 1 });
     function Observer(): undefined {
-      const [, setInput] = Behave.useModel(child);
+      const [, setInput] = Behavon.useModel(child);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setChildInput = setInput;
       return undefined;
     }
 
-    const root = Behave.createModel(Observer, undefined);
+    const root = Behavon.createModel(Observer, undefined);
     await waitFor(() => log.includes("setup:1"));
     setChildInput?.({ value: 2 });
     await waitFor(() => log.includes("setup:2"));
@@ -211,15 +211,15 @@ describe("Model construction and React-corresponding hooks", () => {
     const getSnapshot = () => current;
 
     function ExternalModel(): number {
-      const value = Behave.useSyncExternalStore(subscribe, getSnapshot);
-      const [, publish] = Behave.useSnapshot(channel);
-      Behave.useEffect(() => {
+      const value = Behavon.useSyncExternalStore(subscribe, getSnapshot);
+      const [, publish] = Behavon.useSnapshot(channel);
+      Behavon.useEffect(() => {
         publish(value);
       }, [publish, value]);
       return value;
     }
 
-    const root = Behave.createModel(ExternalModel, undefined);
+    const root = Behavon.createModel(ExternalModel, undefined);
     await waitForSnapshot<number>(channel, (value) => value === 0);
     current = 1;
     for (const listener of [...listeners]) listener();
@@ -241,16 +241,16 @@ describe("Model construction and React-corresponding hooks", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     let evaluations = 0;
     function Keeper(): undefined {
-      Behave.useSnapshot(channel);
+      Behavon.useSnapshot(channel);
       return undefined;
     }
 
-    const keeper = Behave.createModel(Keeper, undefined);
-    const unsubscribe = Behave.subscribe(channel)(() => trace.push("listener"));
+    const keeper = Behavon.createModel(Keeper, undefined);
+    const unsubscribe = Behavon.subscribe(channel)(() => trace.push("listener"));
 
     function Model(): undefined {
-      const [, setEpoch] = Behave.useState(0);
-      const [snapshot, publish] = Behave.useSnapshot(channel);
+      const [, setEpoch] = Behavon.useState(0);
+      const [snapshot, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -261,26 +261,26 @@ describe("Model construction and React-corresponding hooks", () => {
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
         trace.push("after-publish");
       }
-      const reevaluate = Behave.useCallback(() => setEpoch((previous) => previous + 1), [setEpoch]);
-      Behave.useSignal("reevaluate", reevaluate);
+      const reevaluate = Behavon.useCallback(() => setEpoch((previous) => previous + 1), [setEpoch]);
+      Behavon.useSignal("reevaluate", reevaluate);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       trace.push("evaluation-complete");
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(Behave.getSnapshot(channel)()).toBe(published);
+    const root = Behavon.createModel(Model, undefined);
+    expect(Behavon.getSnapshot(channel)()).toBe(published);
     expect(seen).toEqual([undefined]);
     expect(evaluations).toBe(1);
     expect(trace).toEqual(["listener", "after-publish", "evaluation-complete"]);
     expect(warning).toHaveBeenCalledTimes(1);
     expect(warning).toHaveBeenCalledWith(expect.stringMatching(
-      /Model#\d+ called useSnapshot\.publish '.*' owned by Model#\d+ while evaluating.*Behave\.useEffect.*managed callback/,
+      /Model#\d+ called useSnapshot\.publish '.*' owned by Model#\d+ while evaluating.*Behavon\.useEffect.*managed callback/,
     ));
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(evaluations).toBe(1);
 
-    root.reevaluate();
+    signalOf(root, "reevaluate")();
     await waitFor(() => evaluations === 2);
     expect(seen[1]).toBe(published);
     unsubscribe();
@@ -294,16 +294,16 @@ describe("Model construction and React-corresponding hooks", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const published = { value: 1 } as const;
     function Model(): undefined {
-      const [attempt, setAttempt] = Behave.useState(0);
-      const [, publish] = Behave.useSnapshot(channel);
+      const [attempt, setAttempt] = Behavon.useState(0);
+      const [, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       publish(published);
       if (attempt === 0) setAttempt(1);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    expect(Behave.getSnapshot(channel)()).toBe(published);
+    const root = Behavon.createModel(Model, undefined);
+    expect(Behavon.getSnapshot(channel)()).toBe(published);
     expect(warning).toHaveBeenCalledTimes(1);
     root.dispose();
     warning.mockRestore();
@@ -315,14 +315,14 @@ describe("Model construction and React-corresponding hooks", () => {
     const failure = new Error("evaluation failed after publish");
 
     function Broken(): never {
-      const [, publish] = Behave.useSnapshot(channel);
+      const [, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       publish(published);
       throw failure;
     }
 
-    expect(() => Behave.createModel(Broken, undefined)).toThrow(failure);
-    expect(() => Behave.getSnapshot(channel)).toThrow(/no live owner/);
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
+    expect(() => Behavon.getSnapshot(channel)).toThrow(/no live owner/);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
   });
 
@@ -332,19 +332,19 @@ describe("Model construction and React-corresponding hooks", () => {
     const failure = new Error("new owner failed after publish");
 
     function Keeper(): undefined {
-      Behave.useSnapshot(channel);
+      Behavon.useSnapshot(channel);
       return undefined;
     }
     function Broken(): never {
-      const [, publish] = Behave.useSnapshot(channel);
+      const [, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       publish(published);
       throw failure;
     }
 
-    const keeper = Behave.createModel(Keeper, undefined);
-    expect(() => Behave.createModel(Broken, undefined)).toThrow(failure);
-    expect(Behave.getSnapshot(channel)()).toBe(published);
+    const keeper = Behavon.createModel(Keeper, undefined);
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
+    expect(Behavon.getSnapshot(channel)()).toBe(published);
     expect(inspectSnapshotChannelForTests(channel)?.ownerCount).toBe(1);
     expect(inspectSnapshotChannelForTests(channel)?.provisionalOwnerCount).toBe(0);
     keeper.dispose();
@@ -362,21 +362,21 @@ describe("Model construction and React-corresponding hooks", () => {
     let observed: typeof published | undefined;
 
     function Model(): undefined {
-      const [shouldFail, setShouldFail] = Behave.useState(false);
-      const [, publish] = Behave.useSnapshot(channel);
+      const [shouldFail, setShouldFail] = Behavon.useState(false);
+      const [, publish] = Behavon.useSnapshot(channel);
       if (shouldFail) {
         // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
         publish(published);
         throw failure;
       }
-      const fail = Behave.useCallback(() => setShouldFail(true), [setShouldFail]);
-      Behave.useSignal("fail", fail);
+      const fail = Behavon.useCallback(() => setShouldFail(true), [setShouldFail]);
+      Behavon.useSignal("fail", fail);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
-    const unsubscribe = Behave.subscribe(channel)(() => {
-      observed = Behave.getSnapshot(channel)();
+    const root = Behavon.createModel(Model, undefined);
+    const unsubscribe = Behavon.subscribe(channel)(() => {
+      observed = Behavon.getSnapshot(channel)();
     });
     const originalSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
@@ -388,7 +388,7 @@ describe("Model construction and React-corresponding hooks", () => {
       return originalSetTimeout(() => undefined, 0);
     }) as typeof setTimeout;
     try {
-      root.fail();
+      signalOf(root, "fail")();
       await Promise.resolve();
     } finally {
       globalThis.setTimeout = originalSetTimeout;
@@ -397,8 +397,8 @@ describe("Model construction and React-corresponding hooks", () => {
     expect(surfaced).toBe(failure);
     expect(observed).toBe(published);
     unsubscribe();
-    expect(() => Behave.getSnapshot(channel)).toThrow(/no live owner/);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getSnapshot(channel)).toThrow(/no live owner/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("does not reactivate a Model that disposes itself during a scheduled reevaluation", async () => {
@@ -412,17 +412,17 @@ describe("Model construction and React-corresponding hooks", () => {
     let surfaced: unknown;
 
     function Model(): undefined {
-      const [shouldDispose, setShouldDispose] = Behave.useState(false);
-      const [, publish] = Behave.useSnapshot(channel);
+      const [shouldDispose, setShouldDispose] = Behavon.useState(false);
+      const [, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       capturedPublish = publish;
       if (shouldDispose) root?.dispose();
-      const stop = Behave.useCallback(() => setShouldDispose(true), [setShouldDispose]);
-      Behave.useSignal("stop", stop);
+      const stop = Behavon.useCallback(() => setShouldDispose(true), [setShouldDispose]);
+      Behavon.useSignal("stop", stop);
       return undefined;
     }
 
-    root = Behave.createModel(Model, undefined);
+    root = Behavon.createModel(Model, undefined);
     const originalSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
       try {
@@ -433,7 +433,7 @@ describe("Model construction and React-corresponding hooks", () => {
       return originalSetTimeout(() => undefined, 0);
     }) as typeof setTimeout;
     try {
-      root.stop();
+      signalOf(root, "stop")();
       await Promise.resolve();
     } finally {
       globalThis.setTimeout = originalSetTimeout;
@@ -441,10 +441,10 @@ describe("Model construction and React-corresponding hooks", () => {
 
     expect(surfaced).toBeInstanceOf(Error);
     expect(String(surfaced)).toMatch(/disposed during evaluation.*cannot be committed/);
-    expect(() => Behave.getInterface(root as UntypedModelRef)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root as UntypedModelRef)).toThrow(/disposed/);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
     expect(() => capturedPublish?.(1)).not.toThrow();
-    expect(() => Behave.getSnapshot(channel)).toThrow(/no live owner/);
+    expect(() => Behavon.getSnapshot(channel)).toThrow(/no live owner/);
   });
 
   it("runs an omitted-dependency effect after every committed evaluation", async () => {
@@ -452,17 +452,17 @@ describe("Model construction and React-corresponding hooks", () => {
     const trace: string[] = [];
 
     function Model(): undefined {
-      const [epoch, setEpoch] = Behave.useState(0);
+      const [epoch, setEpoch] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       advance = () => setEpoch((previous) => previous + 1);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`setup:${epoch}`);
         return () => trace.push(`cleanup:${epoch}`);
       });
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(trace).toEqual(["setup:0"]);
 
     advance?.();
@@ -481,19 +481,19 @@ describe("Model construction and React-corresponding hooks", () => {
     const trace: string[] = [];
 
     function Model(): undefined {
-      const [, setEpoch] = Behave.useState(0);
+      const [, setEpoch] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       advance = () => setEpoch((previous) => previous + 1);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push("setup");
         return () => trace.push("cleanup");
       }, []);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     advance?.();
     await waitFor(() => evaluations === 2);
     expect(trace).toEqual(["setup"]);
@@ -509,22 +509,22 @@ describe("Model construction and React-corresponding hooks", () => {
     const label = (value: number) => Object.is(value, -0) ? "-0" : String(value);
 
     function Model(): undefined {
-      const [dependency, setValue] = Behave.useState(0);
-      const [, setEpoch] = Behave.useState(0);
+      const [dependency, setValue] = Behavon.useState(0);
+      const [, setEpoch] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setDependency = setValue;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       advance = () => setEpoch((previous) => previous + 1);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`setup:${label(dependency)}`);
         return () => trace.push(`cleanup:${label(dependency)}`);
       }, [dependency]);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     advance?.();
     await waitFor(() => evaluations === 2);
     expect(trace).toEqual(["setup:0"]);
@@ -546,10 +546,10 @@ describe("Model construction and React-corresponding hooks", () => {
     let fail: (() => void) | undefined;
 
     function Model(): undefined {
-      const [shouldFail, setShouldFail] = Behave.useState(false);
+      const [shouldFail, setShouldFail] = Behavon.useState(false);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       fail = () => setShouldFail(true);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`setup:${shouldFail}`);
         return () => trace.push(`cleanup:${shouldFail}`);
       });
@@ -557,11 +557,11 @@ describe("Model construction and React-corresponding hooks", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     const surfaced = await captureScheduledFailure(() => fail?.());
     expect(surfaced).toBe(failure);
     expect(trace).toEqual(["setup:false", "cleanup:false"]);
-    expect(() => Behave.getInterface(root)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
 
   it("updates getSnapshot without replacing a stable external-store subscription", async () => {
@@ -587,12 +587,12 @@ describe("Model construction and React-corresponding hooks", () => {
     const secondGetter = () => current + getterOffset;
 
     function Model(): undefined {
-      const [, setEpoch] = Behave.useState(0);
+      const [, setEpoch] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       advance = () => setEpoch((previous) => previous + 1);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
-      const value = Behave.useSyncExternalStore(
+      const value = Behavon.useSyncExternalStore(
         useSecondSubscribe ? secondSubscribe : subscribe,
         getterOffset === 0 ? firstGetter : secondGetter,
       );
@@ -601,7 +601,7 @@ describe("Model construction and React-corresponding hooks", () => {
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect({ subscribeCount, unsubscribeCount, evaluations, values }).toEqual({
       subscribeCount: 1,
       unsubscribeCount: 0,
@@ -648,15 +648,15 @@ describe("Model construction and React-corresponding hooks", () => {
       return undefined;
     }
 
-    const child = Behave.createModel(Child, 1);
+    const child = Behavon.createModel(Child, 1);
     function Target(): undefined {
-      const [, setter] = Behave.useModel(child);
+      const [, setter] = Behavon.useModel(child);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setInput = setter;
       return undefined;
     }
 
-    const target = Behave.createModel(Target, undefined);
+    const target = Behavon.createModel(Target, undefined);
     function Source(): undefined {
       setInput?.((previous) => {
         updaterCalls += 1;
@@ -665,8 +665,8 @@ describe("Model construction and React-corresponding hooks", () => {
       return undefined;
     }
 
-    expect(() => Behave.createModel(Source, undefined)).toThrow(
-      /Behave\.useModel setter for target Model#\d+ cannot be called while evaluating source Model#\d+/,
+    expect(() => Behavon.createModel(Source, undefined)).toThrow(
+      /Behavon\.useModel setter for target Model#\d+ cannot be called while evaluating source Model#\d+/,
     );
     expect(updaterCalls).toBe(0);
     expect(childInputs).toEqual([1]);
@@ -687,7 +687,7 @@ describe("Model construction and React-corresponding hooks", () => {
     const targetValues: number[] = [];
 
     function Target(): undefined {
-      const [value, setter] = Behave.useState(0);
+      const [value, setter] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setTarget = setter;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -696,27 +696,27 @@ describe("Model construction and React-corresponding hooks", () => {
     }
 
     function Source(): undefined {
-      const [, setter] = Behave.useState(0);
+      const [, setter] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setSource = setter;
       return undefined;
     }
 
-    const target = Behave.createModel(Target, undefined);
-    const source = Behave.createModel(Source, undefined);
+    const target = Behavon.createModel(Target, undefined);
+    const source = Behavon.createModel(Source, undefined);
     const surfaced = await captureScheduledFailure(() => setSource?.((previous) => {
       updaterCalls += 1;
       setTarget?.(1);
       return previous + 1;
     }));
     expect(String(surfaced)).toMatch(
-      /Behave\.useState setter for target Model#\d+ cannot be called while evaluating source Model#\d+/,
+      /Behavon\.useState setter for target Model#\d+ cannot be called while evaluating source Model#\d+/,
     );
     expect(updaterCalls).toBe(1);
     expect(targetValues).toEqual([0]);
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(targetValues).toEqual([0]);
-    expect(() => Behave.getInterface(source)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(source)).toThrow(/disposed/);
     target.dispose();
   });
 
@@ -724,13 +724,13 @@ describe("Model construction and React-corresponding hooks", () => {
     let disposedSetter: ((value: number) => void) | undefined;
 
     function Target(): undefined {
-      const [, setter] = Behave.useState(0);
+      const [, setter] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       disposedSetter = setter;
       return undefined;
     }
 
-    const target = Behave.createModel(Target, undefined);
+    const target = Behavon.createModel(Target, undefined);
     target.dispose();
     expect(() => disposedSetter?.(1)).not.toThrow();
 
@@ -739,8 +739,8 @@ describe("Model construction and React-corresponding hooks", () => {
       return undefined;
     }
 
-    expect(() => Behave.createModel(Source, undefined)).toThrow(
-      /Behave\.useState setter for target Model#\d+ cannot be called while evaluating source Model#\d+/,
+    expect(() => Behavon.createModel(Source, undefined)).toThrow(
+      /Behavon\.useState setter for target Model#\d+ cannot be called while evaluating source Model#\d+/,
     );
   });
 
@@ -752,7 +752,7 @@ describe("Model construction and React-corresponding hooks", () => {
     const targetValues: number[] = [];
 
     function Target(): undefined {
-      const [value, setter] = Behave.useState(0);
+      const [value, setter] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setTarget = setter;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -760,19 +760,19 @@ describe("Model construction and React-corresponding hooks", () => {
       return undefined;
     }
 
-    const target = Behave.createModel(Target, undefined);
+    const target = Behavon.createModel(Target, undefined);
     function Source(): undefined {
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         setTarget?.(1);
       }, []);
-      const updateTarget = Behave.useCallback((value: number) => setTarget?.(value), []);
-      Behave.useSignal("updateTarget", updateTarget);
+      const updateTarget = Behavon.useCallback((value: number) => setTarget?.(value), []);
+      Behavon.useSignal("updateTarget", updateTarget);
       return undefined;
     }
 
-    const source = Behave.createModel(Source, undefined);
+    const source = Behavon.createModel(Source, undefined);
     await waitFor(() => targetValues.at(-1) === 1);
-    source.updateTarget(2);
+    signalOf(source, "updateTarget")(2);
     await waitFor(() => targetValues.at(-1) === 2);
     source.dispose();
     target.dispose();

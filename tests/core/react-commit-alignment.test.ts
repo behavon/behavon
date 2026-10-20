@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { BoundaryState, ModelInstance, Signal, StateSetter } from "behavon";
-import { waitFor } from "../helpers";
+import { waitFor, signalOf } from "../helpers";
 
 function observeBoundary<Input, Output>(instance: ModelInstance<Input, BoundaryState<Output>>) {
   let state: BoundaryState<Output> | undefined;
   let setInput: StateSetter<Input> | undefined;
   function Observer(): undefined {
     // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-    [state, setInput] = Behave.useModel(instance);
+    [state, setInput] = Behavon.useModel(instance);
     return undefined;
   }
-  const observer = Behave.createModel(Observer, undefined);
+  const observer = Behavon.createModel(Observer, undefined);
   return {
     get state() {
       return state as BoundaryState<Output>;
@@ -36,22 +36,22 @@ describe("React-aligned commit-phase lifecycle", () => {
     };
 
     function Model(): undefined {
-      const [version, setVersion] = Behave.useState(0);
+      const [version, setVersion] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       replace = () => setVersion(1);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`first setup:${version}`);
         return () => trace.push(`first cleanup:${version}`);
       }, [version]);
-      Behave.useSyncExternalStore(subscribe(version), () => version);
-      Behave.useEffect(() => {
+      Behavon.useSyncExternalStore(subscribe(version), () => version);
+      Behavon.useEffect(() => {
         trace.push(`second setup:${version}`);
         return () => trace.push(`second cleanup:${version}`);
       }, [version]);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     expect(trace).toEqual(["first setup:0", "subscribe:0", "second setup:0"]);
     replace?.();
     await waitFor(() => trace.includes("second setup:1"));
@@ -75,7 +75,7 @@ describe("React-aligned commit-phase lifecycle", () => {
     const trace: string[] = [];
 
     function Child(input: number): undefined {
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`first setup:${input}`);
         if (input === 1) throw setupFailure;
         return () => {
@@ -83,14 +83,14 @@ describe("React-aligned commit-phase lifecycle", () => {
           if (input === 0) throw cleanupFailure;
         };
       }, [input]);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         trace.push(`second setup:${input}`);
         return () => trace.push(`second cleanup:${input}`);
       }, [input]);
       return undefined;
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), 0);
+    const instance = Behavon.createModel(Behavon.boundary(Child), 0);
     const observed = observeBoundary(instance);
     observed.setInput(1);
     await waitFor(() => observed.state.status === "failed");
@@ -116,7 +116,7 @@ describe("React-aligned commit-phase lifecycle", () => {
     const trace: string[] = [];
 
     function Child(input: { label: string; fail: boolean }): undefined {
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         if (input.fail) {
           trace.push(`fail:${input.label}`);
           throw input.label === "first" ? firstFailure : secondFailure;
@@ -126,21 +126,21 @@ describe("React-aligned commit-phase lifecycle", () => {
       return undefined;
     }
 
-    const first = Behave.createModel(Behave.boundary(Child), { label: "first", fail: false });
-    const second = Behave.createModel(Behave.boundary(Child), { label: "second", fail: false });
+    const first = Behavon.createModel(Behavon.boundary(Child), { label: "first", fail: false });
+    const second = Behavon.createModel(Behavon.boundary(Child), { label: "second", fail: false });
     const firstObserved = observeBoundary(first);
     const secondObserved = observeBoundary(second);
     function Controller(): undefined {
-      const fail = Behave.useCallback(() => {
+      const fail = Behavon.useCallback(() => {
         firstObserved.setInput({ label: "first", fail: true });
         secondObserved.setInput({ label: "second", fail: true });
       }, []);
-      Behave.useSignal("fail", fail);
+      Behavon.useSignal("fail", fail);
       return undefined;
     }
 
-    const controller = Behave.createModel(Controller, undefined);
-    controller.fail();
+    const controller = Behavon.createModel(Controller, undefined);
+    signalOf(controller, "fail")();
     await waitFor(() => firstObserved.state.status === "failed" && secondObserved.state.status === "failed");
     expect(trace).toEqual([
       "dispose:first",
@@ -165,17 +165,17 @@ describe("React-aligned commit-phase lifecycle", () => {
     let terminalCleanupCalls = 0;
 
     function Child(input: number): undefined {
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         if (input === 1) throw setupFailure;
       }, [input]);
-      Behave.useEffect(() => () => {
+      Behavon.useEffect(() => () => {
         terminalCleanupCalls += 1;
         throw terminalCleanupFailure;
       }, []);
       return undefined;
     }
 
-    const instance = Behave.createModel(Behave.boundary(Child), 0);
+    const instance = Behavon.createModel(Behavon.boundary(Child), 0);
     const observed = observeBoundary(instance);
     observed.setInput(1);
     await waitFor(() => observed.state.status === "failed");
@@ -198,24 +198,24 @@ describe("React-aligned commit-phase lifecycle", () => {
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
-      const [version, setValue] = Behave.useState(0);
+      const [version, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setVersion = setValue;
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         if (version === 1) throw firstSetupFailure;
       }, [version]);
-      Behave.useEffect(() => {
+      Behavon.useEffect(() => {
         if (version === 1) throw secondSetupFailure;
       }, [version]);
-      Behave.useEffect(() => () => {
+      Behavon.useEffect(() => () => {
         throw terminalCleanupFailure;
       }, []);
-      const fail = Behave.useCallback(() => setValue(1), [setValue]);
-      Behave.useSignal("fail", fail);
+      const fail = Behavon.useCallback(() => setValue(1), [setValue]);
+      Behavon.useSignal("fail", fail);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     let surfaced: unknown;
     const originalSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
@@ -227,7 +227,7 @@ describe("React-aligned commit-phase lifecycle", () => {
       return originalSetTimeout(() => undefined, 0);
     }) as typeof setTimeout;
     try {
-      root.fail();
+      signalOf(root, "fail")();
       await Promise.resolve();
     } finally {
       globalThis.setTimeout = originalSetTimeout;
@@ -265,13 +265,13 @@ describe("React-aligned commit-phase lifecycle", () => {
     };
 
     function Model(): undefined {
-      const observedValue = Behave.useSyncExternalStore(subscribe, getSnapshot);
+      const observedValue = Behavon.useSyncExternalStore(subscribe, getSnapshot);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       observed.push(observedValue);
       return undefined;
     }
 
-    const root = Behave.createModel(Model, undefined);
+    const root = Behavon.createModel(Model, undefined);
     await waitFor(() => reads >= 3);
     expect(observed).toEqual([0, 0]);
     failNextCheck = true;

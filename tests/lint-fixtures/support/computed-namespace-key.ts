@@ -1,1 +1,1 @@
-export const externalBehaveKey: keyof typeof import("behavon") = "useState";
+export const externalBehavonKey: keyof typeof import("behavon") = "useState";

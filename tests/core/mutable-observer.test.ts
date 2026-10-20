@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import Behave from "behavon";
+import Behavon from "behavon";
 import type { StateSetter } from "behavon";
 import {
   inspectModelInstanceForTests,
@@ -9,7 +9,7 @@ import {
   inspectMutableStateForTests,
   type MutableStateSubject,
 } from "../../src/internal/mutable-observer";
-import { waitFor } from "../helpers";
+import { waitFor, signalOf } from "../helpers";
 
 function stateCellOf(ref: object): MutableStateSubject {
   const cell = inspectModelInstanceForTests(ref).hooks.find(
@@ -24,15 +24,15 @@ describe("MutableObserver state mutation authority", () => {
     let observed = -1;
 
     function Counter(): number {
-      const [count, setCount] = Behave.useState(0);
+      const [count, setCount] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only observer protocol probe records committed evaluation output
       observed = count;
-      const increment = Behave.useCallback(() => setCount((value) => value + 1), [setCount]);
-      Behave.useSignal("increment", increment);
+      const increment = Behavon.useCallback(() => setCount((value) => value + 1), [setCount]);
+      Behavon.useSignal("increment", increment);
       return count;
     }
 
-    const counter = Behave.createModel(Counter, undefined);
+    const counter = Behavon.createModel(Counter, undefined);
     const cell = stateCellOf(counter as object);
     const owner = inspectModelInstanceForTests(counter as object);
     const before = inspectMutableStateForTests(cell);
@@ -40,7 +40,7 @@ describe("MutableObserver state mutation authority", () => {
     expect(before.owner).toBe(owner);
     expect(before.queuedUpdates).toBe(0);
 
-    counter.increment();
+    signalOf(counter, "increment")();
     expect(inspectMutableStateForTests(cell).queuedUpdates).toBe(1);
     await waitFor(() => observed === 1);
 
@@ -57,12 +57,12 @@ describe("MutableObserver state mutation authority", () => {
 
   it("assigns distinct identities and generations to separate Model instances", () => {
     function StateModel(): number {
-      const [value] = Behave.useState(0);
+      const [value] = Behavon.useState(0);
       return value;
     }
 
-    const first = Behave.createModel(StateModel, undefined);
-    const second = Behave.createModel(StateModel, undefined);
+    const first = Behavon.createModel(StateModel, undefined);
+    const second = Behavon.createModel(StateModel, undefined);
     const firstMetadata = inspectMutableStateForTests(stateCellOf(first as object));
     const secondMetadata = inspectMutableStateForTests(stateCellOf(second as object));
 
@@ -76,7 +76,7 @@ describe("MutableObserver state mutation authority", () => {
     const attempts: Array<readonly [identity: number, generation: number]> = [];
 
     function ConvergingModel(): number {
-      const [value, setValue] = Behave.useState(0);
+      const [value, setValue] = Behavon.useState(0);
       const cell = inspectRetainedOperationForTests(setValue).cell as MutableStateSubject;
       const metadata = inspectMutableStateForTests(cell);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only retry probe records observer identity for each attempt
@@ -85,7 +85,7 @@ describe("MutableObserver state mutation authority", () => {
       return value;
     }
 
-    const instance = Behave.createModel(ConvergingModel, undefined);
+    const instance = Behavon.createModel(ConvergingModel, undefined);
     expect(attempts).toHaveLength(2);
     expect(attempts[1]).toEqual(attempts[0]);
     expect(inspectModelInstanceForTests(instance as object).output).toBe(1);
@@ -98,7 +98,7 @@ describe("MutableObserver state mutation authority", () => {
     let provisionalCell: MutableStateSubject | undefined;
 
     function Broken(): never {
-      const [, setValue] = Behave.useState(0);
+      const [, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only provisional lifecycle probe retains the setter and its internal cell
       escapedSetter = setValue;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only provisional lifecycle probe retains the internal cell for post-failure inspection
@@ -106,7 +106,7 @@ describe("MutableObserver state mutation authority", () => {
       throw failure;
     }
 
-    expect(() => Behave.createModel(Broken, undefined)).toThrow(failure);
+    expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
     expect(inspectMutableStateForTests(provisionalCell as MutableStateSubject).status).toBe("released");
     expect(inspectRetainedOperationForTests(escapedSetter as Function).cell).toBeUndefined();
     expect(() => escapedSetter?.(1)).not.toThrow();
@@ -118,7 +118,7 @@ describe("MutableObserver state mutation authority", () => {
     let childCell: MutableStateSubject | undefined;
 
     function Child(): undefined {
-      const [failed, setFailed] = Behave.useState(false);
+      const [failed, setFailed] = Behavon.useState(false);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only Boundary generation probe retains the Child setter
       failChild = setFailed;
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only Boundary generation probe retains the Child cell
@@ -127,7 +127,7 @@ describe("MutableObserver state mutation authority", () => {
       return undefined;
     }
 
-    const boundary = Behave.createModel(Behave.boundary(Child), undefined);
+    const boundary = Behavon.createModel(Behavon.boundary(Child), undefined);
     const initial = inspectMutableStateForTests(childCell as MutableStateSubject);
     failChild?.(true);
     await waitFor(() => (

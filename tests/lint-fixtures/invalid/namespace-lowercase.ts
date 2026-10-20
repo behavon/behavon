@@ -1,5 +1,5 @@
-import * as behave from "behavon";
+import * as behavon from "behavon";
 
 export function NamespaceLowercaseModel(): number {
-  return behave.useState(0)[0];
+  return behavon.useState(0)[0];
 }

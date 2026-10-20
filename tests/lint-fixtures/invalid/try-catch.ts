@@ -1,8 +1,8 @@
-import Behave from "behavon";
+import Behavon from "behavon";
 
 export function TryCatchModel(): undefined {
   try {
-    Behave.useState(0);
+    Behavon.useState(0);
   } catch {
     return undefined;
   }
