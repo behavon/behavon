@@ -1,5 +1,5 @@
 {
-  "name": "behave",
+  "name": "behavon",
   "version": "0.1.0",
   "description": "React-like model hooks with Signal, Slot, and typed snapshot identities",
   "license": "MIT",
@@ -19,13 +19,20 @@
     "dist/index.js.map",
     "dist/index.d.ts",
     "dist/index.d.ts.map",
-    "eslint.behave-hooks.js",
+    "eslint.behavon-hooks.js",
     "README.md"
   ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.build.json",
     "build": "npm run build:lib",
+    "lint:hooks": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"tests/**/*.tsx\"",
+    "check:hooks": "npm run lint:hooks && npm run test:lint:hooks",
+    "test": "npm run check:hooks && vitest run && npm run test:types:package",
+    "test:lint:hooks": "node scripts/verify-hook-authoring.mjs",
+    "test:types:package": "npm run build:lib && npm run verify:types:package",
+    "verify:types:package": "tsc -p tests/types/package-consumer/tsconfig.json && tsc -p tests/types/package-consumer/tsconfig.verify.json",
+    "test:watch": "vitest",
     "pack:check": "npm pack --dry-run"
   },
   "devDependencies": {

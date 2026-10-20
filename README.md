@@ -1,6 +1,6 @@
-# behave
+# behavon
 
-Behave는 React와 runtime을 공유하지 않으면서 React hook의 공개 상태 의미를 Model에 적용하고, Signal·Slot·typed snapshot identity로 Model 조합과 외부 구독을 표현하는 ESM 패키지다.
+Behavon은 React와 runtime을 공유하지 않으면서 React hook의 공개 상태 의미를 Model에 적용하고, Signal·Slot·typed snapshot identity로 Model 조합과 외부 구독을 표현하는 ESM 패키지다.
 
 ## 개발 명령
 

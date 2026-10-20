@@ -5,7 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "paths": {
-      "behave": ["./src/index.ts"]
+      "behavon": ["./src/index.ts"]
     },
     "jsx": "react-jsx",
     "strict": true,
@@ -20,6 +20,8 @@
   },
   "include": [
     "src/**/*.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
     "*.config.ts"
   ]
 }

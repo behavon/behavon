@@ -1,4 +1,4 @@
-export const behavePublicHookNames = Object.freeze([
+export const behavonPublicHookNames = Object.freeze([
   "useState",
   "useLabelState",
   "useReducer",
@@ -18,7 +18,7 @@ export const behavePublicHookNames = Object.freeze([
   "useSnapshot",
 ]);
 
-const publicHooks = new Set(behavePublicHookNames);
+const publicHooks = new Set(behavonPublicHookNames);
 const valueHooks = new Set(["useState", "useLabelState", "useReducer", "useMutable", "useMemo", "useCallback", "useModel", "usePort", "useFuture", "useResource"]);
 const customHookName = /^use[A-Z0-9]/;
 const modelName = /^[A-Z]/;
@@ -114,7 +114,7 @@ function importedBinding(sourceCode, identifier) {
     if (variable !== undefined) {
       const definition = variable.defs.find((candidate) => candidate.type === "ImportBinding");
       const declaration = definition?.parent ?? definition?.node?.parent;
-      if (definition === undefined || declaration?.source?.value !== "behave") return undefined;
+      if (definition === undefined || declaration?.source?.value !== "behavon") return undefined;
       const specifier = definition.node;
       if (specifier.type === "ImportNamespaceSpecifier") return { kind: "namespace", specifier };
       if (specifier.type === "ImportSpecifier") {
@@ -464,8 +464,8 @@ const canonicalApiRule = {
     type: "problem",
     schema: [],
     messages: {
-      namespaceName: "The 'behave' namespace import must use the exact local name 'Behave'.",
-      defaultName: "The default 'behave' import must use the exact local name 'Behave'.",
+      namespaceName: "The 'behavon' namespace import must use the exact local name 'Behave'.",
+      defaultName: "The default 'behavon' import must use the exact local name 'Behave'.",
       namedHookAlias: "A named Behave Hook import must keep a local name matching use[A-Z0-9].",
       computedNamespaceMember: "Access the Behave facade through a non-computed direct member such as Behave.useState or Behave.createModel.",
       wrappedNamespaceHook: "Call Behave public Hooks through the direct Behave facade without casts or wrappers.",
@@ -473,7 +473,7 @@ const canonicalApiRule = {
       extractedHook: "Do not destructure or extract Behave public Hooks; call the facade member directly.",
       directNamedHook: "Call a named Behave Hook import directly instead of extracting or passing it.",
       namespaceAlias: "Do not copy the Behave facade; call public Hooks through the direct Behave import.",
-      hookReexport: "Do not re-export Behave public Hooks through a wrapper module; import them directly from behave.",
+      hookReexport: "Do not re-export Behave public Hooks through a wrapper module; import them directly from behavon.",
       tryHook: "Hooks matching Behave public names or use[A-Z0-9] cannot be called inside try/catch/finally.",
       nestedEndpointHook: "Declare each Hook in a separate top-level statement before passing its result to another Behave Hook.",
       inlineHookResult: "Declare the Behave Hook result in its own top-level local variable before using it in another expression.",
@@ -485,7 +485,7 @@ const canonicalApiRule = {
     const sourceCode = context.sourceCode;
     return {
       ImportDeclaration(node) {
-        if (node.source.value !== "behave") return;
+        if (node.source.value !== "behavon") return;
         for (const specifier of node.specifiers) {
           if (specifier.type === "ImportDefaultSpecifier" && specifier.local.name !== "Behave") {
             context.report({ node: specifier.local, messageId: "defaultName" });
@@ -507,7 +507,7 @@ const canonicalApiRule = {
         }
       },
       ExportNamedDeclaration(node) {
-        if (node.source?.value !== "behave") return;
+        if (node.source?.value !== "behavon") return;
         for (const specifier of node.specifiers) {
           const local = specifier.local?.name ?? specifier.local?.value;
           if (local === "default" || publicHooks.has(local)) {
@@ -516,7 +516,7 @@ const canonicalApiRule = {
         }
       },
       ExportAllDeclaration(node) {
-        if (node.source.value === "behave") context.report({ node, messageId: "hookReexport" });
+        if (node.source.value === "behavon") context.report({ node, messageId: "hookReexport" });
       },
       MemberExpression(node) {
         const object = innerExpression(node.object);
@@ -1041,7 +1041,7 @@ const staticModelDefinitionRule = {
     }
 
     function behaveModuleSource(node) {
-      return staticallyKnownString(sourceCode, node) === "behave";
+      return staticallyKnownString(sourceCode, node) === "behavon";
     }
 
     function behaveRequireCall(node) {
@@ -1057,7 +1057,7 @@ const staticModelDefinitionRule = {
       return variable.defs.some((definition) => {
         if (definition.type !== "ImportBinding") return false;
         const declaration = definition.parent ?? definition.node?.parent;
-        return declaration?.source?.value !== "behave";
+        return declaration?.source?.value !== "behavon";
       });
     }
 
@@ -3335,7 +3335,7 @@ const exhaustiveDependenciesRule = {
   },
 };
 
-export const behaveHooksPlugin = {
+export const behavonHooksPlugin = {
   rules: {
     "canonical-api": canonicalApiRule,
     "evaluation-purity": evaluationPurityRule,
