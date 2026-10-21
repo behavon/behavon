@@ -6,8 +6,8 @@ export function ConditionalPublicHookMatrix(enabled: boolean, model: ModelInstan
   if (enabled) Behavon.useCallback(() => undefined, []);
   if (enabled) Behavon.useEffect(() => undefined, []);
   if (enabled) Behavon.useSyncExternalStore(() => () => undefined, () => 0);
-  if (enabled) Behavon.useSignal("signal", () => undefined);
-  if (enabled) Behavon.useSlot("slot", () => undefined);
+  if (enabled) Behavon.useSignal(conditionalPublicHookMatrixPort, "signal", () => undefined);
+  if (enabled) Behavon.useSlot(conditionalPublicHookMatrixPort, "slot", () => undefined);
   if (enabled) Behavon.useModel(model);
   if (enabled) {
     const dependency = Behavon.usePort(undefined as never);
@@ -16,7 +16,7 @@ export function ConditionalPublicHookMatrix(enabled: boolean, model: ModelInstan
   if (enabled) Behavon.useConnect(undefined as never, undefined as never);
   if (enabled) Behavon.useSnapshot(conditionalSnapshot);
   if (enabled) Behavon.useMutable(0);
-  if (enabled) Behavon.useExport(() => ({ value: 0 }));
+  if (enabled) Behavon.useExport(conditionalPublicHookMatrixPort, "value");
   if (enabled) {
     const labeled = Behavon.useLabelState(conditionalState.value, 0);
     void labeled;
@@ -35,3 +35,6 @@ export function ConditionalPublicHookMatrix(enabled: boolean, model: ModelInstan
   }
   return undefined;
 }
+import type { Signal as PortOnlySignal, Slot as PortOnlySlot, SnapshotRootId } from "behavon";
+type ConditionalPublicHookMatrixPortType = { "signal": PortOnlySignal<any>; "slot": PortOnlySlot<any>; "value": SnapshotRootId<number> };
+const conditionalPublicHookMatrixPort = Behavon.createPort<ConditionalPublicHookMatrixPortType>({ "signal": Behavon.SignalType(), "slot": Behavon.SlotType(), "value": Behavon.SnapshotType() });

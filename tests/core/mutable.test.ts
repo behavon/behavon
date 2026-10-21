@@ -1,3 +1,4 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
 import type { MutableHandle, Signal } from "behavon";
@@ -33,17 +34,20 @@ describe("useMutable", () => {
       readonly reevaluate: Signal;
     }
     let evaluations = 0;
+    type ModelPortType = { "reevaluate": PortOnlySignal<any> };
+    const modelPort = Behavon.createPort<ModelPortType>({ "reevaluate": Behavon.SignalType() });
     function Model(initial: number): Readonly<{ mutable: MutableHandle<number>; revision: number }> {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe counts owner reevaluations
       evaluations += 1;
       const mutable = Behavon.useMutable(initial);
       const [revision, setRevision] = Behavon.useState(0);
       const reevaluate = Behavon.useCallback(() => setRevision(current => current + 1), [setRevision]);
-      Behavon.useSignal("reevaluate", reevaluate);
+      Behavon.useSignal(modelPort, "reevaluate", reevaluate);
+      Behavon.useExport(modelPort, "reevaluate");
       return { mutable, revision };
     }
 
-    const root = Behavon.createModel(Model, 1);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), 1);
     const initialOutput = inspectModelInstanceForTests(root).output as ReturnType<typeof Model>;
     const handle = initialOutput.mutable;
     expect(Object.isFrozen(handle)).toBe(true);
@@ -119,6 +123,8 @@ describe("useMutable", () => {
       readonly fail: Signal;
     }
     let cleanupValue: number | undefined;
+    type ModelPort1Type = { "fail": PortOnlySignal<any> };
+    const modelPort1 = Behavon.createPort<ModelPort1Type>({ "fail": Behavon.SignalType() });
     function Model(): MutableHandle<number> {
       const mutable = Behavon.useMutable(0);
       const [failed, setFailed] = Behavon.useState(false);
@@ -130,11 +136,12 @@ describe("useMutable", () => {
         throw new Error("evaluation failed after mutable write");
       }
       const fail = Behavon.useCallback(() => setFailed(true), [setFailed]);
-      Behavon.useSignal("fail", fail);
+      Behavon.useSignal(modelPort1, "fail", fail);
+      Behavon.useExport(modelPort1, "fail");
       return mutable;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort1Type>), undefined);
     const handle = inspectModelInstanceForTests(root).output as MutableHandle<number>;
     const failure = await captureScheduledFailure(() => signalOf(root, "fail")());
     expect(failure).toBeInstanceOf(Error);
@@ -161,6 +168,8 @@ describe("useMutable", () => {
     interface Endpoints {
       readonly enable: Signal;
     }
+    type ModelPort2Type = { "enable": PortOnlySignal<any> };
+    const modelPort2 = Behavon.createPort<ModelPort2Type>({ "enable": Behavon.SignalType() });
     function Model(): undefined {
       const [enabled, setEnabled] = Behavon.useState(false);
       if (enabled) {
@@ -169,11 +178,12 @@ describe("useMutable", () => {
         void mutable;
       }
       const enable = Behavon.useCallback(() => setEnabled(true), [setEnabled]);
-      Behavon.useSignal("enable", enable);
+      Behavon.useSignal(modelPort2, "enable", enable);
+      Behavon.useExport(modelPort2, "enable");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort2Type>), undefined);
     const failure = await captureScheduledFailure(() => signalOf(root, "enable")());
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error).message).toMatch(

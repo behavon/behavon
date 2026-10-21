@@ -46,5 +46,5 @@
 
 ### 고급
 
-- [`TypedModelRef` / `UntypedModelRef`](./api/TypedModelRef.md)
+- [`TypedModelRef`](./api/TypedModelRef.md)
 - [`useLabelState()` / `transaction`](./api/transaction.md)

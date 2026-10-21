@@ -26,8 +26,9 @@ import type {
   FutureAbortSignal,
   FutureSnapshot,
   TypedModelRef,
-  UntypedModelRef,
 } from "behavon";
+// @ts-expect-error UntypedModelRef was removed with the Port-less Model API.
+import type { UntypedModelRef } from "behavon";
 
 export function PackedReactCorrespondingHookTypeFailures(): void {
   const memo: number = Behavon.useMemo(() => 1, []);
@@ -64,6 +65,15 @@ const packageResource = createResource({
   abort: (_context: { resource?: { value: number }; reason?: PackageStopReason }) => undefined,
   actions: {
     read: ({ resource }: { resource: { value: number }; signal: ResourceAbortSignal }) => resource.value,
+    // Without a declared AbortSignal (lib ES2024 only), the signal is the same minimal shape as the Future one.
+    checked: ({ resource, signal }: { resource: { value: number }; signal: ResourceAbortSignal }) => {
+      const future: FutureAbortSignal = signal;
+      const listener = () => undefined;
+      future.addEventListener("abort", listener, { once: true });
+      future.removeEventListener("abort", listener);
+      signal.throwIfAborted();
+      return signal.aborted ? undefined : resource.value;
+    },
     asyncLike: ({ resource }: { resource: { value: number }; signal: ResourceAbortSignal }): PromiseLike<number> =>
       Promise.resolve(resource.value),
   },
@@ -344,14 +354,9 @@ const packagePortInstance: ModelInstance<number, string, PackagePort> = Behavon.
 const packagePortSnapshot: SnapshotRootId<number> = packagePortInstance.snapshotId;
 void [packagePortDescriptor, packagePortSnapshot];
 
-export function useNamedExportContract(): number {
-  const exported = useExport(() => ({ value: 1 as const }));
-  return exported.value;
-}
-
-export function RejectFunctionExportContract(): undefined {
-  // @ts-expect-error Packed public exports reject direct function-valued properties.
-  Behavon.useExport(() => ({ command: () => undefined }));
+export function RemovedExportInitializerContract(): undefined {
+  // @ts-expect-error Packed useExport takes a Port declared with createPort; the initializer form was removed.
+  useExport(() => ({ value: 1 as const }));
   return undefined;
 }
 
@@ -400,6 +405,10 @@ const packageTransactionStates = Behavon.createId({
 });
 const packageStateId: StateId<number> = packageTransactionStates.count;
 
+const packageTransactionPort = Behavon.createPort<{ packageTransaction: Signal }>({
+  packageTransaction: Behavon.SignalType(),
+});
+
 export function useTransactionContract(): number {
   const [count, setCount] = Behavon.useLabelState(packageStateId, 0);
   const execute = Behavon.useCallback(() => {
@@ -413,7 +422,8 @@ export function useTransactionContract(): number {
     Behavon.transaction.run(id, thenableBody);
     Behavon.transaction.commit(id);
   }, [setCount]);
-  Behavon.useSignal("packageTransaction", execute);
+  Behavon.useSignal(packageTransactionPort, "packageTransaction", execute);
+  Behavon.useExport(packageTransactionPort, "packageTransaction");
   return count;
 }
 
@@ -522,7 +532,7 @@ function Child(input: number): number {
 export const commonModel: Model = input => input;
 export const detailedModel: Model<number, string> = input => String(input);
 
-export function callCommonDependency(dependency: DependencyProxy) {
+export function callCommonDependency(dependency: DependencyProxy<{ command: Signal<[value: string]> }>) {
   return dependency.command("draft");
 }
 
@@ -600,7 +610,9 @@ const typedSignalResult: undefined = typedRef.changed(1);
 const typedRelayResult: undefined = typedRef.relay(1);
 const typedVoidResult: void = typedRef.voidCommand("command");
 const typedUndefinedResult: undefined = typedRef.undefinedCommand();
-const typedSlotResult: undefined = typedRef.receive(1);
+// @ts-expect-error A Slot cannot be invoked on a ref, so the ref does not expose it.
+typedRef.receive(1);
+const typedSlotResult: undefined = undefined;
 const typedNumberResult: number = typedRef.returnsNumber();
 const typedCount: number = typedRef.count;
 const typedSettings: { readonly enabled: boolean } = typedRef.settings;
@@ -641,8 +653,8 @@ typedRef.typo();
 // @ts-expect-error The built opaque identity rejects structurally similar plain objects.
 const rejectedPlainTypedRef: TypedModelRef<ConsumerEndpoints> = plainTypedShape;
 void rejectedPlainTypedRef;
-declare const packageUntypedRef: UntypedModelRef;
-// @ts-expect-error A built untyped ref does not itself prove the consumer's Needs contract.
+declare const packageUntypedRef: TypedModelRef<object>;
+// @ts-expect-error A built ref without the Port's members does not prove the consumer's Needs contract.
 const rejectedUntypedNarrowing: TypedModelRef<ConsumerEndpoints> = packageUntypedRef;
 const anyTypedMember: any = anyTypedRef.arbitraryCommand;
 const indexedTypedMember: Signal = indexedTypedRef.arbitraryCommand;
@@ -668,17 +680,17 @@ declare const detailedModelHandle: ModelHandle<number, number>;
 // @ts-expect-error Detailed Model handles preserve input validation.
 detailedModelHandle[1]("wrong input");
 
-export function useDependency(ref: UntypedModelRef): DependencyProxy {
+export function useDependency(ref: TypedModelRef<any>): DependencyProxy {
   const dependency = Behavon.usePort(ref);
   return dependency;
 }
 
-export function useSchemaLessDependency(ref: UntypedModelRef) {
+export function useSchemaLessDependency(ref: TypedModelRef<any>): DependencyProxy & Readonly<Record<string, any>> {
   const dependency = Behavon.usePort(ref);
   return dependency;
 }
 
-export function useConnectSchemaLessDependencies(sourceRef: UntypedModelRef, destinationRef: UntypedModelRef) {
+export function useConnectSchemaLessDependencies(sourceRef: TypedModelRef<any>, destinationRef: TypedModelRef<any>) {
   const sourceDependency = Behavon.usePort(sourceRef);
   const destinationDependency = Behavon.usePort(destinationRef);
   const source = sourceDependency.source;
@@ -696,18 +708,12 @@ export function createInferredBoundaryModel(): Model<number, BoundaryState<numbe
   return Behavon.boundary(Child);
 }
 
-export function createSchemaLessRoot(input: number): UntypedModelRef {
-  const ref = Behavon.createModel(Child, input);
-  ref.dynamicSignal(input);
-  return ref;
-}
-
-export function createRoot(input: number): UntypedModelRef {
+export function createRoot(input: number): TypedModelRef<object> {
   return Behavon.createModel(Child, input);
 }
 
 const createdInstance = Behavon.createModel(Child, 1);
-const createdUntypedRef: UntypedModelRef = createdInstance;
+const createdUntypedRef: TypedModelRef<object> = createdInstance;
 const assertedCreatedTypedRef = createdInstance as TypedModelRef<ConsumerEndpoints>;
 void createdUntypedRef;
 void assertedCreatedTypedRef;
@@ -735,7 +741,7 @@ export function useEffectWithoutDependencies() {
   Behavon.useEffect(() => undefined);
 }
 
-export function useInspectTypedDependency(ref: UntypedModelRef) {
+export function useInspectTypedDependency(ref: TypedModelRef<any>) {
   const dependency = Behavon.usePort(ref);
   return Behavon.getInterface(dependency);
 }
@@ -770,7 +776,7 @@ function InvalidConnectionContract(): undefined {
 void InvalidConnectionContract;
 
 function RemovedTypedRelationshipOverloads(
-  ref: UntypedModelRef,
+  ref: TypedModelRef<object>,
   instance: ModelInstance<number, number>,
 ) {
   // @ts-expect-error Built declarations expose only schema-free usePort(ref).
@@ -779,13 +785,11 @@ function RemovedTypedRelationshipOverloads(
   const removedTypedGetInterface = Behavon.getInterface<ConsumerEndpoints>(ref);
   // @ts-expect-error A schema-less ModelInstance cannot be reclassified as a Port instance by useModel.
   const [removedOutput, removedSetter] = Behavon.useModel<number, number, ConsumerEndpoints>(instance);
-  // @ts-expect-error Built declarations require a live UntypedModelRef and reject null.
+  // @ts-expect-error Built declarations require a live Model ref and reject null.
   const removedNullableUse = Behavon.usePort(null);
-  const typedEndpoint = removedTypedUse.changed;
-  const nullableEndpoint = removedNullableUse.changed;
   return {
-    typedEndpoint,
-    nullableEndpoint,
+    removedTypedUse,
+    removedNullableUse,
     interfaceEndpoints: removedTypedGetInterface.endpoints,
     removedOutput,
     removedSetter,

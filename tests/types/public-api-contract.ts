@@ -26,7 +26,6 @@ import type {
   ResourceAbortSignal,
   ResourceSnapshot,
   TypedModelRef,
-  UntypedModelRef,
 } from "behavon";
 // @ts-expect-error SnapshotIdentity is an implementation helper, not public API.
 import type { SnapshotIdentity } from "behavon";
@@ -78,14 +77,9 @@ export function ReactCorrespondingHookTypeFailures(): void {
   void [external, malformedSubscribe, malformedSnapshotReader];
 }
 
-export function useNamedExportContract(): number {
-  const exported = useExport(() => ({ value: 1 as const }));
-  return exported.value;
-}
-
-export function RejectFunctionExportContract(): undefined {
-  // @ts-expect-error Public exports are non-function data capabilities.
-  Behavon.useExport(() => ({ command: () => undefined }));
+export function RemovedExportInitializerContract(): undefined {
+  // @ts-expect-error useExport takes a Port declared with createPort; the initializer form was removed.
+  useExport(() => ({ value: 1 as const }));
   return undefined;
 }
 
@@ -157,6 +151,16 @@ const typedActionResource = createResource({
       Promise.resolve(resource.value),
   },
 });
+// Where AbortSignal is declared, the Resource signals are the standard one and go to fetch without a cast.
+const fetchResource = createResource({
+  open: ({ input, signal }: { input: string; signal: ResourceAbortSignal }) => fetch(input, { signal }),
+  close: () => undefined,
+  abort: () => undefined,
+  actions: {
+    fetchMore: ({ signal }: { resource: Response; signal: ResourceAbortSignal }, url: string) => fetch(url, { signal }),
+  },
+});
+void fetchResource;
 
 export function useResourceTypeContract(): void {
   const [snapshot, noActions] = useResource(noActionResource, undefined);
@@ -444,7 +448,25 @@ const DeclaredPortModel: Model<number, string, DeclaredPort> = (input) => {
 const declaredPortInstance = Behavon.createModel(DeclaredPortModel, 1);
 const declaredSnapshot: SnapshotRootId<number> = declaredPortInstance.snapshotId;
 const declaredSignal: Signal<readonly [value: number]> = declaredPortInstance.changed;
-const declaredSlot: Slot<readonly [value: number]> = declaredPortInstance.receive;
+// @ts-expect-error A Slot cannot be invoked on a ref, so the ref does not expose it.
+declaredPortInstance.receive;
+// The Slot hidden on the ref still reaches usePort, ready to connect but not to call.
+interface DeclaredPortConnectorPort {
+  changed: Signal<[value: number]>;
+}
+const declaredPortConnectorPort = Behavon.createPort<DeclaredPortConnectorPort>({ changed: Behavon.SignalType() });
+const DeclaredPortConnector: Model<TypedModelRef<DeclaredPort>, undefined, DeclaredPortConnectorPort> = (target) => {
+  const changedBody = Behavon.useCallback((_value: number) => undefined, []);
+  const changed = Behavon.useSignal(declaredPortConnectorPort, "changed", changedBody);
+  Behavon.useExport(declaredPortConnectorPort, "changed");
+  const port = Behavon.usePort(target);
+  Behavon.useConnect(changed, port.receive);
+  // @ts-expect-error A Slot taken through usePort is for useConnect and cannot be invoked.
+  // eslint-disable-next-line behavon-hooks/evaluation-purity -- type-only invalid Slot call probe is never executed
+  port.receive(1);
+  return undefined;
+};
+const declaredSlot = DeclaredPortConnector;
 const declaredPortModelInstance: ModelInstance<number, string, DeclaredPort> = declaredPortInstance;
 void [declaredSnapshot, declaredSignal, declaredSlot, declaredPortModelInstance];
 // @ts-expect-error ModelInstance exposes every Port member as readonly even when the interface omits readonly.
@@ -554,6 +576,10 @@ const transactionStateIds = Behavon.createId({
 const transactionStateId: StateId<number> = transactionStateIds.count;
 const previousContractValue = 1;
 
+const transactionContractPort = Behavon.createPort<{ executeTransaction: Signal }>({
+  executeTransaction: Behavon.SignalType(),
+});
+
 function TransactionTypeContract(): number {
   const [count, setCount] = Behavon.useLabelState(transactionStateId, 0);
   const execute = Behavon.useCallback(() => {
@@ -571,7 +597,8 @@ function TransactionTypeContract(): number {
     Behavon.transaction.run(id, thenableBody);
     Behavon.transaction.commit(id);
   }, [setCount]);
-  Behavon.useSignal("executeTransaction", execute);
+  Behavon.useSignal(transactionContractPort, "executeTransaction", execute);
+  Behavon.useExport(transactionContractPort, "executeTransaction");
   return count;
 }
 void TransactionTypeContract;
@@ -618,35 +645,13 @@ void BoundaryContract;
 
 declare const observedStringModel: ModelInstance<number, string>;
 
-interface SchemaLessRelationshipsInput {
-  readonly root: UntypedModelRef;
-  readonly observed: ModelInstance<number, string>;
+function PortlessModelContract(observed: ModelInstance<number, string>) {
+  const [output, setInput]: ModelHandle<number, string> = Behavon.useModel(observed);
+  // @ts-expect-error A Model without a Port exposes no endpoints on its ref.
+  void observed.dynamicSignal;
+  return { output, setInput };
 }
-
-function createSchemaLessRelationshipsInput(
-  input: number,
-  observed: ModelInstance<number, string>,
-): SchemaLessRelationshipsInput {
-  return {
-    root: Behavon.createModel(String, input),
-    observed,
-  };
-}
-void createSchemaLessRelationshipsInput;
-
-function SchemaLessRelationships(input: SchemaLessRelationshipsInput) {
-  const dependency: DependencyProxy = Behavon.usePort(input.root);
-  const [output, setInput]: ModelHandle<number, string> = Behavon.useModel(input.observed);
-  const rootSignal = input.root.dynamicSignal;
-  const dependencyEndpoint = dependency.dynamicEndpoint;
-  return {
-    rootSignal,
-    dependencyEndpoint,
-    output,
-    setInput,
-  };
-}
-void SchemaLessRelationships;
+void PortlessModelContract;
 
 declare const publicTypeContract: PublicTypeContract;
 void publicTypeContract;
@@ -668,11 +673,25 @@ function StateOverloadContract(): undefined {
 }
 void StateOverloadContract;
 
+interface EndpointDeclarationsPort {
+  changed: Signal<readonly [value: number]>;
+  receive: Slot<readonly [value: number]>;
+}
+const endpointDeclarationsPort = Behavon.createPort<EndpointDeclarationsPort>({
+  changed: Behavon.SignalType(),
+  receive: Behavon.SlotType(),
+});
+
 function EndpointDeclarations(): () => void {
   const signalBody = Behavon.useCallback((_value: number) => "body result", []);
   const slotBody = Behavon.useCallback((_value: number) => 42, []);
-  const signal: Signal<readonly [value: number]> = Behavon.useSignal("changed", signalBody);
-  const slot: Slot<readonly [value: number]> = Behavon.useSlot("receive", slotBody);
+  const signal: Signal<readonly [value: number]> = Behavon.useSignal(endpointDeclarationsPort, "changed", signalBody);
+  Behavon.useExport(endpointDeclarationsPort, "changed");
+  const slot: Slot<readonly [value: number]> = Behavon.useSlot(endpointDeclarationsPort, "receive", slotBody);
+  // @ts-expect-error useSignal takes a Port declared with createPort; the string form was removed.
+  Behavon.useSignal("removed", signalBody);
+  // @ts-expect-error useSlot takes a Port declared with createPort; the string form was removed.
+  Behavon.useSlot("removed", slotBody);
   const invokeEndpoints = Behavon.useCallback(() => {
     const signalResult: undefined = signal(1);
     const slotResult: undefined = slot(1);
@@ -830,7 +849,8 @@ interface DetailedDependencySurface {
   readonly impossible: never;
 }
 declare const detailedDependency: DependencyProxy<DetailedDependencySurface>;
-declare const detailedRef: UntypedModelRef;
+// A ref of a Model without a Port: only dispose.
+declare const detailedRef: TypedModelRef<object>;
 type ReservedDependencyKey = "dispose" | "then" | "toJSON" | "constructor";
 type AssertNever<Value extends never> = Value;
 type DetailedReservedKeys = AssertNever<Extract<ReservedDependencyKey, keyof typeof detailedDependency>>;
@@ -839,11 +859,11 @@ void detailedReservedKeys;
 
 interface DetailedDependencyContractInput {
   readonly dependency: DependencyProxy<DetailedDependencySurface>;
-  readonly ref: UntypedModelRef;
+  readonly ref: TypedModelRef<DetailedDependencySurface>;
 }
 
 function DetailedDependencyContract(input: DetailedDependencyContractInput): undefined {
-  const dependency: DependencyProxy = Behavon.usePort(input.ref);
+  const dependency = Behavon.usePort(input.ref);
   Behavon.useConnect(dependency.changed, input.dependency.receive);
   Behavon.useConnect(input.dependency.changed, input.dependency.receive);
   Behavon.useConnect(input.dependency.relay, input.dependency.receive);
@@ -901,7 +921,9 @@ const typedSignalResult: undefined = detailedTypedRef.changed(1);
 const typedRelayResult: undefined = detailedTypedRef.relay(1);
 const typedVoidResult: void = detailedTypedRef.voidCommand("command");
 const typedUndefinedResult: undefined = detailedTypedRef.undefinedCommand();
-const typedSlotResult: undefined = detailedTypedRef.receive(1);
+// @ts-expect-error A Slot cannot be invoked on a ref, so the ref does not expose it.
+detailedTypedRef.receive(1);
+const typedSlotResult: undefined = undefined;
 const typedNumberResult: number = detailedTypedRef.returnsNumber();
 const typedCount: number = detailedTypedRef.count;
 const typedSettings: { readonly enabled: boolean } = detailedTypedRef.settings;
@@ -946,7 +968,7 @@ detailedTypedRef.typo();
 // @ts-expect-error The opaque typed-ref identity rejects structurally similar plain objects.
 const rejectedPlainTypedRef: TypedModelRef<DetailedDependencySurface> = plainTypedShape;
 void rejectedPlainTypedRef;
-// @ts-expect-error An untyped ref does not itself prove the consumer's Needs contract.
+// @ts-expect-error A ref without the Port's members does not prove the consumer's Needs contract.
 const rejectedUntypedNarrowing: TypedModelRef<DetailedDependencySurface> = detailedRef;
 const anyTypedMember: any = anyTypedRef.arbitraryCommand;
 const indexedTypedMember: Signal = indexedTypedRef.arbitraryCommand;
@@ -966,9 +988,9 @@ function TypedModelRefContract() {
 }
 void TypedModelRefContract;
 
-const dynamicRefResult: any = detailedRef.changed("runtime-validated payload");
-void dynamicRefResult;
-const detailedRoot: UntypedModelRef =
+// @ts-expect-error A ref without a Port exposes no endpoints.
+detailedRef.changed("runtime-validated payload");
+const detailedRoot: TypedModelRef<object> =
   Behavon.createModel(String, 1);
 const detailedInstance: ModelInstance<number, string> =
   Behavon.createModel(String, 1);
@@ -1003,43 +1025,23 @@ void DetailedModelContract;
 void detailedRoot;
 void detailedInstance;
 
-declare const schemaLessRef: UntypedModelRef;
-const dynamicSignalResult: any = schemaLessRef.dynamicSignal("draft");
-const disposeResult: void = schemaLessRef.dispose();
-void dynamicSignalResult;
-void disposeResult;
-
-declare const schemaLessDependency: DependencyProxy;
-const dynamicDependencyResult: any = schemaLessDependency.dynamicEndpoint("draft");
-void dynamicDependencyResult;
-
-function SchemaLessDependencyContract(input: UntypedModelRef): () => void {
-  const dependency: DependencyProxy = Behavon.usePort(input);
-  const disconnect = Behavon.useConnect(
-    dependency.dynamicSource,
-    dependency.dynamicDestination,
-  );
-  return disconnect;
-}
-void SchemaLessDependencyContract;
-
 // Each removed name has its own assertion so one missing export cannot mask another.
-// @ts-expect-error Detailed ModelRef schema facade was removed in favor of UntypedModelRef.
+// @ts-expect-error Detailed ModelRef schema facade was removed.
 import type { ModelRef } from "behavon";
+// @ts-expect-error UntypedModelRef was removed with the Port-less Model API.
+import type { UntypedModelRef } from "behavon";
 function RemovedTypedRelationshipOverloads() {
   // @ts-expect-error usePort no longer accepts an endpoint schema type argument.
-  const removedTypedUse = Behavon.usePort<DetailedDependencySurface>(schemaLessRef);
+  const removedTypedUse = Behavon.usePort<DetailedDependencySurface>(detailedRef);
   // @ts-expect-error getInterface no longer accepts an endpoint schema type argument.
-  const removedTypedGetInterface = Behavon.getInterface<DetailedDependencySurface>(schemaLessRef);
+  const removedTypedGetInterface = Behavon.getInterface<DetailedDependencySurface>(detailedRef);
   // @ts-expect-error A schema-less ModelInstance cannot be reclassified as a Port instance by useModel.
   const [removedOutput, removedSetter] = Behavon.useModel<number, string, DetailedDependencySurface>(observedStringModel);
-  // @ts-expect-error usePort requires a live UntypedModelRef; null is not an inert dependency sentinel.
+  // @ts-expect-error usePort requires a live Model ref; null is not an inert dependency sentinel.
   const removedNullableUse = Behavon.usePort(null);
-  const typedEndpoint = removedTypedUse.changed;
-  const nullableEndpoint = removedNullableUse.changed;
   return {
-    typedEndpoint,
-    nullableEndpoint,
+    removedTypedUse,
+    removedNullableUse,
     interfaceEndpoints: removedTypedGetInterface.endpoints,
     removedOutput,
     removedSetter,

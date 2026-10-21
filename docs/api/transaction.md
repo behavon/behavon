@@ -36,6 +36,8 @@ const transaction: {
 - `run` 안에서 `transaction.start`에 넣지 않은 `useLabelState` state의 setter를 부르면 오류입니다.
 - `run`에서 오류가 밖으로 나가면 그 transaction은 되돌려지고 끝나며, 오류는 그대로 다시 던져집니다. 그 뒤의 `commit`·`rollback`은 오류입니다.
 - `body`가 Promise를 반환하면 오류입니다.
+- `run` 안에서 부른 setter의 변경은 `commit` 때 차례로 적용됩니다. 함수를 넘기면(`set(last => next)`) 그 함수도 `commit` 때 실행되며, 앞선 변경이 반영된 값을 받습니다. 그래서 `run` 안에서는 확정 전의 값을 읽을 수 없습니다. callback이 읽는 state는 마지막으로 확정된 값입니다.
+- setter에 넘긴 함수가 오류를 던지면 `commit`이 그 오류를 던지고 Model이 종료됩니다. 거부할 조건은 setter 함수 안이 아니라 `run` 안에서 확인하고 오류를 던집니다.
 - 다른 transaction이 잠근 state를 잠그려 하면 오류입니다.
 - 잠긴 state의 setter를 transaction 밖에서 부르면, transaction이 끝난 뒤에 적용됩니다.
 - `run` 안에서 [`useState`](./useState.md) setter나 [`useReducer`](./useReducer.md) dispatch를 부르면 transaction에 담기지 않고 transaction이 끝난 뒤 따로 적용됩니다. 되돌려지지 않습니다. 개발 모드에서는 경고를 출력합니다.

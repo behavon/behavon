@@ -11,6 +11,7 @@ The documentation is currently available in Korean only.
 - [Getting started](./docs/getting-started.md)
 - [Core concepts](./docs/core-concepts.md)
 - [Table of contents and API](./docs/README.md)
+- [Use-case examples](./examples/README.md) (Korean)
 
 ## Development commands
 

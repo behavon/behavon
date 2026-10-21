@@ -21,9 +21,9 @@ export function DependencyCompletenessModel(input: Input): undefined {
   const mutable = Behavon.useMutable(0);
   const customCommand = useCustomCommand();
   const signalBody = Behavon.useCallback(() => undefined, []);
-  const signal = Behavon.useSignal("signal", signalBody);
+  const signal = Behavon.useSignal(dependencyCompletenessModelPort, "signal", signalBody);
   const slotBody = Behavon.useCallback(() => undefined, []);
-  const slot = Behavon.useSlot("slot", slotBody);
+  const slot = Behavon.useSlot(dependencyCompletenessModelPort, "slot", slotBody);
   const { step } = input;
   const user = input.user;
 
@@ -36,10 +36,13 @@ export function DependencyCompletenessModel(input: Input): undefined {
     slot();
     customCommand();
   }, [customCommand, output, snapshot, step, user.id]);
-  Behavon.useSignal("update", update);
+  Behavon.useSignal(dependencyCompletenessModelPort, "update", update);
 
   const derived = Behavon.useMemo(() => count + input.user.id.length, [count, input.user]);
   Behavon.useEffect(() => void input.step);
   Behavon.useEffect(() => void derived, [derived, input.step]);
   return undefined;
 }
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
+type DependencyCompletenessModelPortType = { "signal": PortOnlySignal<any>; "slot": PortOnlySlot<any>; "update": PortOnlySignal<any> };
+const dependencyCompletenessModelPort = Behavon.createPort<DependencyCompletenessModelPortType>({ "signal": Behavon.SignalType(), "slot": Behavon.SlotType(), "update": Behavon.SignalType() });

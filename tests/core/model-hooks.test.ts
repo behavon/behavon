@@ -1,6 +1,7 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it, vi } from "vitest";
 import Behavon from "behavon";
-import type { Signal, Slot, UntypedModelRef } from "behavon";
+import type { Signal, Slot, TypedModelRef } from "behavon";
 import { inspectSnapshotChannelForTests } from "../../src/internal/snapshot-channels";
 import { uniqueChannel, waitFor, waitForSnapshot, signalOf } from "../helpers";
 
@@ -71,14 +72,17 @@ describe("Model construction and React-corresponding hooks", () => {
     const channel = uniqueChannel("failed-construction");
     const failure = new Error("construction failed");
 
+    type BrokenPortType = { "leaked": PortOnlySignal<any> };
+    const brokenPort = Behavon.createPort<BrokenPortType>({ "leaked": Behavon.SignalType() });
     function Broken(): never {
       const callback = Behavon.useCallback(() => undefined, []);
-      Behavon.useSignal("leaked", callback);
+      Behavon.useSignal(brokenPort, "leaked", callback);
+      Behavon.useExport(brokenPort, "leaked");
       Behavon.useSnapshot(channel);
       throw failure;
     }
 
-    expect(() => Behavon.createModel(Broken, undefined)).toThrow(failure);
+    expect(() => Behavon.createModel((Broken as unknown as Model<any, any, BrokenPortType>), undefined)).toThrow(failure);
 
     function Replacement(): undefined {
       Behavon.useSnapshot(channel);
@@ -106,6 +110,8 @@ describe("Model construction and React-corresponding hooks", () => {
       readonly callback: () => void;
     }
 
+    type ModelPortType = { "incrementTwice": PortOnlySignal<any>; "publishAgain": PortOnlySignal<any> };
+    const modelPort = Behavon.createPort<ModelPortType>({ "incrementTwice": Behavon.SignalType(), "publishAgain": Behavon.SignalType() });
     function Model(): Snapshot {
       const [count, setCount] = Behavon.useState(() => 0);
       const [, publish] = Behavon.useSnapshot(channel);
@@ -122,8 +128,10 @@ describe("Model construction and React-corresponding hooks", () => {
         setCount((previous) => previous + 1);
       }, [setCount]);
       const publishAgain = Behavon.useCallback(() => setCount((previous) => previous), [setCount]);
-      Behavon.useSignal("incrementTwice", incrementTwice);
-      Behavon.useSignal("publishAgain", publishAgain);
+      Behavon.useSignal(modelPort, "incrementTwice", incrementTwice);
+      Behavon.useExport(modelPort, "incrementTwice");
+      Behavon.useSignal(modelPort, "publishAgain", publishAgain);
+      Behavon.useExport(modelPort, "publishAgain");
       const snapshot = Behavon.useMemo(() => ({ count, doubled, callback: stable }), [count, doubled, stable]);
       Behavon.useEffect(() => {
         publish(snapshot);
@@ -131,7 +139,7 @@ describe("Model construction and React-corresponding hooks", () => {
       return snapshot;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), undefined);
     await waitForSnapshot<Snapshot>(channel, (value) => value?.count === 0);
     signalOf(root, "incrementTwice")();
     const snapshot = await waitForSnapshot<Snapshot>(channel, (value) => value?.count === 2);
@@ -248,6 +256,8 @@ describe("Model construction and React-corresponding hooks", () => {
     const keeper = Behavon.createModel(Keeper, undefined);
     const unsubscribe = Behavon.subscribe(channel)(() => trace.push("listener"));
 
+    type ModelPort1Type = { "reevaluate": PortOnlySignal<any> };
+    const modelPort1 = Behavon.createPort<ModelPort1Type>({ "reevaluate": Behavon.SignalType() });
     function Model(): undefined {
       const [, setEpoch] = Behavon.useState(0);
       const [snapshot, publish] = Behavon.useSnapshot(channel);
@@ -262,13 +272,14 @@ describe("Model construction and React-corresponding hooks", () => {
         trace.push("after-publish");
       }
       const reevaluate = Behavon.useCallback(() => setEpoch((previous) => previous + 1), [setEpoch]);
-      Behavon.useSignal("reevaluate", reevaluate);
+      Behavon.useSignal(modelPort1, "reevaluate", reevaluate);
+      Behavon.useExport(modelPort1, "reevaluate");
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       trace.push("evaluation-complete");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort1Type>), undefined);
     expect(Behavon.getSnapshot(channel)()).toBe(published);
     expect(seen).toEqual([undefined]);
     expect(evaluations).toBe(1);
@@ -361,6 +372,8 @@ describe("Model construction and React-corresponding hooks", () => {
     let surfaced: unknown;
     let observed: typeof published | undefined;
 
+    type ModelPort2Type = { "fail": PortOnlySignal<any> };
+    const modelPort2 = Behavon.createPort<ModelPort2Type>({ "fail": Behavon.SignalType() });
     function Model(): undefined {
       const [shouldFail, setShouldFail] = Behavon.useState(false);
       const [, publish] = Behavon.useSnapshot(channel);
@@ -370,11 +383,12 @@ describe("Model construction and React-corresponding hooks", () => {
         throw failure;
       }
       const fail = Behavon.useCallback(() => setShouldFail(true), [setShouldFail]);
-      Behavon.useSignal("fail", fail);
+      Behavon.useSignal(modelPort2, "fail", fail);
+      Behavon.useExport(modelPort2, "fail");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort2Type>), undefined);
     const unsubscribe = Behavon.subscribe(channel)(() => {
       observed = Behavon.getSnapshot(channel)();
     });
@@ -407,10 +421,12 @@ describe("Model construction and React-corresponding hooks", () => {
     }
 
     const channel = uniqueChannel("self-dispose-reevaluation");
-    let root: UntypedModelRef | undefined;
+    let root: TypedModelRef<any> | undefined;
     let capturedPublish: ((value: number | undefined) => void) | undefined;
     let surfaced: unknown;
 
+    type ModelPort3Type = { "stop": PortOnlySignal<any> };
+    const modelPort3 = Behavon.createPort<ModelPort3Type>({ "stop": Behavon.SignalType() });
     function Model(): undefined {
       const [shouldDispose, setShouldDispose] = Behavon.useState(false);
       const [, publish] = Behavon.useSnapshot(channel);
@@ -418,11 +434,12 @@ describe("Model construction and React-corresponding hooks", () => {
       capturedPublish = publish;
       if (shouldDispose) root?.dispose();
       const stop = Behavon.useCallback(() => setShouldDispose(true), [setShouldDispose]);
-      Behavon.useSignal("stop", stop);
+      Behavon.useSignal(modelPort3, "stop", stop);
+      Behavon.useExport(modelPort3, "stop");
       return undefined;
     }
 
-    root = Behavon.createModel(Model, undefined);
+    root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort3Type>), undefined);
     const originalSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
       try {
@@ -441,7 +458,7 @@ describe("Model construction and React-corresponding hooks", () => {
 
     expect(surfaced).toBeInstanceOf(Error);
     expect(String(surfaced)).toMatch(/disposed during evaluation.*cannot be committed/);
-    expect(() => Behavon.getInterface(root as UntypedModelRef)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root as TypedModelRef<any>)).toThrow(/disposed/);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
     expect(() => capturedPublish?.(1)).not.toThrow();
     expect(() => Behavon.getSnapshot(channel)).toThrow(/no live owner/);
@@ -761,16 +778,19 @@ describe("Model construction and React-corresponding hooks", () => {
     }
 
     const target = Behavon.createModel(Target, undefined);
+    type SourcePortType = { "updateTarget": PortOnlySignal<any> };
+    const sourcePort = Behavon.createPort<SourcePortType>({ "updateTarget": Behavon.SignalType() });
     function Source(): undefined {
       Behavon.useEffect(() => {
         setTarget?.(1);
       }, []);
       const updateTarget = Behavon.useCallback((value: number) => setTarget?.(value), []);
-      Behavon.useSignal("updateTarget", updateTarget);
+      Behavon.useSignal(sourcePort, "updateTarget", updateTarget);
+      Behavon.useExport(sourcePort, "updateTarget");
       return undefined;
     }
 
-    const source = Behavon.createModel(Source, undefined);
+    const source = Behavon.createModel((Source as unknown as Model<any, any, SourcePortType>), undefined);
     await waitFor(() => targetValues.at(-1) === 1);
     signalOf(source, "updateTarget")(2);
     await waitFor(() => targetValues.at(-1) === 2);

@@ -214,6 +214,7 @@ declare const endpointArgs: unique symbol;
 declare const modelInput: unique symbol;
 declare const modelOutput: unique symbol;
 declare const modelInstanceIdentity: unique symbol;
+declare const modelRefPort: unique symbol;
 declare const connectionIdentity: unique symbol;
 declare const interfaceTargetIdentity: unique symbol;
 
@@ -345,12 +346,6 @@ type IsOptionalKey<Schema extends object, Name extends keyof Schema> =
   {} extends Pick<Schema, Name> ? true : false;
 type HasFunctionMember<Value> =
   Extract<Value, (...args: any[]) => any> extends never ? false : true;
-type PublicExportObject<Exports extends Readonly<Record<string, unknown>>> = {
-  readonly [Name in keyof Exports]: HasFunctionMember<Exports[Name]> extends true
-    ? never
-    : Exports[Name];
-};
-
 interface InterfaceTarget {
   readonly [interfaceTargetIdentity]: true;
 }
@@ -375,20 +370,39 @@ type DependencyFacade<Schema extends object> = {
       : Readonly<Schema>[Name];
 };
 
-export type DependencyProxy<Schema extends object = object> = InterfaceTarget &
-  (keyof Schema extends never ? Readonly<Record<string, any>> : DependencyFacade<Schema>);
+export type DependencyProxy<Schema extends object = object> = InterfaceTarget & DependencyFacade<Schema>;
 
-export type UntypedModelRef = ModelRefBase & Readonly<Record<string, any>>;
+// A ref typed as any (or with an index signature) gives a proxy whose members are any.
+type DependencyProxyForRef<Ref> =
+  IsAny<Ref> extends true ? DependencyProxy & Readonly<Record<string, any>>
+    : string extends keyof Ref ? DependencyProxy & Readonly<Record<string, any>>
+    : Ref extends ModelRefBase ? DependencyProxy<DependencySchemaForRef<Ref>>
+    : never;
 
-export type TypedModelRef<Port extends object> = ModelRefBase & Readonly<Port>;
+/** The runtime ref proxy before it is narrowed to a Port. Internal only. */
+type AnyModelRef = ModelRefBase & Readonly<Record<string, any>>;
 
-type ModelRefForPort<Port extends object> = keyof Port extends never
-  ? UntypedModelRef
-  : TypedModelRef<Port>;
+/**
+ * Slots cannot be invoked on a ref, so they are left out. The whole Port rides along in a hidden
+ * member so that `usePort` can still hand the Slots out for `useConnect`.
+ */
+export type TypedModelRef<Port extends object> = ModelRefBase & (IsAny<Port> extends true ? Readonly<Port> : {
+  readonly [Name in keyof Port as IsSlotOnly<Port[Name]> extends true ? never : Name]: Port[Name];
+}) & {
+  readonly [modelRefPort]?: Port;
+};
+
+type IsSlotOnly<Value> =
+  IsAny<Value> extends true ? false
+    : IsNever<Value> extends true ? false
+    : [Value] extends [{ readonly [endpointRole]: { readonly signal: true } }] ? false
+    : [Value] extends [Slot<infer _Args>] ? true
+    : false;
+
+type ModelRefForPort<Port extends object> = TypedModelRef<Port>;
 
 type DependencySchemaForRef<Ref extends ModelRefBase> =
-  IsAny<Ref> extends true ? object
-    : string extends keyof Ref ? object
+  typeof modelRefPort extends keyof Ref ? NonNullable<Ref[typeof modelRefPort]>
     : Omit<Ref, keyof ModelRefBase>;
 
 export type ModelInstance<
@@ -413,9 +427,9 @@ export type BoundaryState<Output = any> =
 export type Connection = { readonly [connectionIdentity]: true };
 
 export interface ConnectionMeta {
-  readonly source: UntypedModelRef;
+  readonly source: TypedModelRef<object>;
   readonly signal: string;
-  readonly destination: UntypedModelRef;
+  readonly destination: TypedModelRef<object>;
   readonly slot: string;
   readonly connection: Connection;
 }
@@ -622,7 +636,7 @@ export class FutureCancellationError extends Error {
   }
 }
 
-interface FutureAbortSignalFallback {
+interface AbortSignalFallback {
   readonly aborted: boolean;
   readonly reason: unknown;
   addEventListener(type: "abort", listener: () => void, options?: Readonly<{ once?: boolean }>): void;
@@ -630,9 +644,12 @@ interface FutureAbortSignalFallback {
   throwIfAborted(): void;
 }
 
-export type FutureAbortSignal = typeof globalThis extends {
+/** The standard AbortSignal where the environment declares one, otherwise its minimal shape. */
+type PlatformAbortSignal = typeof globalThis extends {
   AbortSignal: { prototype: infer Signal };
-} ? Signal : FutureAbortSignalFallback;
+} ? Signal : AbortSignalFallback;
+
+export type FutureAbortSignal = PlatformAbortSignal;
 
 export interface FutureFactoryContext {
   readonly signal: FutureAbortSignal;
@@ -675,12 +692,7 @@ export interface Future<Input, Value> {
   readonly rejected: OccurrenceSource<FutureRejectedOccurrence<Input>>;
 }
 
-export interface ResourceAbortSignal {
-  readonly aborted: boolean;
-  readonly reason: unknown;
-  addEventListener(type: "abort", listener: () => void, options?: { once?: boolean }): void;
-  removeEventListener(type: "abort", listener: () => void): void;
-}
+export type ResourceAbortSignal = PlatformAbortSignal;
 
 export interface ResourceActionContext<Resource> {
   readonly resource: Resource;
@@ -1317,7 +1329,7 @@ interface RuntimeModelInstance {
   hooks: HookCell[];
   endpoints: Map<string, EndpointRecord>;
   exports: Map<string, unknown>;
-  readonly ref: UntypedModelRef;
+  readonly ref: AnyModelRef;
   readonly dependencyProxy: DependencyProxy;
   readonly endpointCache: Map<string, UnknownCallback>;
   readonly disposeFunction: () => void;
@@ -2066,7 +2078,7 @@ function finalizeDisposedInstance(instance: RuntimeModelInstance): void {
   instance.evaluating = false;
 }
 
-function createRefProxy(instance: RuntimeModelInstance): UntypedModelRef {
+function createRefProxy(instance: RuntimeModelInstance): AnyModelRef {
   const target = Object.create(null) as object;
   const proxy = new Proxy(target, {
     get(_target, property) {
@@ -2083,7 +2095,7 @@ function createRefProxy(instance: RuntimeModelInstance): UntypedModelRef {
       assertSignalExported(instance, property);
       return getEndpointHandle(instance, property).callable;
     },
-  }) as UntypedModelRef;
+  }) as AnyModelRef;
   registerInterfaceTarget(proxy as object, instance);
   return proxy;
 }
@@ -2296,7 +2308,7 @@ function dispatchSignal(instance: RuntimeModelInstance, name: string, args: unkn
 function makeVirtualConnectionMeta(destination: RuntimeModelInstance, slot: string): ConnectionMeta {
   const virtualSource = Object.freeze({
     dispose: () => undefined,
-  }) as UntypedModelRef;
+  }) as AnyModelRef;
   const meta = {
     source: virtualSource,
     signal: slot,
@@ -5059,9 +5071,8 @@ function assertPortDeclarationComplete(draft: ModelDraft): void {
       throw new Error(`Behavon Model did not export declared Port Signal '${name}'`);
     }
   }
-  for (const [name, endpoint] of draft.endpoints) {
-    // A Signal outside the Port is internal: it is wired with useConnect and never public.
-    if (!port.members.has(name) && endpoint.slots.length > 0) {
+  for (const name of draft.endpoints.keys()) {
+    if (!port.members.has(name)) {
       throw new Error(`Behavon Model registered undeclared Port endpoint '${name}'`);
     }
   }
@@ -5076,11 +5087,12 @@ function declareEndpoint(
   role: "signal" | "slot",
   name: string,
   callback: UnknownCallback,
-  port?: PortDescriptor<object>,
+  port: PortDescriptor<object>,
 ): EndpointHandle {
   const context = requireContext(role === "signal" ? "useSignal" : "useSlot");
+  requirePortDescriptor(port, role === "signal" ? "useSignal" : "useSlot");
   assertEndpointName(name);
-  if (port !== undefined) registerPortMember(context, port, name, role);
+  registerPortMember(context, port, name, role);
   if (context.draft.exports.has(name)) {
     throw new Error(`Behavon public member '${name}' cannot be both an endpoint and an export`);
   }
@@ -5137,19 +5149,12 @@ export function useSignal<Surface extends object, Name extends SignalPortName<Su
   name: Name,
   callback: (...args: SignalPortArgs<Surface[Name]>) => Result,
 ): Surface[Name];
-export function useSignal<Args extends readonly unknown[], Result>(
-  name: string,
-  callback: (...args: Args) => Result,
-): Signal<Args>;
 export function useSignal(
-  portOrName: PortDescriptor<object> | string,
-  nameOrCallback: string | UnknownCallback,
-  portCallback?: UnknownCallback,
+  port: PortDescriptor<object>,
+  name: string,
+  callback: UnknownCallback,
 ): Signal<readonly unknown[]> {
-  const port = typeof portOrName === "string" ? undefined : portOrName;
-  const name = typeof portOrName === "string" ? portOrName : nameOrCallback as string;
-  const callback = typeof portOrName === "string" ? nameOrCallback as UnknownCallback : portCallback;
-  return declareEndpoint("signal", name, callback as UnknownCallback, port).callable as Signal<readonly unknown[]>;
+  return declareEndpoint("signal", name, callback, port).callable as Signal<readonly unknown[]>;
 }
 
 export function useSlot<Surface extends object, Name extends SlotPortName<Surface>, Result>(
@@ -5157,19 +5162,19 @@ export function useSlot<Surface extends object, Name extends SlotPortName<Surfac
   name: Name,
   callback: (...args: SlotPortArgs<Surface[Name]>) => Result,
 ): Surface[Name];
-export function useSlot<Args extends readonly unknown[], Result>(
-  name: string,
-  callback: (...args: Args) => Result,
-): Slot<Args>;
 export function useSlot(
-  portOrName: PortDescriptor<object> | string,
-  nameOrCallback: string | UnknownCallback,
-  portCallback?: UnknownCallback,
+  port: PortDescriptor<object>,
+  name: string,
+  callback: UnknownCallback,
 ): Slot<readonly unknown[]> {
-  const port = typeof portOrName === "string" ? undefined : portOrName;
-  const name = typeof portOrName === "string" ? portOrName : nameOrCallback as string;
-  const callback = typeof portOrName === "string" ? nameOrCallback as UnknownCallback : portCallback;
-  return declareEndpoint("slot", name, callback as UnknownCallback, port).callable as Slot<readonly unknown[]>;
+  return declareEndpoint("slot", name, callback, port).callable as Slot<readonly unknown[]>;
+}
+
+// Signals, Slots, and exports exist only through a Port declared with createPort.
+function requirePortDescriptor(port: unknown, api: "useSignal" | "useSlot" | "useExport"): void {
+  if ((typeof port !== "object" && typeof port !== "function") || port === null || !portDescriptors.has(port as PortDescriptor<object>)) {
+    throw new Error(`Behavon.${api} requires a Port created by Behavon.createPort as its first argument`);
+  }
 }
 
 function createExportValue(
@@ -5219,42 +5224,32 @@ export function useExport<Surface extends object, Name extends SnapshotPortName<
   name: Name,
   identity: Surface[Name],
 ): Surface[Name];
-export function useExport<const Exports extends Readonly<Record<string, unknown>>>(
-  initialize: () => Exports & PublicExportObject<Exports>,
-): Readonly<Exports>;
 export function useExport(
-  portOrInitialize: PortDescriptor<object> | (() => Readonly<Record<string, unknown>>),
-  portName?: string,
+  port: PortDescriptor<object>,
+  name: string,
   providedIdentity?: SnapshotRootId<unknown>,
 ): unknown {
   const context = requireContext("useExport");
-  const port = typeof portOrInitialize === "function" ? undefined : portOrInitialize;
-  const name = port === undefined ? undefined : portName;
-  if (port !== undefined && name === undefined) {
-    throw new Error("Behavon.useExport Port form requires a declared member name");
+  requirePortDescriptor(port, "useExport");
+  if (typeof name !== "string") {
+    throw new Error("Behavon.useExport requires a declared Port member name");
   }
-  if (port !== undefined && portDescriptors.get(port)?.members.get(name as string)?.kind === "signal") {
-    return exportPortSignal(context, port, name as string);
+  if (portDescriptors.get(port)?.members.get(name)?.kind === "signal") {
+    return exportPortSignal(context, port, name);
   }
-  const member = port === undefined
-    ? undefined
-    : registerPortMember(context, port, name as string, "snapshot") as Extract<
-        RuntimePortMember,
-        { kind: "snapshot" }
-      >;
+  const member = registerPortMember(context, port, name, "snapshot") as Extract<
+    RuntimePortMember,
+    { kind: "snapshot" }
+  >;
   const existing = activeHook(context, "export") as ExportCell | undefined;
   if (existing !== undefined && (existing.port !== port || existing.portName !== name)) {
     throw new Error("Behavon public export changed its Port declaration");
   }
-  const initialize = port === undefined
-    ? portOrInitialize as () => Readonly<Record<string, unknown>>
-    : () => {
-        const identity = providedIdentity === undefined
-          ? createId((member as Extract<RuntimePortMember, { kind: "snapshot" }>).descriptor)
-          : providedIdentity;
-        requireSnapshotRootToken(identity, "useExport");
-        return { [name as string]: identity };
-      };
+  const initialize = () => {
+    const identity = providedIdentity === undefined ? createId(member.descriptor) : providedIdentity;
+    requireSnapshotRootToken(identity, "useExport");
+    return { [name]: identity };
+  };
   const cell = existing ?? {
     kind: "export" as const,
     owner: context.instance,
@@ -5273,7 +5268,7 @@ export function useExport(
   }
   context.draft.hooks.push({ kind: "export", cell, value: cell.value });
   context.hookIndex += 1;
-  return name === undefined ? cell.value : cell.value[name];
+  return cell.value[name];
 }
 
 // Opens a Port Signal implemented by useSignal: its handle becomes the public export of that name.
@@ -5513,7 +5508,7 @@ export function boundary<Input, Output>(
   return BoundaryModel;
 }
 
-export function usePort<Ref extends ModelRefBase>(ref: Ref): DependencyProxy<DependencySchemaForRef<Ref>>;
+export function usePort<Ref extends ModelRefBase>(ref: Ref): DependencyProxyForRef<Ref>;
 export function usePort(ref: InterfaceTarget): unknown {
   const context = requireContext("usePort");
   const instance = getInterfaceTarget<RuntimeModelInstance>(ref as object);
@@ -5732,7 +5727,7 @@ export function getSnapshot<Id extends SnapshotId<unknown>>(
 }
 
 export function getInterface(
-  target: UntypedModelRef | TypedModelRef<object> | DependencyProxy,
+  target: TypedModelRef<object> | DependencyProxy,
 ): BehavonInterfaceDescriptor;
 export function getInterface(
   target: InterfaceTarget,

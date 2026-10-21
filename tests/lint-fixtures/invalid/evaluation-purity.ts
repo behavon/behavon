@@ -1,4 +1,4 @@
-import Behavon, { transaction, type DependencyProxy, type StateSetter, type UntypedModelRef } from "behavon";
+import Behavon, { transaction, type DependencyProxy, type StateSetter, type TypedModelRef } from "behavon";
 
 let externalCount = 0;
 const externalObject = { value: 0 };
@@ -38,7 +38,7 @@ export function MutationModel(input: {
     memoSet.add(1);
     setterObject.extra = true;
   }, [memo, state]);
-  Behavon.useSignal("callback", callback);
+  Behavon.useSignal(mutationModelPort, "callback", callback);
 
   const random = Date.now() + Math.random() + performance.now();
   crypto.randomUUID();
@@ -65,7 +65,7 @@ export function DestructuringMutationModel(input: { value: number }): number {
 export function EvaluationOperationModel(): undefined {
   const [, publish] = Behavon.useSnapshot(evaluationSnapshot);
   const body = Behavon.useCallback(() => undefined, []);
-  const signal = Behavon.useSignal("signal", body);
+  const signal = Behavon.useSignal(evaluationOperationModelPort, "signal", body);
   let assignedState: { value: number };
   let assignedSetter: StateSetter<{ value: number }>;
   [assignedState, assignedSetter] = Behavon.useState({ value: 0 });
@@ -142,7 +142,7 @@ export function useHookWithoutHookCalls(): number {
 export function OperationCallApplyModel(): undefined {
   const [, publish] = Behavon.useSnapshot(callApplySnapshot);
   const body = Behavon.useCallback(() => undefined, []);
-  const signal = Behavon.useSignal("call.apply", body);
+  const signal = Behavon.useSignal(operationCallApplyModelPort, "call.apply", body);
   const publishAlias = publish;
   const signalAlias = signal;
   publish.call(undefined, 1);
@@ -162,7 +162,7 @@ export function DeferredImmutableMutationModel(input: { value: number }): undefi
   const deferred = Behavon.useCallback(() => {
     Reflect.set(state, "value", 4);
   }, [state]);
-  Behavon.useSignal("deferred.immutable", deferred);
+  Behavon.useSignal(deferredImmutableMutationModelPort, "deferred.immutable", deferred);
   return undefined;
 }
 
@@ -306,10 +306,10 @@ export function StoredOperationModel(): undefined {
     snapshots?: readonly [unknown, (value: number) => void];
   } = {};
   const slots: Array<(() => unknown) | undefined> = [];
-  box.signal = Behavon.useSignal("stored.signal", body);
-  box.slot = Behavon.useSlot("stored.slot", body);
+  box.signal = Behavon.useSignal(storedOperationModelPort, "stored.signal", body);
+  box.slot = Behavon.useSlot(storedOperationModelPort, "stored.slot", body);
   box.snapshots = Behavon.useSnapshot(storedSnapshot);
-  slots[0] = Behavon.useSignal("stored.index", body);
+  slots[0] = Behavon.useSignal(storedOperationModelPort, "stored.index", body);
   box.signal!();
   box.slot!.call(undefined);
   box.snapshots[1].apply(undefined, [1]);
@@ -333,7 +333,7 @@ export function HelperCallableProvenanceModel(): undefined {
   const callback = Behavon.useCallback(() => {
     externalCount = 8;
   }, []);
-  const signal = Behavon.useSignal("helper.operation", () => undefined);
+  const signal = Behavon.useSignal(helperCallableProvenanceModelPort, "helper.operation", () => undefined);
   invokeOperationParameter(signal);
   invokeOperationParameterCall(signal);
   invokeManagedParameter(callback);
@@ -370,7 +370,7 @@ export function DirectStoredHelperModel(): number {
 
 export function DirectStoredManagedCallbackModel(): undefined {
   const [, publish] = Behavon.useSnapshot(storedCallbackSnapshot);
-  const signal = Behavon.useSignal("stored.callback.signal", () => undefined);
+  const signal = Behavon.useSignal(directStoredManagedCallbackModelPort, "stored.callback.signal", () => undefined);
   const publishCallback = Behavon.useCallback(() => {
     publish(1);
   }, [publish]);
@@ -389,14 +389,14 @@ function invokeDependencyEndpoint(endpoint: (...args: unknown[]) => unknown): vo
 }
 
 function invokeDependencyProxy(
-  dependency: DependencyProxy,
+  dependency: DependencyProxy & Readonly<Record<string, any>>,
   endpointName: string,
 ): void {
   dependency[endpointName]("helper");
 }
 
 export function DependencyEndpointOperationModel(input: {
-  readonly dependency: UntypedModelRef;
+  readonly dependency: TypedModelRef<any>;
   readonly endpointName: string;
 }): undefined {
   const dependency = Behavon.usePort(input.dependency);
@@ -442,6 +442,23 @@ export function AsyncTransactionRunModel(): undefined {
     Behavon.transaction.run(id, async () => undefined);
     Behavon.transaction.rollback(id);
   }, []);
-  Behavon.useSignal("asyncTransaction", callback);
+  Behavon.useSignal(asyncTransactionRunModelPort, "asyncTransaction", callback);
   return undefined;
 }
+import type { Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
+type MutationModelPortType = { "callback": PortOnlySignal<any> };
+const mutationModelPort = Behavon.createPort<MutationModelPortType>({ "callback": Behavon.SignalType() });
+type EvaluationOperationModelPortType = { "signal": PortOnlySignal<any> };
+const evaluationOperationModelPort = Behavon.createPort<EvaluationOperationModelPortType>({ "signal": Behavon.SignalType() });
+type OperationCallApplyModelPortType = { "call.apply": PortOnlySignal<any> };
+const operationCallApplyModelPort = Behavon.createPort<OperationCallApplyModelPortType>({ "call.apply": Behavon.SignalType() });
+type DeferredImmutableMutationModelPortType = { "deferred.immutable": PortOnlySignal<any> };
+const deferredImmutableMutationModelPort = Behavon.createPort<DeferredImmutableMutationModelPortType>({ "deferred.immutable": Behavon.SignalType() });
+type StoredOperationModelPortType = { "stored.signal": PortOnlySignal<any>; "stored.slot": PortOnlySlot<any>; "stored.index": PortOnlySignal<any> };
+const storedOperationModelPort = Behavon.createPort<StoredOperationModelPortType>({ "stored.signal": Behavon.SignalType(), "stored.slot": Behavon.SlotType(), "stored.index": Behavon.SignalType() });
+type HelperCallableProvenanceModelPortType = { "helper.operation": PortOnlySignal<any> };
+const helperCallableProvenanceModelPort = Behavon.createPort<HelperCallableProvenanceModelPortType>({ "helper.operation": Behavon.SignalType() });
+type DirectStoredManagedCallbackModelPortType = { "stored.callback.signal": PortOnlySignal<any> };
+const directStoredManagedCallbackModelPort = Behavon.createPort<DirectStoredManagedCallbackModelPortType>({ "stored.callback.signal": Behavon.SignalType() });
+type AsyncTransactionRunModelPortType = { "asyncTransaction": PortOnlySignal<any> };
+const asyncTransactionRunModelPort = Behavon.createPort<AsyncTransactionRunModelPortType>({ "asyncTransaction": Behavon.SignalType() });

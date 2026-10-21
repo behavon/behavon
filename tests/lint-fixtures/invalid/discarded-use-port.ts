@@ -1,10 +1,10 @@
 import Behavon from "behavon";
-import type { ModelInstance, UntypedModelRef } from "behavon";
+import type { ModelInstance, TypedModelRef } from "behavon";
 
 let assignedDependency: unknown;
 
 export function DiscardedValueModel(
-  dependency: UntypedModelRef,
+  dependency: TypedModelRef<any>,
   instance: ModelInstance<undefined, undefined>,
 ): undefined {
   Behavon.usePort(dependency);
@@ -21,8 +21,10 @@ export function DiscardedValueModel(
   bareReadDependency;
   const {} = Behavon.usePort(dependency);
   assignedDependency = Behavon.usePort(dependency);
-  Behavon.useExport(() => ({ value: 0 }));
+  Behavon.useExport(discardedValuePort, "value");
   return undefined;
 }
 
 void assignedDependency;
+const discardedValuePort = Behavon.createPort<{ value: SnapshotRootId<number> }>({ value: Behavon.SnapshotType() });
+import type { SnapshotRootId } from "behavon";

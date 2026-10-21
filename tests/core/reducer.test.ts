@@ -453,7 +453,7 @@ describe("useReducer", () => {
       Behavon.useExport(port, "execute");
       return value;
     };
-    const instance = Behavon.createModel(Model, undefined);
+    const instance = Behavon.createModel(Model as Model<undefined, number, Port>, undefined);
     instance.execute(true);
     await waitFor(() => outputOf<number>(instance as object) === 3);
     instance.execute(false);

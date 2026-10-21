@@ -1,5 +1,5 @@
 import Behavon, { transaction } from "behavon";
-import type { UntypedModelRef } from "behavon";
+import type { TypedModelRef } from "behavon";
 
 const externalTrace: number[] = [];
 const externalPrimitive = 1;
@@ -22,7 +22,7 @@ export function DeferredTransactionModel(): number {
     transaction.run(id, () => setValue((previous) => previous + 1));
     transaction.commit(id);
   }, [setValue]);
-  Behavon.useSignal("transaction", execute);
+  Behavon.useSignal(deferredTransactionModelPort, "transaction", execute);
   return value;
 }
 
@@ -35,7 +35,7 @@ export function LocalMutationModel(input: { readonly value: number }): number {
 }
 
 export function DeferredOperationModel(input: {
-  readonly dependency: UntypedModelRef;
+  readonly dependency: TypedModelRef<any>;
   readonly object: { value: number };
 }): undefined {
   const dependency = Behavon.usePort(input.dependency);
@@ -72,7 +72,7 @@ export function DeferredOperationModel(input: {
     dependency.delete.apply(undefined, ["value"]);
     boundEndpoint(state.value);
   }, [boundEndpoint, dependency, input, state]);
-  Behavon.useSignal("run", callback);
+  Behavon.useSignal(deferredOperationModelPort, "run", callback);
   return undefined;
 }
 
@@ -135,7 +135,7 @@ export function CommandAndLocalHelperModel(input: {
 export function DeferredCallOperationModel(): undefined {
   const [, publish] = Behavon.useSnapshot(deferredSnapshot);
   const body = Behavon.useCallback(() => undefined, []);
-  const signal = Behavon.useSignal("deferred.call", body);
+  const signal = Behavon.useSignal(deferredCallOperationModelPort, "deferred.call", body);
   Behavon.useEffect(() => {
     publish.call(undefined, 1);
     signal.apply(undefined, []);
@@ -234,7 +234,7 @@ function invokeReboundOperation(operation: () => unknown): void {
 
 export function AlternateOperationControlModel(): undefined {
   const body = Behavon.useCallback(() => undefined, []);
-  const signal = Behavon.useSignal("alternate.control", body);
+  const signal = Behavon.useSignal(alternateOperationControlModelPort, "alternate.control", body);
   const box: { signal?: () => unknown } = {};
   box.signal = signal;
   const originalCallback = Behavon.useCallback(() => {
@@ -262,3 +262,12 @@ export function ImpureAliasRebindControlModel(): number {
   const localClock = { now: () => 2 };
   return now.call(undefined) + localClock.now.apply(undefined, []);
 }
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
+type DeferredTransactionModelPortType = { "transaction": PortOnlySignal<any> };
+const deferredTransactionModelPort = Behavon.createPort<DeferredTransactionModelPortType>({ "transaction": Behavon.SignalType() });
+type DeferredOperationModelPortType = { "run": PortOnlySignal<any> };
+const deferredOperationModelPort = Behavon.createPort<DeferredOperationModelPortType>({ "run": Behavon.SignalType() });
+type DeferredCallOperationModelPortType = { "deferred.call": PortOnlySignal<any> };
+const deferredCallOperationModelPort = Behavon.createPort<DeferredCallOperationModelPortType>({ "deferred.call": Behavon.SignalType() });
+type AlternateOperationControlModelPortType = { "alternate.control": PortOnlySignal<any> };
+const alternateOperationControlModelPort = Behavon.createPort<AlternateOperationControlModelPortType>({ "alternate.control": Behavon.SignalType() });

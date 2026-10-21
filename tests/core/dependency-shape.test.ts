@@ -1,3 +1,4 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
 import type { Signal } from "behavon";
@@ -43,6 +44,8 @@ describe("hook dependency shape invariants", () => {
         readonly expand: Signal;
       }
 
+      type ModelPortType = { "expand": PortOnlySignal<any> };
+      const modelPort = Behavon.createPort<ModelPortType>({ "expand": Behavon.SignalType() });
       function Model(): undefined {
         const [expanded, setExpanded] = Behavon.useState(false);
         const dependencies = expanded ? [0, 1] : [0];
@@ -53,11 +56,12 @@ describe("hook dependency shape invariants", () => {
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/exhaustive-deps -- generated runtime probe selects one Hook kind and only exercises its dependency shape
         else Behavon.useEffect(() => undefined, dependencies);
         const expand = Behavon.useCallback(() => setExpanded(true), [setExpanded]);
-        Behavon.useSignal("expand", expand);
+        Behavon.useSignal(modelPort, "expand", expand);
+        Behavon.useExport(modelPort, "expand");
         return undefined;
       }
 
-      const root = Behavon.createModel(Model, undefined);
+      const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), undefined);
       const failure = await captureScheduledFailure(() => signalOf(root, "expand")());
       expectShapeFailure(failure, api, "array\\(length 1\\)", "array\\(length 2\\)");
       expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
@@ -71,6 +75,8 @@ describe("hook dependency shape invariants", () => {
       }
       const dependencies: unknown[] = [0];
 
+      type ModelPort1Type = { "expand": PortOnlySignal<any> };
+      const modelPort1 = Behavon.createPort<ModelPort1Type>({ "expand": Behavon.SignalType() });
       function Model(): undefined {
         const [, setEpoch] = Behavon.useState(0);
         // eslint-disable-next-line react-hooks/rules-of-hooks, behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- generated runtime probe selects one Hook kind and only exercises its dependency shape
@@ -83,11 +89,12 @@ describe("hook dependency shape invariants", () => {
           dependencies.push(1);
           setEpoch((value) => value + 1);
         }, [setEpoch]);
-        Behavon.useSignal("expand", expand);
+        Behavon.useSignal(modelPort1, "expand", expand);
+        Behavon.useExport(modelPort1, "expand");
         return undefined;
       }
 
-      const root = Behavon.createModel(Model, undefined);
+      const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort1Type>), undefined);
       const failure = await captureScheduledFailure(() => signalOf(root, "expand")());
       expectShapeFailure(failure, api, "array\\(length 1\\)", "array\\(length 2\\)");
       expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
@@ -100,6 +107,8 @@ describe("hook dependency shape invariants", () => {
         readonly changeMode: Signal;
       }
 
+      type ModelPort2Type = { "changeMode": PortOnlySignal<any> };
+      const modelPort2 = Behavon.createPort<ModelPort2Type>({ "changeMode": Behavon.SignalType() });
       function Model(): undefined {
         const [changed, setChanged] = Behavon.useState(false);
         const dependencies = initialMode === "omitted"
@@ -108,11 +117,12 @@ describe("hook dependency shape invariants", () => {
         // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only runtime probe transitions between omitted and explicit dependency modes
         Behavon.useEffect(() => undefined, dependencies);
         const changeMode = Behavon.useCallback(() => setChanged(true), [setChanged]);
-        Behavon.useSignal("changeMode", changeMode);
+        Behavon.useSignal(modelPort2, "changeMode", changeMode);
+        Behavon.useExport(modelPort2, "changeMode");
         return undefined;
       }
 
-      const root = Behavon.createModel(Model, undefined);
+      const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort2Type>), undefined);
       const failure = await captureScheduledFailure(() => signalOf(root, "changeMode")());
       expectShapeFailure(
         failure,
@@ -132,23 +142,27 @@ describe("hook dependency shape invariants", () => {
     const effects: string[] = [];
     const observed: boolean[] = [];
 
+    type ModelPort3Type = { "inspect": PortOnlySignal<any>; "fail": PortOnlySignal<any> };
+    const modelPort3 = Behavon.createPort<ModelPort3Type>({ "inspect": Behavon.SignalType(), "fail": Behavon.SignalType() });
     function Model(): undefined {
       const [failedCandidate, setFailedCandidate] = Behavon.useState(false);
       const inspect = Behavon.useCallback(() => {
         observed.push(failedCandidate);
       }, [failedCandidate]);
-      Behavon.useSignal("inspect", inspect);
+      Behavon.useSignal(modelPort3, "inspect", inspect);
       Behavon.useEffect(() => {
         effects.push(`setup:${failedCandidate}`);
         return () => effects.push(`cleanup:${failedCandidate}`);
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only runtime probe intentionally changes dependency mode in a failing candidate
       }, failedCandidate ? undefined : []);
       const fail = Behavon.useCallback(() => setFailedCandidate(true), [setFailedCandidate]);
-      Behavon.useSignal("fail", fail);
+      Behavon.useSignal(modelPort3, "fail", fail);
+      Behavon.useExport(modelPort3, "inspect");
+      Behavon.useExport(modelPort3, "fail");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort3Type>), undefined);
     expect(effects).toEqual(["setup:false"]);
 
     const failure = await captureScheduledFailure(() => signalOf(root, "fail")());

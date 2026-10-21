@@ -80,7 +80,7 @@ export function AliasAndCustomHookModel(input: { readonly user: { readonly id: s
     customCommand();
     void user.id;
   }, []);
-  Behavon.useSignal("callback", callback);
+  Behavon.useSignal(aliasAndCustomHookModelPort, "callback", callback);
   return undefined;
 }
 
@@ -99,3 +99,6 @@ export function ReassignedStableCapabilityModel(input: { readonly replacement: (
   Behavon.useEffect(() => setValue(1), []);
   return undefined;
 }
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
+type AliasAndCustomHookModelPortType = { "callback": PortOnlySignal<any> };
+const aliasAndCustomHookModelPort = Behavon.createPort<AliasAndCustomHookModelPortType>({ "callback": Behavon.SignalType() });

@@ -1,6 +1,7 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
-import type { Signal, Slot, StateSetter, UntypedModelRef } from "behavon";
+import type { Signal, Slot, StateSetter, TypedModelRef } from "behavon";
 import { inspectSnapshotChannelForTests } from "../../src/internal/snapshot-channels";
 import { uniqueChannel, waitFor, signalOf } from "../helpers";
 
@@ -83,6 +84,8 @@ describe("user-code failure boundaries", () => {
     const failure = { boundary: "state updater" };
     let evaluations = 0;
 
+    type ModelPortType = { "fail": PortOnlySignal<any> };
+    const modelPort = Behavon.createPort<ModelPortType>({ "fail": Behavon.SignalType() });
     function Model(): undefined {
       const [, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -92,11 +95,12 @@ describe("user-code failure boundaries", () => {
           throw failure;
         });
       }, [setValue]);
-      Behavon.useSignal("fail", failBody);
+      Behavon.useSignal(modelPort, "fail", failBody);
+      Behavon.useExport(modelPort, "fail");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), undefined);
     expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
     expect(evaluations).toBe(1);
     expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
@@ -138,6 +142,8 @@ describe("user-code failure boundaries", () => {
     const failure = new Error("memo factory failed");
     let stableCalls = 0;
 
+    type ModelPort1Type = { "fail": PortOnlySignal<any>; "stable": PortOnlySignal<any> };
+    const modelPort1 = Behavon.createPort<ModelPort1Type>({ "fail": Behavon.SignalType(), "stable": Behavon.SignalType() });
     function Model(): undefined {
       const [shouldFail, setShouldFail] = Behavon.useState(false);
       // eslint-disable-next-line behavon-hooks/canonical-api -- memo-failure probe needs the factory invocation, not its value
@@ -146,15 +152,17 @@ describe("user-code failure boundaries", () => {
         return 1;
       }, [shouldFail]);
       const failBody = Behavon.useCallback(() => setShouldFail(true), [setShouldFail]);
-      Behavon.useSignal("fail", failBody);
+      Behavon.useSignal(modelPort1, "fail", failBody);
+      Behavon.useExport(modelPort1, "fail");
       const stableBody = Behavon.useCallback(() => {
         stableCalls += 1;
       }, []);
-      Behavon.useSignal("stable", stableBody);
+      Behavon.useSignal(modelPort1, "stable", stableBody);
+      Behavon.useExport(modelPort1, "stable");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort1Type>), undefined);
     expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
     expect(stableCalls).toBe(0);
     expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
@@ -166,6 +174,8 @@ describe("user-code failure boundaries", () => {
     }
     const failure = new Error("dependency length failed");
 
+    type ModelPort2Type = { "fail": PortOnlySignal<any> };
+    const modelPort2 = Behavon.createPort<ModelPort2Type>({ "fail": Behavon.SignalType() });
     function Model(): undefined {
       const [shouldFail, setShouldFail] = Behavon.useState(false);
       const dependencies = shouldFail
@@ -179,11 +189,12 @@ describe("user-code failure boundaries", () => {
       // eslint-disable-next-line behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only dependency-access failure probe requires a dynamic dependency object
       Behavon.useMemo(() => 1, dependencies);
       const failBody = Behavon.useCallback(() => setShouldFail(true), [setShouldFail]);
-      Behavon.useSignal("fail", failBody);
+      Behavon.useSignal(modelPort2, "fail", failBody);
+      Behavon.useExport(modelPort2, "fail");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort2Type>), undefined);
     expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
     expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
@@ -201,7 +212,9 @@ describe("user-code failure boundaries", () => {
       },
     });
 
-    function createBrokenRoot(mode: "every" | "index"): UntypedModelRef {
+    function createBrokenRoot(mode: "every" | "index"): TypedModelRef<any> {
+      type ModelPort3Type = { "reevaluate": PortOnlySignal<any> };
+      const modelPort3 = Behavon.createPort<ModelPort3Type>({ "reevaluate": Behavon.SignalType() });
       function Model(): undefined {
         const [epoch, setEpoch] = Behavon.useState(0);
         const initial = mode === "every" ? everyDependencies : [0];
@@ -218,10 +231,11 @@ describe("user-code failure boundaries", () => {
         const reevaluateBody = Behavon.useCallback(() => {
           setEpoch((value) => value + 1);
         }, [setEpoch]);
-        Behavon.useSignal("reevaluate", reevaluateBody);
+        Behavon.useSignal(modelPort3, "reevaluate", reevaluateBody);
+        Behavon.useExport(modelPort3, "reevaluate");
         return undefined;
       }
-      return Behavon.createModel(Model, undefined);
+      return Behavon.createModel((Model as unknown as Model<any, any, ModelPort3Type>), undefined);
     }
 
     const everyRoot = createBrokenRoot("every");
@@ -246,6 +260,8 @@ describe("user-code failure boundaries", () => {
       },
     } as unknown as readonly unknown[];
 
+    type ModelPort4Type = { "reevaluate": PortOnlySignal<any> };
+    const modelPort4 = Behavon.createPort<ModelPort4Type>({ "reevaluate": Behavon.SignalType() });
     function Model(): undefined {
       const [, setEpoch] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/canonical-api, behavon-hooks/exhaustive-deps -- test-only dependency-method failure probe requires a dynamic dependency object
@@ -253,11 +269,12 @@ describe("user-code failure boundaries", () => {
       const reevaluateBody = Behavon.useCallback(() => {
         setEpoch((value) => value + 1);
       }, [setEpoch]);
-      Behavon.useSignal("reevaluate", reevaluateBody);
+      Behavon.useSignal(modelPort4, "reevaluate", reevaluateBody);
+      Behavon.useExport(modelPort4, "reevaluate");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort4Type>), undefined);
     expect(await captureScheduledFailure(() => signalOf(root, "reevaluate")())).toBe(failure);
     expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
   });
@@ -285,13 +302,16 @@ describe("user-code failure boundaries", () => {
     }
     const failure = { boundary: "async Signal body" };
 
+    type ModelPort5Type = { "fire": PortOnlySignal<any> };
+    const modelPort5 = Behavon.createPort<ModelPort5Type>({ "fire": Behavon.SignalType() });
     function Model(): undefined {
       const fireBody = Behavon.useCallback(() => Promise.reject(failure), []);
-      Behavon.useSignal("fire", fireBody);
+      Behavon.useSignal(modelPort5, "fire", fireBody);
+      Behavon.useExport(modelPort5, "fire");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort5Type>), undefined);
     expect(await captureUnhandledRejection(() => signalOf(root, "fire")())).toBe(failure);
     root.dispose();
   });
@@ -302,6 +322,8 @@ describe("user-code failure boundaries", () => {
     let getterCalls = 0;
     let siblingCalls = 0;
 
+    type ModelPort6Type = { "receive": PortOnlySlot<any> };
+    const modelPort6 = Behavon.createPort<ModelPort6Type>({ "receive": Behavon.SlotType() });
     function Model(): undefined {
       const receiveBody = Behavon.useCallback(() => Object.defineProperty({}, "then", {
         get(): never {
@@ -313,12 +335,12 @@ describe("user-code failure boundaries", () => {
         siblingCalls += 1;
       }, []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      direct = Behavon.useSlot("receive", receiveBody);
-      Behavon.useSlot("receive", siblingBody);
+      direct = Behavon.useSlot(modelPort6, "receive", receiveBody);
+      Behavon.useSlot(modelPort6, "receive", siblingBody);
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort6Type>), undefined);
     let returned: unknown;
     expect(await captureUnhandledRejection(() => {
       returned = direct?.();
@@ -373,6 +395,8 @@ describe("user-code failure boundaries", () => {
     const failure = new Error("active getSnapshot failed");
     let shouldFail = false;
 
+    type ModelPort7Type = { "reevaluate": PortOnlySignal<any> };
+    const modelPort7 = Behavon.createPort<ModelPort7Type>({ "reevaluate": Behavon.SignalType() });
     function Model(): undefined {
       const [, setEpoch] = Behavon.useState(0);
       Behavon.useSyncExternalStore(
@@ -385,11 +409,12 @@ describe("user-code failure boundaries", () => {
       const reevaluateBody = Behavon.useCallback(() => {
         setEpoch((value) => value + 1);
       }, [setEpoch]);
-      Behavon.useSignal("reevaluate", reevaluateBody);
+      Behavon.useSignal(modelPort7, "reevaluate", reevaluateBody);
+      Behavon.useExport(modelPort7, "reevaluate");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort7Type>), undefined);
     shouldFail = true;
     expect(await captureScheduledFailure(() => signalOf(root, "reevaluate")())).toBe(failure);
     expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
@@ -496,7 +521,7 @@ describe("user-code failure boundaries", () => {
 
     const root = Behavon.createModel(Model, undefined);
     expect(captureThrown(() => root.dispose())).toBe(failure);
-    expect(() => Behavon.getInterface(root as UntypedModelRef)).toThrow(/disposed/);
+    expect(() => Behavon.getInterface(root as TypedModelRef<any>)).toThrow(/disposed/);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
   });
 
@@ -543,18 +568,21 @@ describe("user-code failure boundaries", () => {
     const observedStates: number[] = [];
     let setInput: StateSetter<number> | undefined;
 
+    type ChildPortType = { "ping": PortOnlySignal<any> };
+    const childPort = Behavon.createPort<ChildPortType>({ "ping": Behavon.SignalType() });
     function Child(input: number): undefined {
       const [state] = Behavon.useState(7);
       const pingBody = Behavon.useCallback(() => {
         pingCalls += 1;
         observedStates.push(state);
       }, [state]);
-      Behavon.useSignal("ping", pingBody);
+      Behavon.useSignal(childPort, "ping", pingBody);
+      Behavon.useExport(childPort, "ping");
       if (input === 2) throw failure;
       return undefined;
     }
 
-    const child = Behavon.createModel(Child, 1);
+    const child = Behavon.createModel((Child as unknown as Model<any, any, ChildPortType>), 1);
     function Observer(): undefined {
       const [, setter] = Behavon.useModel(child);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring

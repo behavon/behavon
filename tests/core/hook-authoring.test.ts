@@ -1,6 +1,7 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot, SnapshotRootId } from "behavon";
 import { afterAll, describe, expect, it } from "vitest";
 import Behavon from "behavon";
-import type { Signal, StateSetter, UntypedModelRef } from "behavon";
+import type { Signal, StateSetter, TypedModelRef } from "behavon";
 import { uniqueChannel, waitFor, signalOf } from "../helpers";
 
 const nestedModelProbe = Behavon.createModel((input: number) => input, 0);
@@ -57,6 +58,9 @@ function expectNestedHookFailure(failure: unknown, hook: string, boundary: strin
 }
 
 describe("runtime-known Hook authoring boundaries", () => {
+  const nestedSignalPort = Behavon.createPort<{ nested: PortOnlySignal<any> }>({ nested: Behavon.SignalType() });
+  const nestedSlotPort = Behavon.createPort<{ nested: PortOnlySlot<any> }>({ nested: Behavon.SlotType() });
+  const nestedExportPort = Behavon.createPort<{ nested: SnapshotRootId<boolean> }>({ nested: Behavon.SnapshotType() });
   const publicHooks: ReadonlyArray<readonly [string, () => unknown]> = [
     ["useState", () => Behavon.useState(0)],
     ["useReducer", () => Behavon.useReducer((state: number) => state, 0)],
@@ -68,9 +72,9 @@ describe("runtime-known Hook authoring boundaries", () => {
     ["useFuture", () => Behavon.useFuture(async () => undefined, { concurrency: "serial" })],
     ["useResource", () => Behavon.useResource(nestedResourceProbe, undefined)],
     ["useSyncExternalStore", () => Behavon.useSyncExternalStore(() => () => undefined, () => 0)],
-    ["useSignal", () => Behavon.useSignal("nested", () => undefined)],
-    ["useSlot", () => Behavon.useSlot("nested", () => undefined)],
-    ["useExport", () => Behavon.useExport(() => ({ nested: true }))],
+    ["useSignal", () => Behavon.useSignal(nestedSignalPort, "nested", () => undefined)],
+    ["useSlot", () => Behavon.useSlot(nestedSlotPort, "nested", () => undefined)],
+    ["useExport", () => Behavon.useExport(nestedExportPort, "nested")],
     ["useModel", () => Behavon.useModel(nestedModelProbe)],
     ["usePort", () => Behavon.usePort(undefined as never)],
     ["useConnect", () => Behavon.useConnect(undefined as never, undefined as never)],
@@ -142,12 +146,20 @@ describe("runtime-known Hook authoring boundaries", () => {
 
     useSecond = false;
     rerender = undefined;
+    // Every Port member is registered on each evaluation, so the names swap positions instead.
+    const signalSwapPort = Behavon.createPort<{ first: PortOnlySignal<any>; second: PortOnlySignal<any> }>({
+      first: Behavon.SignalType(),
+      second: Behavon.SignalType(),
+    });
     function SignalModel(): undefined {
       const [, setTick] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains the rerender trigger
       rerender = setTick;
       const callback = Behavon.useCallback(() => undefined, []);
-      Behavon.useSignal(useSecond ? "second" : "first", callback);
+      Behavon.useSignal(signalSwapPort, useSecond ? "second" : "first", callback);
+      Behavon.useSignal(signalSwapPort, useSecond ? "first" : "second", callback);
+      Behavon.useExport(signalSwapPort, "first");
+      Behavon.useExport(signalSwapPort, "second");
       return undefined;
     }
     const signalOwner = Behavon.createModel(SignalModel, undefined);
@@ -159,12 +171,17 @@ describe("runtime-known Hook authoring boundaries", () => {
 
     useSecond = false;
     rerender = undefined;
+    const slotSwapPort = Behavon.createPort<{ first: PortOnlySlot<any>; second: PortOnlySlot<any> }>({
+      first: Behavon.SlotType(),
+      second: Behavon.SlotType(),
+    });
     function SlotModel(): undefined {
       const [, setTick] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains the rerender trigger
       rerender = setTick;
       const callback = Behavon.useCallback(() => undefined, []);
-      Behavon.useSlot(useSecond ? "second" : "first", callback);
+      Behavon.useSlot(slotSwapPort, useSecond ? "second" : "first", callback);
+      Behavon.useSlot(slotSwapPort, useSecond ? "first" : "second", callback);
       return undefined;
     }
     const slotOwner = Behavon.createModel(SlotModel, undefined);
@@ -300,17 +317,20 @@ describe("runtime-known Hook authoring boundaries", () => {
       readonly publish: Signal;
     }
     const channel = uniqueChannel("nested-snapshot-listener");
+    type ModelPortType = { "publish": PortOnlySignal<any> };
+    const modelPort = Behavon.createPort<ModelPortType>({ "publish": Behavon.SignalType() });
     function Model(): undefined {
       const [phase, setPhase] = Behavon.useState(0);
       const [, publish] = Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       if (phase === 1) publish(1);
       const advance = Behavon.useCallback(() => setPhase(1), [setPhase]);
-      Behavon.useSignal("publish", advance);
+      Behavon.useSignal(modelPort, "publish", advance);
+      Behavon.useExport(modelPort, "publish");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), undefined);
     const unsubscribe = Behavon.subscribe(channel)(() => Behavon.useState(0));
     const failure = await captureScheduledFailure(() => signalOf(root, "publish")());
     expectNestedHookFailure(failure, "useState", "useSnapshot subscriber notification");
@@ -508,6 +528,8 @@ describe("runtime-known Hook authoring boundaries", () => {
     }
     const values: number[] = [];
     let fail = false;
+    type ModelPort1Type = { "fail": PortOnlySignal<any>; "recover": PortOnlySignal<any> };
+    const modelPort1 = Behavon.createPort<ModelPort1Type>({ "fail": Behavon.SignalType(), "recover": Behavon.SignalType() });
     function Model(): undefined {
       const [value, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -523,16 +545,18 @@ describe("runtime-known Hook authoring boundaries", () => {
         fail = true;
         setValue(1);
       }, [setValue]);
-      Behavon.useSignal("fail", trigger);
+      Behavon.useSignal(modelPort1, "fail", trigger);
+      Behavon.useExport(modelPort1, "fail");
       const recover = Behavon.useCallback(() => {
         fail = false;
         setValue(2);
       }, [setValue]);
-      Behavon.useSignal("recover", recover);
+      Behavon.useSignal(modelPort1, "recover", recover);
+      Behavon.useExport(modelPort1, "recover");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort1Type>), undefined);
     expectNestedHookFailure(await captureScheduledFailure(() => signalOf(root, "fail")()), "useState", "useMemo factory");
     expect(values).toEqual([0, 1]);
     expect(() => Behavon.getInterface(root)).toThrow(/disposed/);

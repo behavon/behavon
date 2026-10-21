@@ -1,3 +1,4 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
 import type { BoundaryState, ModelInstance, Signal, StateSetter } from "behavon";
@@ -88,13 +89,18 @@ describe("disposed ModelInstance terminal graph release", () => {
     let setter: StateSetter<typeof state> | undefined;
     let retainedCallback: (() => object) | undefined;
 
+    type PeerPortType = { "alive": PortOnlySignal<any> };
+    const peerPort = Behavon.createPort<PeerPortType>({ "alive": Behavon.SignalType() });
     function Peer(): undefined {
       const alive = Behavon.useCallback(() => undefined, []);
-      Behavon.useSignal("alive", alive);
+      Behavon.useSignal(peerPort, "alive", alive);
+      Behavon.useExport(peerPort, "alive");
       return undefined;
     }
-    const peer = Behavon.createModel(Peer, undefined);
+    const peer = Behavon.createModel((Peer as unknown as Model<any, any, PeerPortType>), undefined);
 
+    type ModelPortType = { "ping": PortOnlySignal<any> };
+    const modelPort = Behavon.createPort<ModelPortType>({ "ping": Behavon.SignalType() });
     function Model(modelInput: object): object {
       const [, setValue] = Behavon.useState(state);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -108,11 +114,12 @@ describe("disposed ModelInstance terminal graph release", () => {
       Behavon.useSnapshot(channel);
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only terminal scrub probe intentionally retains an outer dependency in an Effect cell
       Behavon.useEffect(() => () => void dependency, [dependency]);
-      Behavon.useSignal("ping", retainedCallback);
+      Behavon.useSignal(modelPort, "ping", retainedCallback);
+      Behavon.useExport(modelPort, "ping");
       return output;
     }
 
-    const root = Behavon.createModel(Model, input);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), input);
     const disposeOnly = root.dispose;
     const before = inspectModelInstanceForTests(root as object);
     expect(before.model).toBe(Model);

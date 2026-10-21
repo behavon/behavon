@@ -1,6 +1,7 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
-import type { DependencyProxy, Signal, Slot, SnapshotId, SnapshotRootId, UntypedModelRef } from "behavon";
+import type { DependencyProxy, Signal, Slot, SnapshotId, SnapshotRootId, TypedModelRef } from "behavon";
 import {
   acquireSnapshotFamily,
   commitSnapshotOwner,
@@ -20,14 +21,17 @@ interface SnapshotEndpoints {
   readonly stage: Signal<readonly [value: number | undefined]>;
 }
 
-function createSnapshotModel(channel: SnapshotRootId<number | undefined>): UntypedModelRef {
+function createSnapshotModel(channel: SnapshotRootId<number | undefined>): TypedModelRef<any> {
+  type SnapshotModelPortType = { "stage": PortOnlySignal<any> };
+  const snapshotModelPort = Behavon.createPort<SnapshotModelPortType>({ "stage": Behavon.SignalType() });
   function SnapshotModel(): undefined {
     const [, publish] = Behavon.useSnapshot(channel);
     const stage = Behavon.useCallback((value: number | undefined) => publish(value), [publish]);
-    Behavon.useSignal("stage", stage);
+    Behavon.useSignal(snapshotModelPort, "stage", stage);
+    Behavon.useExport(snapshotModelPort, "stage");
     return undefined;
   }
-  return Behavon.createModel(SnapshotModel, undefined);
+  return Behavon.createModel((SnapshotModel as unknown as Model<any, any, SnapshotModelPortType>), undefined);
 }
 
 describe("snapshot identities", () => {
@@ -52,6 +56,8 @@ describe("snapshot identities", () => {
       readonly group: Signal<readonly [phase: string]>;
       readonly complete: Signal;
     }
+    type FamilyModelPortType = { "root": PortOnlySignal<any>; "change": PortOnlySignal<any>; "group": PortOnlySignal<any>; "complete": PortOnlySignal<any> };
+    const familyModelPort = Behavon.createPort<FamilyModelPortType>({ "root": Behavon.SignalType(), "change": Behavon.SignalType(), "group": Behavon.SignalType(), "complete": Behavon.SignalType() });
     function FamilyModel(): undefined {
       const [, publish] = Behavon.useSnapshot(family);
       const root = Behavon.useCallback((value: number) => publish(value), []);
@@ -61,10 +67,14 @@ describe("snapshot identities", () => {
         () => publish(family.group.completed, (previous) => !(previous ?? false)),
         [],
       );
-      Behavon.useSignal("root", root);
-      Behavon.useSignal("change", change);
-      Behavon.useSignal("group", group);
-      Behavon.useSignal("complete", complete);
+      Behavon.useSignal(familyModelPort, "root", root);
+      Behavon.useExport(familyModelPort, "root");
+      Behavon.useSignal(familyModelPort, "change", change);
+      Behavon.useExport(familyModelPort, "change");
+      Behavon.useSignal(familyModelPort, "group", group);
+      Behavon.useExport(familyModelPort, "group");
+      Behavon.useSignal(familyModelPort, "complete", complete);
+      Behavon.useExport(familyModelPort, "complete");
       return undefined;
     }
 
@@ -75,7 +85,7 @@ describe("snapshot identities", () => {
     expect(Object.isFrozen(descriptor)).toBe(false);
     expect(Object.isFrozen(groupDescriptor)).toBe(false);
 
-    const model = Behavon.createModel(FamilyModel, undefined) as unknown as UntypedModelRef & Endpoints;
+    const model = Behavon.createModel((FamilyModel as unknown as Model<any, any, FamilyModelPortType>), undefined) as unknown as TypedModelRef<any> & Endpoints;
     const notifications = { root: 0, change: 0, group: 0, completed: 0 };
     const offRoot = Behavon.subscribe(family)(() => { notifications.root += 1; });
     const offChange = Behavon.subscribe(family.change)(() => { notifications.change += 1; });
@@ -812,7 +822,7 @@ describe("snapshot identities", () => {
         child: Behavon.SnapshotType<string>(),
       });
       const openGeneration = (): Readonly<{
-        owner: UntypedModelRef;
+        owner: TypedModelRef<any>;
         publish: (...args: readonly unknown[]) => void;
       }> => {
         let retainedPublish: ((...args: readonly unknown[]) => void) | undefined;
@@ -1006,7 +1016,7 @@ describe("Proxy safety and interface reflection", () => {
 
   it("fails fast when usePort receives null at runtime", () => {
     function InvalidDependency(): undefined {
-      const invalidRef: UntypedModelRef = null as any;
+      const invalidRef: TypedModelRef<any> = null as any;
       const dependency = Behavon.usePort(invalidRef);
       const unreachable = dependency.unreachableEndpoint;
       void unreachable;
@@ -1020,21 +1030,34 @@ describe("Proxy safety and interface reflection", () => {
 
   it("describes the same active registry from a ref and dependency Proxy", () => {
     let proxy: DependencyProxy | undefined;
+    interface TargetPort {
+      readonly alpha: PortOnlySignal<any>;
+      readonly shared: PortOnlySignal<any>;
+      readonly sharedSlot: PortOnlySlot<any>;
+    }
+    const targetPort = Behavon.createPort<TargetPort>({
+      alpha: Behavon.SignalType(),
+      shared: Behavon.SignalType(),
+      sharedSlot: Behavon.SlotType(),
+    });
 
-    function Target(): undefined {
+    const Target: Model<undefined, undefined, TargetPort> = () => {
       const alpha = Behavon.useCallback((_value: number) => undefined, []);
       const first = Behavon.useCallback(() => undefined, []);
       const second = Behavon.useCallback(() => undefined, []);
-      Behavon.useSignal("alpha", alpha);
-      Behavon.useSignal("shared", first);
-      Behavon.useSignal("shared", second);
-      Behavon.useSlot("shared", first);
+      Behavon.useSignal(targetPort, "alpha", alpha);
+      Behavon.useExport(targetPort, "alpha");
+      Behavon.useSignal(targetPort, "shared", first);
+      Behavon.useSignal(targetPort, "shared", second);
+      Behavon.useExport(targetPort, "shared");
+      // A Port member is either a Signal or a Slot, so the Slot sharing a callback has its own name.
+      Behavon.useSlot(targetPort, "sharedSlot", first);
       return undefined;
-    }
+    };
 
     const target = Behavon.createModel(Target, undefined);
 
-    function Inspector(input: UntypedModelRef): undefined {
+    function Inspector(input: TypedModelRef<any>): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       proxy = Behavon.usePort(input);
       return undefined;
@@ -1044,7 +1067,8 @@ describe("Proxy safety and interface reflection", () => {
     const expected = {
       endpoints: [
         { name: "alpha", signalRegistrations: 1, slotRegistrations: 0 },
-        { name: "shared", signalRegistrations: 2, slotRegistrations: 1 },
+        { name: "shared", signalRegistrations: 2, slotRegistrations: 0 },
+        { name: "sharedSlot", signalRegistrations: 0, slotRegistrations: 1 },
       ],
     };
     expect(Behavon.getInterface(target)).toEqual(expected);
@@ -1067,47 +1091,42 @@ describe("Proxy safety and interface reflection", () => {
   });
 
   it.each(protocolNames)("rejects the reserved endpoint name %s", (name) => {
-    function InvalidSignal(): undefined {
-      const callback = Behavon.useCallback(() => undefined, []);
-      Behavon.useSignal(name, callback);
-      return undefined;
-    }
-    function InvalidSlot(): undefined {
-      const callback = Behavon.useCallback(() => undefined, []);
-      Behavon.useSlot(name, callback);
-      return undefined;
-    }
-    expect(() => Behavon.createModel(InvalidSignal, undefined)).toThrow();
-    expect(() => Behavon.createModel(InvalidSlot, undefined)).toThrow();
+    // Endpoints exist only through a Port, so the reserved name is rejected where the Port is declared.
+    expect(() => Behavon.createPort({ [name]: Behavon.SignalType() } as never)).toThrow(
+      `Behavon.createPort member name is reserved: ${name}`,
+    );
+    expect(() => Behavon.createPort({ [name]: Behavon.SlotType() } as never)).toThrow(
+      `Behavon.createPort member name is reserved: ${name}`,
+    );
   });
 
   it("requires non-empty string endpoint names", () => {
-    function EmptySignal(): undefined {
-      const callback = Behavon.useCallback(() => undefined, []);
-      Behavon.useSignal("", callback);
-      return undefined;
-    }
+    const nonStringSlotPort = Behavon.createPort<{ value: PortOnlySlot<any> }>({ value: Behavon.SlotType() });
     function NonStringSlot(): undefined {
       const callback = Behavon.useCallback(() => undefined, []);
-      Behavon.useSlot(42 as unknown as string, callback);
+      Behavon.useSlot(nonStringSlotPort, 42 as unknown as "value", callback);
       return undefined;
     }
 
-    expect(() => Behavon.createModel(EmptySignal, undefined)).toThrow(/non-empty string/);
+    // An empty name cannot be declared in a Port in the first place.
+    expect(() => Behavon.createPort({ "": Behavon.SignalType() } as never)).toThrow("Behavon.createPort member name is reserved: ");
     expect(() => Behavon.createModel(NonStringSlot, undefined)).toThrow(/non-empty string/);
   });
 
   it("handles Promise, serialization and symbols without treating them as endpoints", async () => {
     let proxy: ReturnType<typeof Behavon.usePort> | undefined;
 
+    type TargetPortType = { "event": PortOnlySignal<any> };
+    const targetPort = Behavon.createPort<TargetPortType>({ "event": Behavon.SignalType() });
     function Target(): undefined {
       const event = Behavon.useCallback(() => undefined, []);
-      Behavon.useSignal("event", event);
+      Behavon.useSignal(targetPort, "event", event);
+      Behavon.useExport(targetPort, "event");
       return undefined;
     }
 
-    const target = Behavon.createModel(Target, undefined);
-    function Inspector(input: UntypedModelRef): undefined {
+    const target = Behavon.createModel((Target as unknown as Model<any, any, TargetPortType>), undefined);
+    function Inspector(input: TypedModelRef<any>): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       proxy = Behavon.usePort(input);
       return undefined;
@@ -1117,7 +1136,7 @@ describe("Proxy safety and interface reflection", () => {
     await expect(Promise.resolve(dependency)).resolves.toBe(dependency);
     expect(() => JSON.stringify(dependency)).not.toThrow();
     expect(() => Reflect.get(dependency, Symbol.toStringTag)).not.toThrow();
-    expect(() => dependency.unknownApplicationEndpoint).toThrow();
+    expect(() => (dependency as unknown as Record<string, unknown>).unknownApplicationEndpoint).toThrow();
     inspector.dispose();
     target.dispose();
   });
@@ -1135,7 +1154,7 @@ describe("Proxy safety and interface reflection", () => {
       Target,
       undefined,
     );
-    function Inspector(input: UntypedModelRef): undefined {
+    function Inspector(input: TypedModelRef<any>): undefined {
       // eslint-disable-next-line behavon-hooks/canonical-api -- missing-endpoint probe consumes the proxy through its throwing property lookup
       const dependency = Behavon.usePort(input);
       dependency.missing;

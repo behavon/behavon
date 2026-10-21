@@ -9,16 +9,25 @@ function getInterface(target: ModelInstance | TypedModelRef | DependencyProxy): 
 ```
 
 - `target`: [`createModel`](./createModel.md)이 반환한 instance나 [`usePort`](./usePort.md) 결과.
-- `endpoints`: 등록한 순서대로 나열합니다. `useExport`로 열었는지와 관계없이 등록한 Signal과 Slot을 모두 보여 줍니다. 공개 값은 포함하지 않습니다.
+- `endpoints`: 등록한 순서대로 나열합니다. Signal과 Slot을 보여 주고, snapshot 공개 값은 포함하지 않습니다.
 
 종료된 instance를 넘기면 오류입니다.
 
 ## 예제
 
 ```ts
-function Counter(): number {
+import Behavon, { type Model, type Signal } from "behavon"
+
+interface CounterPort {
+  increment: Signal
+}
+
+const counterPort = Behavon.createPort<CounterPort>({ increment: Behavon.SignalType() })
+
+const Counter: Model<undefined, number, CounterPort> = () => {
   const increment = Behavon.useCallback(() => undefined, [])
-  Behavon.useSignal("increment", increment)
+  Behavon.useSignal(counterPort, "increment", increment)
+  Behavon.useExport(counterPort, "increment")
   return 0
 }
 

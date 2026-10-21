@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import Behavon, { FutureCancellationError, futureDiagnostics } from "behavon";
-import type { BoundaryState, Future, Signal, StateSetter } from "behavon";
+import type { BoundaryState, Future, Model, Signal, StateSetter } from "behavon";
 import { inspectModelInstanceForTests, observeModelInstanceCreationForTests } from "../../src/internal/model-inspection";
 import { waitFor } from "../helpers";
 
@@ -439,7 +439,7 @@ describe("useFuture", () => {
       Behavon.useExport(port, "run");
       return { value, future };
     }
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel(Model as Model<undefined, ReturnType<typeof Model>, Port>, undefined);
     try {
       expect(() => root.run()).toThrow("rollback");
       await waitFor(() => outputOf<ReturnType<typeof Model>>(root).future.snapshot().status === "pending");

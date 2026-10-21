@@ -32,7 +32,7 @@ Signal은 발생시키는 쪽이고, Slot은 받는 쪽입니다. [`useSignal`](
 
 ## 공개
 
-[`createPort`](./api/createPort.md)는 Model이 바깥에 내놓는 이름과 타입을 선언합니다. 선언한 Signal과 snapshot은 [`useExport`](./api/useExport.md)를 호출해야 instance에서 쓸 수 있습니다. 선언한 Slot은 다른 Model이 [`usePort`](./api/usePort.md)로 가져와 연결합니다. instance의 타입은 선언한 Port 타입입니다.
+[`createPort`](./api/createPort.md)는 Model이 바깥에 내놓는 이름과 타입을 선언합니다. 선언한 Signal과 snapshot은 [`useExport`](./api/useExport.md)를 호출해야 instance에서 쓸 수 있습니다. 선언한 Slot은 다른 Model이 [`usePort`](./api/usePort.md)로 가져와 연결합니다. instance의 타입은 선언한 Port 타입에서 Slot을 뺀 것입니다. Slot은 instance에서 부를 수 없으므로 나오지 않고, `usePort`로 꺼냅니다.
 
 ```ts
 import Behavon, { type Model, type Signal } from "behavon"

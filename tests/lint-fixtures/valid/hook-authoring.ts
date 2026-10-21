@@ -1,5 +1,5 @@
 import Behavon, { useEffect, useReducer, useState } from "behavon";
-import type { StateSetter } from "behavon";
+import type { SnapshotRootId, StateSetter } from "behavon";
 
 export type BehavonFacadeType = typeof Behavon;
 
@@ -17,8 +17,8 @@ export function CounterModel(): number {
 
 export function NamedHookModel(): number {
   const [value] = useState(1);
-  const exported = Behavon.useExport(() => ({ identity: "named" as const }));
-  return exported.identity === "named" ? value : 0;
+  const exported = Behavon.useExport(namedHookPort, "identity");
+  return exported === undefined ? 0 : value;
 }
 
 export function ReducerModel(): number {
@@ -27,15 +27,15 @@ export function ReducerModel(): number {
 }
 
 export function StableExportDependencyModel(): number {
-  const exported = Behavon.useExport(() => ({ value: 1 as const }));
+  const exported = Behavon.useExport(stableExportDependencyPort, "value");
   Behavon.useEffect(() => {
-    void exported.value;
+    void exported;
   }, []);
-  return exported.value;
+  return 1;
 }
 
 export function RegistrationOnlyExportModel(): undefined {
-  Behavon.useExport(() => ({ identity: "public" as const }));
+  Behavon.useExport(registrationOnlyExportPort, "identity");
   return undefined;
 }
 
@@ -56,3 +56,6 @@ export function callBindinglessComputedMember(): number {
   const Behavon = { useState: (value: number) => value };
   return Behavon[key](0);
 }
+const namedHookPort = Behavon.createPort<{ identity: SnapshotRootId<string> }>({ identity: Behavon.SnapshotType() });
+const stableExportDependencyPort = Behavon.createPort<{ value: SnapshotRootId<number> }>({ value: Behavon.SnapshotType() });
+const registrationOnlyExportPort = Behavon.createPort<{ identity: SnapshotRootId<string> }>({ identity: Behavon.SnapshotType() });

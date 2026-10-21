@@ -2745,7 +2745,7 @@ const evaluationPurityRule = {
           }
 
           if (!parentIsEvaluation) continue;
-          const synchronousIndexes = name === "useMemo" || name === "useState" || name === "useExport"
+          const synchronousIndexes = name === "useMemo" || name === "useState"
             ? [0]
             : name === "useLabelState" ? [1]
             : name === "useReducer" ? [0, 2]

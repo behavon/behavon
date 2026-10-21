@@ -22,7 +22,7 @@ marker의 타입 인자는 `Port`에서 정해지므로 다시 적지 않아도 
 - 모듈 최상위에서 호출합니다. Model이 평가되는 도중에 부르면 오류입니다.
 - Model은 `Model<Input, Output, Port>`로 타입을 적습니다.
 - 선언한 항목은 모두 채워야 합니다. 빠뜨리면 Model을 만들 때 오류입니다.
-- Port에 없는 Signal은 `useSignal(name, callback)`으로 만들 수 있지만 바깥에서 쓸 수 없습니다. Port에 없는 Slot과 공개 값은 오류입니다.
+- Signal·Slot·공개 값은 모두 Port에 선언합니다. Port에 없는 이름으로 `useSignal`·`useSlot`·`useExport`를 부르면 오류입니다.
 - 한 Model은 Port를 하나만 씁니다. 두 Port를 섞으면 오류입니다.
 - `declaration`에는 `Port`의 모든 key를 직접 적습니다. 빠진 key, 남는 key, 역할이 다른 marker는 타입 오류입니다.
 

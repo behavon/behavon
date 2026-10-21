@@ -1,3 +1,4 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
 import type { Signal, Slot, StateSetter } from "behavon";
@@ -189,23 +190,29 @@ describe("useCallback React identity and closure semantics", () => {
       trace.push("invoked");
     };
 
+    type ValidPortType = { "invoke": PortOnlySignal<any> };
+    const validPort = Behavon.createPort<ValidPortType>({ "invoke": Behavon.SignalType() });
     function Valid(): undefined {
       const managed = Behavon.useCallback(supplied, []);
-      Behavon.useSignal("invoke", managed);
+      Behavon.useSignal(validPort, "invoke", managed);
+      Behavon.useExport(validPort, "invoke");
       return undefined;
     }
 
-    const root = Behavon.createModel(Valid, undefined);
+    const root = Behavon.createModel((Valid as unknown as Model<any, any, ValidPortType>), undefined);
     signalOf(root, "invoke")();
     expect(trace).toEqual(["invoked"]);
     root.dispose();
 
+    type InvalidPortType = { "invoke": PortOnlySignal<any> };
+    const invalidPort = Behavon.createPort<InvalidPortType>({ "invoke": Behavon.SignalType() });
     function Invalid(): undefined {
-      Behavon.useSignal("invoke", supplied);
+      Behavon.useSignal(invalidPort, "invoke", supplied);
+      Behavon.useExport(invalidPort, "invoke");
       return undefined;
     }
 
-    expect(() => Behavon.createModel(Invalid, undefined)).toThrow(
+    expect(() => Behavon.createModel((Invalid as unknown as Model<any, any, InvalidPortType>), undefined)).toThrow(
       /useSignal requires a managed callback from the same Model/,
     );
   });
@@ -253,6 +260,8 @@ describe("useCallback React identity and closure semantics", () => {
     let memoRuns = 0;
     const effects: string[] = [];
 
+    type ModelPortType = { "setDependency": PortOnlySignal<any>; "tick": PortOnlySignal<any> };
+    const modelPort = Behavon.createPort<ModelPortType>({ "setDependency": Behavon.SignalType(), "tick": Behavon.SignalType() });
     function Model(): undefined {
       const [dependency, setDependency] = Behavon.useState(Number.NaN);
       const [epoch, setEpoch] = Behavon.useState(0);
@@ -283,12 +292,14 @@ describe("useCallback React identity and closure semantics", () => {
       }, [callback]);
       const setDependencyBody = Behavon.useCallback((value: number) => setDependency(value), [setDependency]);
       const tickBody = Behavon.useCallback(() => setEpoch((value) => value + 1), [setEpoch]);
-      Behavon.useSignal("setDependency", setDependencyBody);
-      Behavon.useSignal("tick", tickBody);
+      Behavon.useSignal(modelPort, "setDependency", setDependencyBody);
+      Behavon.useExport(modelPort, "setDependency");
+      Behavon.useSignal(modelPort, "tick", tickBody);
+      Behavon.useExport(modelPort, "tick");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), undefined);
     const initial = callbacks[0];
     const initialDerived = derivedCallbacks[0];
     expect(initial()).toBe("NaN:0");
@@ -341,6 +352,8 @@ describe("useCallback React identity and closure semantics", () => {
     const disconnects: Array<() => void> = [];
     const trace: string[] = [];
 
+    type ModelPort1Type = { "advance": PortOnlySignal<any>; "fire": PortOnlySignal<any>; "receive": PortOnlySlot<any> };
+    const modelPort1 = Behavon.createPort<ModelPort1Type>({ "advance": Behavon.SignalType(), "fire": Behavon.SignalType(), "receive": Behavon.SlotType() });
     function Model(): undefined {
       const [version, setVersion] = Behavon.useState(0);
       const advanceBody = Behavon.useCallback(() => setVersion((value) => value + 1), [setVersion]);
@@ -350,9 +363,11 @@ describe("useCallback React identity and closure semantics", () => {
       signalBodies.push(signalBody);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       slotBodies.push(slotBody);
-      Behavon.useSignal("advance", advanceBody);
-      const fire = Behavon.useSignal("fire", signalBody);
-      const receive = Behavon.useSlot("receive", slotBody);
+      Behavon.useSignal(modelPort1, "advance", advanceBody);
+      Behavon.useExport(modelPort1, "advance");
+      const fire = Behavon.useSignal(modelPort1, "fire", signalBody);
+      Behavon.useExport(modelPort1, "fire");
+      const receive = Behavon.useSlot(modelPort1, "receive", slotBody);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       fireHandles.push(fire);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -363,7 +378,7 @@ describe("useCallback React identity and closure semantics", () => {
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort1Type>), undefined);
     const firstSignalBody = signalBodies[0];
     const firstSlotBody = slotBodies[0];
     signalOf(root, "fire")();
@@ -399,20 +414,24 @@ describe("useCallback React identity and closure semantics", () => {
     const endpointResults: number[] = [];
     let shouldThrow = false;
 
+    type ModelPort2Type = { "advance": PortOnlySignal<any>; "inspect": PortOnlySignal<any> };
+    const modelPort2 = Behavon.createPort<ModelPort2Type>({ "advance": Behavon.SignalType(), "inspect": Behavon.SignalType() });
     function Model(): undefined {
       const [version, setVersion] = Behavon.useState(0);
       const inspect = Behavon.useCallback(() => version, [version]);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       callbacks.push(inspect);
       const advance = Behavon.useCallback(() => setVersion(1), [setVersion]);
-      Behavon.useSignal("advance", advance);
+      Behavon.useSignal(modelPort2, "advance", advance);
+      Behavon.useExport(modelPort2, "advance");
       const inspectEndpoint = Behavon.useCallback(() => endpointResults.push(version), [version]);
-      Behavon.useSignal("inspect", inspectEndpoint);
+      Behavon.useSignal(modelPort2, "inspect", inspectEndpoint);
+      Behavon.useExport(modelPort2, "inspect");
       if (version === 1 && shouldThrow) throw failure;
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort2Type>), undefined);
     const committed = callbacks[0];
     signalOf(root, "inspect")();
     shouldThrow = true;
@@ -450,6 +469,8 @@ describe("useCallback React identity and closure semantics", () => {
     const callbacks: Array<() => number> = [];
     const endpointResults: number[] = [];
 
+    type ModelPort3Type = { "inspect": PortOnlySignal<any>; "speculate": PortOnlySignal<any> };
+    const modelPort3 = Behavon.createPort<ModelPort3Type>({ "inspect": Behavon.SignalType(), "speculate": Behavon.SignalType() });
     function Model(): undefined {
       const [, setValue] = Behavon.useState(0);
       const renderedPhase = phase;
@@ -457,16 +478,18 @@ describe("useCallback React identity and closure semantics", () => {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       callbacks.push(inspect);
       const inspectEndpoint = Behavon.useCallback(() => endpointResults.push(renderedPhase), [renderedPhase]);
-      Behavon.useSignal("inspect", inspectEndpoint);
+      Behavon.useSignal(modelPort3, "inspect", inspectEndpoint);
+      Behavon.useExport(modelPort3, "inspect");
       const speculate = Behavon.useCallback(() => setValue((previous) => {
         phase = 1;
         return previous;
       }), [setValue]);
-      Behavon.useSignal("speculate", speculate);
+      Behavon.useSignal(modelPort3, "speculate", speculate);
+      Behavon.useExport(modelPort3, "speculate");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort3Type>), undefined);
     signalOf(root, "speculate")();
     await settle();
     expect(callbacks).toHaveLength(2);
@@ -489,6 +512,8 @@ describe("useCallback React identity and closure semantics", () => {
     const handles: Signal[] = [];
     let setter: StateSetter<number> | undefined;
 
+    type ModelPort4Type = { "advance": PortOnlySignal<any>; "inspect": PortOnlySignal<any> };
+    const modelPort4 = Behavon.createPort<ModelPort4Type>({ "advance": Behavon.SignalType(), "inspect": Behavon.SignalType() });
     function Model(): undefined {
       const [version, setVersion] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -497,14 +522,16 @@ describe("useCallback React identity and closure semantics", () => {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       callbacks.push(inspect);
       const advance = Behavon.useCallback(() => setVersion(1), [setVersion]);
-      Behavon.useSignal("advance", advance);
-      const inspectHandle = Behavon.useSignal("inspect", inspect);
+      Behavon.useSignal(modelPort4, "advance", advance);
+      Behavon.useExport(modelPort4, "advance");
+      const inspectHandle = Behavon.useSignal(modelPort4, "inspect", inspect);
+      Behavon.useExport(modelPort4, "inspect");
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       handles.push(inspectHandle);
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort4Type>), undefined);
     signalOf(root, "advance")();
     await waitFor(() => callbacks.length === 2);
     expect(handles[1]).toBe(handles[0]);
@@ -528,13 +555,16 @@ describe("useCallback React identity and closure semantics", () => {
     let setter: StateSetter<number> | undefined;
     let endpoint: Signal | undefined;
 
+    type ModelPort5Type = { "inspect": PortOnlySignal<any> };
+    const modelPort5 = Behavon.createPort<ModelPort5Type>({ "inspect": Behavon.SignalType() });
     function Model(): undefined {
       const [, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       setter = setValue;
       const inspect = Behavon.useCallback(() => trace.push("endpoint"), []);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
-      endpoint = Behavon.useSignal("inspect", inspect);
+      endpoint = Behavon.useSignal(modelPort5, "inspect", inspect);
+      Behavon.useExport(modelPort5, "inspect");
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       ordinary = Behavon.useCallback(function (this: { readonly label: string }) {
         trace.push(`ordinary:${this.label}`);
@@ -561,7 +591,7 @@ describe("useCallback React identity and closure semantics", () => {
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort5Type>), undefined);
     const retainedOrdinary = ordinary as (this: { readonly label: string }) => string;
     const retainedThrowing = throwing as () => never;
     const retainedSetterCallback = invokeSetter as () => string;
@@ -585,16 +615,22 @@ describe("useCallback React identity and closure semantics", () => {
     }
     const owner = Behavon.createModel(Owner, undefined);
 
+    type OrdinaryPortType = { "ordinary": PortOnlySignal<any> };
+    const ordinaryPort = Behavon.createPort<OrdinaryPortType>({ "ordinary": Behavon.SignalType() });
     function Ordinary(): undefined {
-      Behavon.useSignal("ordinary", () => undefined);
+      Behavon.useSignal(ordinaryPort, "ordinary", () => undefined);
+      Behavon.useExport(ordinaryPort, "ordinary");
       return undefined;
     }
+    type CrossOwnerPortType = { "foreign": PortOnlySignal<any> };
+    const crossOwnerPort = Behavon.createPort<CrossOwnerPortType>({ "foreign": Behavon.SignalType() });
     function CrossOwner(): undefined {
-      Behavon.useSignal("foreign", foreign as () => void);
+      Behavon.useSignal(crossOwnerPort, "foreign", foreign as () => void);
+      Behavon.useExport(crossOwnerPort, "foreign");
       return undefined;
     }
-    expect(() => Behavon.createModel(Ordinary, undefined)).toThrow(/managed callback from the same Model/);
-    expect(() => Behavon.createModel(CrossOwner, undefined)).toThrow(/managed callback from the same Model/);
+    expect(() => Behavon.createModel((Ordinary as unknown as Model<any, any, OrdinaryPortType>), undefined)).toThrow(/managed callback from the same Model/);
+    expect(() => Behavon.createModel((CrossOwner as unknown as Model<any, any, CrossOwnerPortType>), undefined)).toThrow(/managed callback from the same Model/);
     owner.dispose();
 
     interface Endpoints {
@@ -604,18 +640,23 @@ describe("useCallback React identity and closure semantics", () => {
     }
     const trace: number[] = [];
     let retained: (() => void) | undefined;
+    type ModelPort6Type = { "advance": PortOnlySignal<any>; "retained": PortOnlySignal<any>; "current": PortOnlySignal<any> };
+    const modelPort6 = Behavon.createPort<ModelPort6Type>({ "advance": Behavon.SignalType(), "retained": Behavon.SignalType(), "current": Behavon.SignalType() });
     function Model(): undefined {
       const [version, setVersion] = Behavon.useState(0);
       const current = Behavon.useCallback(() => trace.push(version), [version]);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       retained ??= current;
       const advance = Behavon.useCallback(() => setVersion(1), [setVersion]);
-      Behavon.useSignal("advance", advance);
-      Behavon.useSignal("retained", retained);
-      Behavon.useSignal("current", current);
+      Behavon.useSignal(modelPort6, "advance", advance);
+      Behavon.useExport(modelPort6, "advance");
+      Behavon.useSignal(modelPort6, "retained", retained);
+      Behavon.useExport(modelPort6, "retained");
+      Behavon.useSignal(modelPort6, "current", current);
+      Behavon.useExport(modelPort6, "current");
       return undefined;
     }
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort6Type>), undefined);
     signalOf(root, "advance")();
     await settle();
     signalOf(root, "retained")();
@@ -629,7 +670,14 @@ describe("useCallback React identity and closure semantics", () => {
       readonly advance: Signal;
       readonly first: Signal;
       readonly second: Signal;
+      readonly firstSlot: Slot;
     }
+    const endpointsPort = Behavon.createPort<Endpoints>({
+      advance: Behavon.SignalType(),
+      first: Behavon.SignalType(),
+      second: Behavon.SignalType(),
+      firstSlot: Behavon.SlotType(),
+    });
     const callbacks: Array<() => void> = [];
     const slotHandles: Slot[] = [];
     const trace: number[] = [];
@@ -640,11 +688,15 @@ describe("useCallback React identity and closure semantics", () => {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       callbacks.push(shared);
       const advance = Behavon.useCallback(() => setVersion(1), [setVersion]);
-      Behavon.useSignal("advance", advance);
-      Behavon.useSignal("first", shared);
-      Behavon.useSignal("first", shared);
-      Behavon.useSignal("second", shared);
-      const firstSlot = Behavon.useSlot("first", shared);
+      Behavon.useSignal(endpointsPort, "advance", advance);
+      Behavon.useExport(endpointsPort, "advance");
+      Behavon.useSignal(endpointsPort, "first", shared);
+      Behavon.useSignal(endpointsPort, "first", shared);
+      Behavon.useExport(endpointsPort, "first");
+      Behavon.useSignal(endpointsPort, "second", shared);
+      Behavon.useExport(endpointsPort, "second");
+      // A Port member is either a Signal or a Slot, so the Slot sharing the callback has its own name.
+      const firstSlot = Behavon.useSlot(endpointsPort, "firstSlot", shared);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       slotHandles.push(firstSlot);
       return undefined;

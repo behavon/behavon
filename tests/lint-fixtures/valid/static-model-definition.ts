@@ -104,12 +104,6 @@ function StaticModel(): undefined {
   return undefined;
 }
 
-function SchemaLessModel(): undefined {
-  const legacy = Behavon.useCallback(() => undefined, []);
-  Behavon.useSignal("legacy", legacy);
-  return undefined;
-}
-
 const StaticBoundaryModel = Behavon.boundary(StaticModel);
 const StaticModels = { Nested: StaticModel };
 
@@ -242,7 +236,6 @@ export const PreservingReadonlyPortArray: ReadonlyArray<
 
 export function createStaticModels(): void {
   const direct = Behavon.createModel(StaticModel, undefined);
-  const schemaLess = Behavon.createModel(SchemaLessModel, undefined);
   const bounded = Behavon.createModel(StaticBoundaryModel, undefined);
   const member = Behavon.createModel(StaticModels.Nested, undefined);
   const contextualProperty = Behavon.createModel(ContextualPortModels.Property, undefined);
@@ -282,7 +275,6 @@ export function createStaticModels(): void {
   const imported = Behavon.createModel(ImportedPortModel, undefined);
   const opaqueImportedHook = Behavon.createModel(OpaqueImportedHookModel, undefined);
   direct.dispose();
-  schemaLess.dispose();
   bounded.dispose();
   member.dispose();
   contextualProperty.dispose();

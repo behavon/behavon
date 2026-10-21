@@ -1,3 +1,4 @@
+import type { Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
 import type {
@@ -94,24 +95,32 @@ describe("Model Port declarations", () => {
     const snapshotOnlyPort = Behavon.createPort<SnapshotOnlyPort>({
       snapshotId: Behavon.SnapshotType(),
     });
-    function InternalSignal(): undefined {
+    function ExtraSignal(): undefined {
       Behavon.useExport(snapshotOnlyPort, "snapshotId");
       const extra = Behavon.useCallback(() => undefined, []);
-      Behavon.useSignal("extra", extra);
+      // @ts-expect-error A Signal must be declared in the Port.
+      Behavon.useSignal(snapshotOnlyPort, "extra", extra);
       return undefined;
     }
-    const internal = Behavon.createModel(InternalSignal, undefined);
-    expect(() => internal.extra).toThrow(/Signal 'extra' is not exported/);
-    internal.dispose();
+    expect(() => Behavon.createModel(ExtraSignal, undefined)).toThrow(/Port has no declared member 'extra'/);
 
     function ExtraSlot(): undefined {
       Behavon.useExport(snapshotOnlyPort, "snapshotId");
       const extra = Behavon.useCallback(() => undefined, []);
-      Behavon.useSlot("extra", extra);
+      // @ts-expect-error A Slot must be declared in the Port.
+      Behavon.useSlot(snapshotOnlyPort, "extra", extra);
       return undefined;
     }
-    expect(() => Behavon.createModel(ExtraSlot, undefined)).toThrow(
-      /registered undeclared Port endpoint 'extra'/,
+    expect(() => Behavon.createModel(ExtraSlot, undefined)).toThrow(/Port has no declared member 'extra'/);
+
+    function StringName(): undefined {
+      const extra = Behavon.useCallback(() => undefined, []);
+      // @ts-expect-error useSignal only takes a Port declared with createPort.
+      Behavon.useSignal("extra", extra);
+      return undefined;
+    }
+    expect(() => Behavon.createModel(StringName, undefined)).toThrow(
+      "Behavon.useSignal requires a Port created by Behavon.createPort as its first argument",
     );
 
     function UnexportedSignal(): undefined {
@@ -154,7 +163,7 @@ describe("Model Port declarations", () => {
     expect(() => Behavon.createModel(Mixed, undefined)).toThrow(/more than one Port/);
   });
 
-  it("lets only Signals opened by useExport be called from outside the Model", async () => {
+  it("connects and calls only the Signals a Port declares and opens", async () => {
     interface MirrorPort {
       receive: Slot<[value: number]>;
     }
@@ -170,15 +179,20 @@ describe("Model Port declarations", () => {
 
     interface CountPort {
       increment: Signal;
+      valueChanged: Signal<[value: number]>;
     }
-    const countPort = Behavon.createPort<CountPort>({ increment: Behavon.SignalType() });
+    const countPort = Behavon.createPort<CountPort>({
+      increment: Behavon.SignalType(),
+      valueChanged: Behavon.SignalType(),
+    });
     const Count: Model<TypedModelRef<MirrorPort>, number, CountPort> = (mirrorRef) => {
       const [value, setValue] = Behavon.useState(0);
       const increment = Behavon.useCallback(() => setValue((n) => n + 1), [setValue]);
       Behavon.useSignal(countPort, "increment", increment);
       Behavon.useExport(countPort, "increment");
       const changedBody = Behavon.useCallback((_value: number) => undefined, []);
-      const valueChanged = Behavon.useSignal("valueChanged", changedBody);
+      const valueChanged = Behavon.useSignal(countPort, "valueChanged", changedBody);
+      Behavon.useExport(countPort, "valueChanged");
       const mirror = Behavon.usePort(mirrorRef);
       Behavon.useConnect(valueChanged, mirror.receive);
       Behavon.useEffect(() => {
@@ -193,15 +207,16 @@ describe("Model Port declarations", () => {
     await Promise.resolve();
     expect(received).toEqual([0, 1]);
 
+    // A name the Port does not declare is not reachable from the ref or usePort.
     const outside = count as unknown as Record<string, unknown>;
-    expect(() => outside.valueChanged).toThrow(/Signal 'valueChanged' is not exported/);
+    expect(() => outside.missing).toThrow(/has no endpoint 'missing'/);
     function Spy(target: TypedModelRef<CountPort>): undefined {
       const dependency = Behavon.usePort(target);
       const untyped = dependency as unknown as Record<string, unknown>;
-      void untyped.valueChanged;
+      void untyped.missing;
       return undefined;
     }
-    expect(() => Behavon.createModel(Spy, count)).toThrow(/Signal 'valueChanged' is not exported/);
+    expect(() => Behavon.createModel(Spy, count)).toThrow(/has no endpoint 'missing'/);
     expect(received).toEqual([0, 1]);
     count.dispose();
     mirror.dispose();
@@ -221,39 +236,6 @@ describe("Model Port declarations", () => {
     expect(() => Behavon.createModel(ExportFirst, undefined)).toThrow(
       /requires Signal 'fire' to be registered with useSignal first/,
     );
-  });
-
-  it("keeps a same-name Slot connectable but blocks invoking its unexported Signal part", () => {
-    const delivered: number[] = [];
-    function Dual(): undefined {
-      const signalBody = Behavon.useCallback((_value: number) => undefined, []);
-      const slotBody = Behavon.useCallback((value: number) => {
-        delivered.push(value);
-      }, []);
-      Behavon.useSignal("shared", signalBody);
-      Behavon.useSlot("shared", slotBody);
-      return undefined;
-    }
-    const dual = Behavon.createModel(Dual, undefined);
-    let invoke: (() => void) | undefined;
-    function Wiring(): undefined {
-      const body = Behavon.useCallback((_value: number) => undefined, []);
-      const out = Behavon.useSignal("out", body);
-      const dependency = Behavon.usePort(dual);
-      Behavon.useConnect(out, dependency.shared);
-      Behavon.useEffect(() => {
-        out(7);
-      }, [out]);
-      // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a dependency handle
-      invoke = () => dependency.shared(1);
-      return undefined;
-    }
-    const wiring = Behavon.createModel(Wiring, undefined);
-    expect(delivered).toEqual([7]);
-    expect(() => invoke?.()).toThrow(/Signal 'shared' is not exported/);
-    expect(delivered).toEqual([7]);
-    wiring.dispose();
-    dual.dispose();
   });
 
   it("treats every runtime descriptor key as required even when a widened variable bypasses excess-property typing", () => {

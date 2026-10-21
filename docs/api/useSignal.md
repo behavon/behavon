@@ -1,14 +1,12 @@
-# `useSignal(port, name, callback)` / `useSignal(name, callback)`
+# `useSignal(port, name, callback)`
 
 Signal을 만들고, 그 Signal을 발생시키는 함수를 반환합니다.
 
 ```ts
 function useSignal<Port>(port: PortDescriptor<Port>, name: keyof Port, callback: (...args: Args) => unknown): Signal<Args>
-function useSignal<Args extends readonly unknown[]>(name: string, callback: (...args: Args) => unknown): Signal<Args>
 ```
 
-- `useSignal(port, name, callback)`: [`createPort`](./createPort.md)에 `SignalType()`으로 선언한 항목을 만듭니다. `callback`의 인자 타입은 선언과 맞아야 합니다.
-- `useSignal(name, callback)`: Port에 선언하지 않은 Signal을 만듭니다. Model 밖에서는 쓸 수 없고, Model 안에서 [`useConnect`](./useConnect.md)에 씁니다.
+- `port`, `name`: [`createPort`](./createPort.md)에 `SignalType()`으로 선언한 항목. Port가 아니거나 선언하지 않은 이름이면 오류입니다. `callback`의 인자 타입은 선언과 맞아야 합니다.
 - `callback`: 같은 Model에서 [`useCallback`](./useCallback.md)으로 만든 함수. 일반 함수를 넘기면 오류입니다.
 
 반환된 Signal을 호출하면 다음 순서로 실행됩니다.
@@ -18,7 +16,7 @@ function useSignal<Args extends readonly unknown[]>(name: string, callback: (...
 
 반환값은 항상 `undefined`입니다. `callback`이 오류를 던지면 거기서 멈추고 그 오류가 호출한 쪽으로 전달됩니다. `callback`에서 state를 바꾸면 Model은 호출 직후가 아니라 다음 microtask에 다시 평가됩니다.
 
-Model 밖에서 호출하려면 Port에 선언하고 [`useExport(port, name)`](./useExport.md)로 엽니다. 열지 않은 Signal을 instance나 [`usePort`](./usePort.md) 결과에서 꺼내면 `Signal 'name' is not exported` 오류입니다. 종료된 Model의 Signal을 호출해도 오류입니다.
+Port에 선언한 Signal은 [`useExport(port, name)`](./useExport.md)로 열어야 합니다. 열지 않으면 Model을 만들 때 오류입니다. 같은 이름의 `useSignal`을 모두 부른 뒤에 엽니다. 연 뒤에 같은 이름으로 다시 등록하면 오류입니다. 연 Signal은 instance와 [`usePort`](./usePort.md) 결과에서 호출할 수 있습니다. 종료된 Model의 Signal을 호출하면 오류입니다.
 
 Model 본문에서 바로 호출하지 말고 [`useEffect`](./useEffect.md)나 다른 callback 안에서 호출하세요. 개발 모드에서는 본문에서 호출하면 경고를 출력합니다.
 

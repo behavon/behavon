@@ -18,6 +18,7 @@ function boundary<Input, Output>(model: Model<Input, Output>): Model<Input, Boun
 - 실패 상태에서 input을 바꿔도 자동으로 다시 시도하지 않습니다.
 - 오래된 `reset`이나 종료된 instance의 `reset`은 아무 일도 하지 않습니다.
 - 바깥 instance를 `dispose()`하면 내부 Model도 함께 종료됩니다.
+- 내부 Model이 [`useExport`](./useExport.md)로 연 Signal과 snapshot, Port의 Slot은 바깥 instance에 없습니다. 바깥 instance에서 부르면 오류입니다.
 
 ## 예제
 

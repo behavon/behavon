@@ -1,6 +1,7 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
-import type { UntypedModelRef, Signal, Slot, StateSetter } from "behavon";
+import type { TypedModelRef, Signal, Slot, StateSetter } from "behavon";
 import { uniqueChannel, waitFor, waitForSnapshot, signalOf } from "../helpers";
 
 async function settle(): Promise<void> {
@@ -39,6 +40,8 @@ describe("Object.is update bailout", () => {
     let cleanups = 0;
     let updaterCalls = 0;
 
+    type ModelPortType = { "update": PortOnlySignal<any> };
+    const modelPort = Behavon.createPort<ModelPortType>({ "update": Behavon.SignalType() });
     function Model(): undefined {
       const [left, setLeft] = Behavon.useState(1);
       const [right, setRight] = Behavon.useState(shared);
@@ -58,7 +61,8 @@ describe("Object.is update bailout", () => {
         }
         if (mode === "object") setRight(shared);
       }, [setLeft, setRight]);
-      Behavon.useSignal("update", update);
+      Behavon.useSignal(modelPort, "update", update);
+      Behavon.useExport(modelPort, "update");
       Behavon.useEffect(() => {
         setups += 1;
         return () => {
@@ -69,7 +73,7 @@ describe("Object.is update bailout", () => {
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), undefined);
     expect({ setups, cleanups }).toEqual({ setups: 1, cleanups: 0 });
     for (const mode of ["value", "updater", "batch", "multi", "object"]) {
       signalOf(root, "update")(mode);
@@ -89,6 +93,8 @@ describe("Object.is update bailout", () => {
     let setups = 0;
     let cleanups = 0;
 
+    type ModelPort1Type = { "change": PortOnlySignal<any> };
+    const modelPort1 = Behavon.createPort<ModelPort1Type>({ "change": Behavon.SignalType() });
     function Model(): undefined {
       const [left, setLeft] = Behavon.useState(0);
       const [right, setRight] = Behavon.useState(0);
@@ -97,7 +103,8 @@ describe("Object.is update bailout", () => {
         setLeft(0);
         setRight((previous) => previous + 1);
       }, [setLeft, setRight]);
-      Behavon.useSignal("change", change);
+      Behavon.useSignal(modelPort1, "change", change);
+      Behavon.useExport(modelPort1, "change");
       Behavon.useEffect(() => {
         setups += 1;
         values.push([left, right]);
@@ -109,7 +116,7 @@ describe("Object.is update bailout", () => {
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort1Type>), undefined);
     signalOf(root, "change")();
     await waitFor(() => values.length === 2);
     expect(values).toEqual([[0, 0], [0, 1]]);
@@ -127,12 +134,16 @@ describe("Object.is update bailout", () => {
     const committed: number[] = [];
     let setups = 0;
 
+    type ModelPort2Type = { "sameNaN": PortOnlySignal<any>; "negativeZero": PortOnlySignal<any> };
+    const modelPort2 = Behavon.createPort<ModelPort2Type>({ "sameNaN": Behavon.SignalType(), "negativeZero": Behavon.SignalType() });
     function Model(): undefined {
       const [value, setValue] = Behavon.useState(Number.NaN);
       const sameNaNBody = Behavon.useCallback(() => setValue(Number.NaN), [setValue]);
-      Behavon.useSignal("sameNaN", sameNaNBody);
+      Behavon.useSignal(modelPort2, "sameNaN", sameNaNBody);
+      Behavon.useExport(modelPort2, "sameNaN");
       const negativeZeroBody = Behavon.useCallback(() => setValue(-0), [setValue]);
-      Behavon.useSignal("negativeZero", negativeZeroBody);
+      Behavon.useSignal(modelPort2, "negativeZero", negativeZeroBody);
+      Behavon.useExport(modelPort2, "negativeZero");
       Behavon.useEffect(() => {
         setups += 1;
         committed.push(value);
@@ -141,7 +152,7 @@ describe("Object.is update bailout", () => {
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort2Type>), undefined);
     signalOf(root, "sameNaN")();
     await settle();
     expect(setups).toBe(1);
@@ -156,16 +167,19 @@ describe("Object.is update bailout", () => {
       readonly replace: Signal;
     }
     const committed: object[] = [];
+    type ModelPort3Type = { "replace": PortOnlySignal<any> };
+    const modelPort3 = Behavon.createPort<ModelPort3Type>({ "replace": Behavon.SignalType() });
     function Model(): undefined {
       const [value, setValue] = Behavon.useState({ value: 1 });
       const replaceBody = Behavon.useCallback(() => setValue({ value: 1 }), [setValue]);
-      Behavon.useSignal("replace", replaceBody);
+      Behavon.useSignal(modelPort3, "replace", replaceBody);
+      Behavon.useExport(modelPort3, "replace");
       Behavon.useEffect(() => {
         committed.push(value);
       }, [value]);
       return undefined;
     }
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort3Type>), undefined);
     signalOf(root, "replace")();
     await waitFor(() => committed.length === 2);
     expect(committed[1]).not.toBe(committed[0]);
@@ -180,6 +194,8 @@ describe("Object.is update bailout", () => {
     const order: string[] = [];
     let committed = 0;
 
+    type ModelPort4Type = { "fail": PortOnlySignal<any> };
+    const modelPort4 = Behavon.createPort<ModelPort4Type>({ "fail": Behavon.SignalType() });
     function Model(): undefined {
       const [value, setValue] = Behavon.useState(0);
       const failBody = Behavon.useCallback(() => {
@@ -196,14 +212,15 @@ describe("Object.is update bailout", () => {
           return 2;
         });
       }, [setValue]);
-      Behavon.useSignal("fail", failBody);
+      Behavon.useSignal(modelPort4, "fail", failBody);
+      Behavon.useExport(modelPort4, "fail");
       Behavon.useEffect(() => {
         committed = value;
       }, [value]);
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort4Type>), undefined);
     expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
     expect(order).toEqual(["first", "throw"]);
     expect(committed).toBe(0);
@@ -218,6 +235,8 @@ describe("Object.is update bailout", () => {
     let outerCalls = 0;
     let suffixCalls = 0;
 
+    type ModelPort5Type = { "update": PortOnlySignal<any> };
+    const modelPort5 = Behavon.createPort<ModelPort5Type>({ "update": Behavon.SignalType() });
     function Model(): undefined {
       const [right, setRight] = Behavon.useState(0);
       const [left, setLeft] = Behavon.useState(0);
@@ -232,14 +251,15 @@ describe("Object.is update bailout", () => {
           return previous;
         });
       }, [setLeft, setRight]);
-      Behavon.useSignal("update", updateBody);
+      Behavon.useSignal(modelPort5, "update", updateBody);
+      Behavon.useExport(modelPort5, "update");
       Behavon.useEffect(() => {
         committed.push([left, right]);
       }, [left, right]);
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort5Type>), undefined);
     signalOf(root, "update")();
     await waitFor(() => committed.length === 2);
     expect(committed).toEqual([[0, 0], [1, 1]]);
@@ -312,6 +332,8 @@ describe("Object.is update bailout", () => {
     }
     const committed: number[] = [];
     let followUpQueued = false;
+    type ModelPort6Type = { "change": PortOnlySignal<any> };
+    const modelPort6 = Behavon.createPort<ModelPort6Type>({ "change": Behavon.SignalType() });
     function Model(): undefined {
       const [value, setValue] = Behavon.useState(0);
       if (value === 1 && !followUpQueued) {
@@ -320,14 +342,15 @@ describe("Object.is update bailout", () => {
         setValue(1);
       }
       const changeBody = Behavon.useCallback(() => setValue(1), [setValue]);
-      Behavon.useSignal("change", changeBody);
+      Behavon.useSignal(modelPort6, "change", changeBody);
+      Behavon.useExport(modelPort6, "change");
       Behavon.useEffect(() => {
         committed.push(value);
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only Object.is probe intentionally wraps the captured value in a fresh object dependency
       }, [{ value }]);
       return undefined;
     }
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort6Type>), undefined);
     signalOf(root, "change")();
     await waitFor(() => committed.length === 2);
     expect(committed).toEqual([0, 1]);
@@ -342,9 +365,11 @@ describe("Object.is update bailout", () => {
       readonly terminate: Signal;
     }
     const failure = new Error("updater failure");
-    let root: UntypedModelRef;
+    let root: TypedModelRef<any>;
     let setValue: StateSetter<number> | undefined;
 
+    type ModelPort7Type = { "fail": PortOnlySignal<any>; "terminate": PortOnlySignal<any> };
+    const modelPort7 = Behavon.createPort<ModelPort7Type>({ "fail": Behavon.SignalType(), "terminate": Behavon.SignalType() });
     function Model(): undefined {
       const [, setter] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -353,21 +378,23 @@ describe("Object.is update bailout", () => {
         setter(1);
         throw failure;
       }), [setter]);
-      Behavon.useSignal("fail", failBody);
+      Behavon.useSignal(modelPort7, "fail", failBody);
+      Behavon.useExport(modelPort7, "fail");
       const terminateBody = Behavon.useCallback(() => setter((previous) => {
         setter(2);
         root.dispose();
         return previous;
       }), [setter]);
-      Behavon.useSignal("terminate", terminateBody);
+      Behavon.useSignal(modelPort7, "terminate", terminateBody);
+      Behavon.useExport(modelPort7, "terminate");
       return undefined;
     }
 
-    root = Behavon.createModel(Model, undefined);
+    root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort7Type>), undefined);
     expect(await captureScheduledFailure(() => signalOf(root, "fail")())).toBe(failure);
     expect(() => setValue?.(3)).not.toThrow();
 
-    root = Behavon.createModel(Model, undefined);
+    root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort7Type>), undefined);
     const terminalFailure = await captureScheduledFailure(() => signalOf(root, "terminate")());
     expect(String(terminalFailure)).toMatch(/disposed during evaluation.*cannot be committed/);
     expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
@@ -386,17 +413,21 @@ describe("Object.is update bailout", () => {
     let unsubscribeCalls = 0;
     const callbackPhases: number[] = [];
 
+    type ModelPort8Type = { "inspect": PortOnlySignal<any>; "speculate": PortOnlySignal<any> };
+    const modelPort8 = Behavon.createPort<ModelPort8Type>({ "inspect": Behavon.SignalType(), "speculate": Behavon.SignalType() });
     function Model(): undefined {
       const [value, setValue] = Behavon.useState(0);
       const renderedPhase = phase;
       const memoPhase = Behavon.useMemo(() => renderedPhase, [renderedPhase]);
       const inspect = Behavon.useCallback(() => callbackPhases.push(memoPhase), [memoPhase]);
-      Behavon.useSignal("inspect", inspect);
+      Behavon.useSignal(modelPort8, "inspect", inspect);
+      Behavon.useExport(modelPort8, "inspect");
       const speculateBody = Behavon.useCallback(() => setValue((previous) => {
         phase = 1;
         return previous;
       }), [setValue]);
-      Behavon.useSignal("speculate", speculateBody);
+      Behavon.useSignal(modelPort8, "speculate", speculateBody);
+      Behavon.useExport(modelPort8, "speculate");
       const subscribe = (_listener: () => void) => {
         subscribeCalls += 1;
         return () => {
@@ -417,7 +448,7 @@ describe("Object.is update bailout", () => {
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort8Type>), undefined);
     signalOf(root, "speculate")();
     await settle();
     expect({ effectSetups, effectCleanups, subscribeCalls, unsubscribeCalls }).toEqual({
@@ -438,6 +469,8 @@ describe("Object.is update bailout", () => {
     let phase = 0;
     const observedOutputs: number[] = [];
 
+    type ChildPortType = { "speculate": PortOnlySignal<any> };
+    const childPort = Behavon.createPort<ChildPortType>({ "speculate": Behavon.SignalType() });
     function Child(): number {
       const [, setValue] = Behavon.useState(0);
       const renderedPhase = phase;
@@ -445,22 +478,26 @@ describe("Object.is update bailout", () => {
         phase = 1;
         return previous;
       }), [setValue]);
-      Behavon.useSignal("speculate", speculateBody);
+      Behavon.useSignal(childPort, "speculate", speculateBody);
+      Behavon.useExport(childPort, "speculate");
       return renderedPhase;
     }
-    const child = Behavon.createModel(Child, undefined);
+    const child = Behavon.createModel((Child as unknown as Model<any, any, ChildPortType>), undefined);
+    type ParentPortType = { "inspect": PortOnlySignal<any> };
+    const parentPort = Behavon.createPort<ParentPortType>({ "inspect": Behavon.SignalType() });
     function Parent(): undefined {
       const [epoch, setEpoch] = Behavon.useState(0);
       const [output] = Behavon.useModel(child);
       const inspectBody = Behavon.useCallback(() => setEpoch((previous) => previous + 1), [setEpoch]);
-      Behavon.useSignal("inspect", inspectBody);
+      Behavon.useSignal(parentPort, "inspect", inspectBody);
+      Behavon.useExport(parentPort, "inspect");
       Behavon.useEffect(() => {
         if (output !== undefined) observedOutputs.push(output);
       }, [epoch, output]);
       return undefined;
     }
 
-    const root = Behavon.createModel(Parent, undefined);
+    const root = Behavon.createModel((Parent as unknown as Model<any, any, ParentPortType>), undefined);
     signalOf(child, "speculate")();
     await settle();
     signalOf(root, "inspect")();
@@ -477,19 +514,26 @@ describe("Object.is update bailout", () => {
     let target = 0;
     const deliveries: number[] = [];
 
+    type SourcePortType = { "fire": PortOnlySignal<any> };
+    const sourcePort = Behavon.createPort<SourcePortType>({ "fire": Behavon.SignalType() });
     function Source(): undefined {
       const fireBody = Behavon.useCallback(() => undefined, []);
-      Behavon.useSignal("fire", fireBody);
+      Behavon.useSignal(sourcePort, "fire", fireBody);
+      Behavon.useExport(sourcePort, "fire");
       return undefined;
     }
+    type SinkPortType = { "receive": PortOnlySlot<any> };
+    const sinkPort = Behavon.createPort<SinkPortType>({ "receive": Behavon.SlotType() });
     function Sink(id: number): undefined {
       const receiveBody = Behavon.useCallback(() => deliveries.push(id), [id]);
-      Behavon.useSlot("receive", receiveBody);
+      Behavon.useSlot(sinkPort, "receive", receiveBody);
       return undefined;
     }
-    const source = Behavon.createModel(Source, undefined);
-    const first = Behavon.createModel(Sink, 1);
-    const second = Behavon.createModel(Sink, 2);
+    const source = Behavon.createModel((Source as unknown as Model<any, any, SourcePortType>), undefined);
+    const first = Behavon.createModel((Sink as unknown as Model<any, any, SinkPortType>), 1);
+    const second = Behavon.createModel((Sink as unknown as Model<any, any, SinkPortType>), 2);
+    type ParentPort1Type = { "speculate": PortOnlySignal<any> };
+    const parentPort1 = Behavon.createPort<ParentPort1Type>({ "speculate": Behavon.SignalType() });
     function Parent(): undefined {
       const [, setValue] = Behavon.useState(0);
       const sinkDependency = Behavon.usePort(target === 0 ? first : second);
@@ -498,11 +542,12 @@ describe("Object.is update bailout", () => {
         target = 1;
         return previous;
       }), [setValue]);
-      Behavon.useSignal("speculate", speculateBody);
+      Behavon.useSignal(parentPort1, "speculate", speculateBody);
+      Behavon.useExport(parentPort1, "speculate");
       return undefined;
     }
 
-    const root = Behavon.createModel(Parent, undefined);
+    const root = Behavon.createModel((Parent as unknown as Model<any, any, ParentPort1Type>), undefined);
     signalOf(root, "speculate")();
     await settle();
     signalOf(source, "fire")();
@@ -525,6 +570,8 @@ describe("Object.is update bailout", () => {
       };
     };
     const getSnapshot = () => current;
+    type ModelPort9Type = { "notify": PortOnlySignal<any> };
+    const modelPort9 = Behavon.createPort<ModelPort9Type>({ "notify": Behavon.SignalType() });
     function Model(): undefined {
       const [state, setState] = Behavon.useState(0);
       const external = Behavon.useSyncExternalStore(subscribe, getSnapshot);
@@ -533,13 +580,14 @@ describe("Object.is update bailout", () => {
         current = 1;
         listener?.();
       }, [setState, state]);
-      Behavon.useSignal("notify", notifyBody);
+      Behavon.useSignal(modelPort9, "notify", notifyBody);
+      Behavon.useExport(modelPort9, "notify");
       Behavon.useEffect(() => {
         seen.push(external);
       }, [external]);
       return undefined;
     }
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort9Type>), undefined);
     signalOf(root, "notify")();
     await waitFor(() => seen.length === 2);
     expect(seen).toEqual([0, 1]);
@@ -559,6 +607,8 @@ describe("Object.is update bailout", () => {
     };
     const getSnapshot = () => current;
 
+    type ModelPort10Type = { "notifyDuringUpdate": PortOnlySignal<any> };
+    const modelPort10 = Behavon.createPort<ModelPort10Type>({ "notifyDuringUpdate": Behavon.SignalType() });
     function Model(): undefined {
       const [, setState] = Behavon.useState(0);
       const external = Behavon.useSyncExternalStore(subscribe, getSnapshot);
@@ -567,14 +617,15 @@ describe("Object.is update bailout", () => {
         listener?.();
         return previous;
       }), [setState]);
-      Behavon.useSignal("notifyDuringUpdate", notifyDuringUpdateBody);
+      Behavon.useSignal(modelPort10, "notifyDuringUpdate", notifyDuringUpdateBody);
+      Behavon.useExport(modelPort10, "notifyDuringUpdate");
       Behavon.useEffect(() => {
         committedSnapshots.push(external);
       }, [external]);
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort10Type>), undefined);
     signalOf(root, "notifyDuringUpdate")();
     await waitFor(() => committedSnapshots.length === 2);
     expect(committedSnapshots).toEqual([0, 1]);
@@ -643,6 +694,8 @@ describe("Object.is update bailout", () => {
     interface Endpoints { readonly update: Signal; }
     const channel = uniqueChannel("same-state-publication");
     let activations = 0;
+    type ModelPort11Type = { "update": PortOnlySignal<any> };
+    const modelPort11 = Behavon.createPort<ModelPort11Type>({ "update": Behavon.SignalType() });
     function Model(): undefined {
       const [, setValue] = Behavon.useState(0);
       const [, publish] = Behavon.useSnapshot(channel);
@@ -650,14 +703,15 @@ describe("Object.is update bailout", () => {
         publish(2);
         return previous;
       }), [publish, setValue]);
-      Behavon.useSignal("update", updateBody);
+      Behavon.useSignal(modelPort11, "update", updateBody);
+      Behavon.useExport(modelPort11, "update");
       Behavon.useEffect(() => {
         activations += 1;
       // eslint-disable-next-line behavon-hooks/exhaustive-deps -- test-only publication bailout probe intentionally allocates a fresh dependency object
       }, [{}]);
       return undefined;
     }
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort11Type>), undefined);
     signalOf(root, "update")();
     expect(await waitForSnapshot<number>(channel, (snapshot) => snapshot === 2)).toBe(2);
     expect(activations).toBe(1);

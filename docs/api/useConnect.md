@@ -7,7 +7,7 @@ function useConnect<Args extends readonly unknown[]>(source: Signal<Args>, desti
 ```
 
 - `source`: 보내는 Signal. 다음 중 하나입니다.
-  - 같은 Model의 [`useSignal`](./useSignal.md) 반환값. Port에 없는 Signal도 됩니다.
+  - 같은 Model의 [`useSignal`](./useSignal.md) 반환값.
   - 다른 instance가 [`useExport`](./useExport.md)로 연 Signal을 [`usePort`](./usePort.md)로 가져온 것.
 - `destination`: 받는 Slot. 같은 Model의 [`useSlot`](./useSlot.md) 반환값이나, 다른 instance의 Slot을 `usePort`로 가져온 것.
 
@@ -21,7 +21,7 @@ function useConnect<Args extends readonly unknown[]>(source: Signal<Args>, desti
 
 ## 예제
 
-`Counter`는 Port에 없는 `changed` Signal을 만들고, 그 Signal을 `Logger`의 Slot에 연결합니다.
+`Counter`는 값이 바뀔 때마다 `changed` Signal을 발생시키고, 그 Signal을 `Logger`의 Slot에 연결합니다.
 
 ```ts
 import Behavon, { type Model, type Signal, type Slot, type TypedModelRef } from "behavon"
@@ -40,14 +40,19 @@ const Logger: Model<undefined, undefined, LoggerPort> = () => {
 
 interface CounterPort {
   increment: Signal
+  changed: Signal<[value: number]>
 }
 
-const counterPort = Behavon.createPort<CounterPort>({ increment: Behavon.SignalType() })
+const counterPort = Behavon.createPort<CounterPort>({
+  increment: Behavon.SignalType(),
+  changed: Behavon.SignalType(),
+})
 
 const Counter: Model<TypedModelRef<LoggerPort>, number, CounterPort> = (loggerRef) => {
   const [count, setCount] = Behavon.useState(0)
   const changedBody = Behavon.useCallback((_value: number) => undefined, [])
-  const changed = Behavon.useSignal("changed", changedBody)
+  const changed = Behavon.useSignal(counterPort, "changed", changedBody)
+  Behavon.useExport(counterPort, "changed")
   const logger = Behavon.usePort(loggerRef)
   Behavon.useConnect(changed, logger.log)
 

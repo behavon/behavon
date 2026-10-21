@@ -1,3 +1,4 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
 import type { StateSetter } from "behavon";
@@ -23,16 +24,19 @@ describe("MutableObserver state mutation authority", () => {
   it("keeps one live identity and generation through enqueue, evaluation, and commit", async () => {
     let observed = -1;
 
+    type CounterPortType = { "increment": PortOnlySignal<any> };
+    const counterPort = Behavon.createPort<CounterPortType>({ "increment": Behavon.SignalType() });
     function Counter(): number {
       const [count, setCount] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only observer protocol probe records committed evaluation output
       observed = count;
       const increment = Behavon.useCallback(() => setCount((value) => value + 1), [setCount]);
-      Behavon.useSignal("increment", increment);
+      Behavon.useSignal(counterPort, "increment", increment);
+      Behavon.useExport(counterPort, "increment");
       return count;
     }
 
-    const counter = Behavon.createModel(Counter, undefined);
+    const counter = Behavon.createModel((Counter as unknown as Model<any, any, CounterPortType>), undefined);
     const cell = stateCellOf(counter as object);
     const owner = inspectModelInstanceForTests(counter as object);
     const before = inspectMutableStateForTests(cell);

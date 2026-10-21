@@ -1,14 +1,13 @@
-# `TypedModelRef<Needs>` / `UntypedModelRef`
+# `TypedModelRef<Needs>`
 
 Instance를 받는 쪽에서 쓰는 타입입니다.
 
 ```ts
-type TypedModelRef<Needs> = Readonly<Needs> & { dispose(): void }
-type UntypedModelRef = Readonly<Record<string, any>> & { dispose(): void }
+type TypedModelRef<Needs> = Readonly<Needs에서 Slot을 뺀 항목> & { dispose(): void }
 ```
 
 - `TypedModelRef<Needs>`: 받는 쪽이 쓸 이름만 적은 타입. [`createPort`](./createPort.md)의 Port를 쓰는 instance는 `Needs`가 그 Port의 일부이면 그대로 넘길 수 있습니다.
-- `UntypedModelRef`: Port가 없는 instance의 타입. 모든 이름이 `any`라서 이름이 틀려도 컴파일됩니다.
+- `Needs`에 Slot이 있어도 ref에는 나오지 않습니다. Slot은 ref에서 부를 수 없기 때문입니다. 그 ref를 [`usePort`](./usePort.md)에 넘기면 Slot을 꺼내 [`useConnect`](./useConnect.md)의 `destination`으로 쓸 수 있습니다.
 
 `TypedModelRef`로는 결과값을 읽을 수 없습니다. [`useModel`](./useModel.md)에는 `ModelInstance` 타입이 필요합니다. 일반 객체는 `TypedModelRef`에 넣을 수 없고, `createModel`이 반환한 instance만 넣을 수 있습니다.
 

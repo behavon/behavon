@@ -1,3 +1,4 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
 import type { BoundaryState, ModelInstance, Signal, StateSetter } from "behavon";
@@ -130,16 +131,19 @@ describe("React-aligned commit-phase lifecycle", () => {
     const second = Behavon.createModel(Behavon.boundary(Child), { label: "second", fail: false });
     const firstObserved = observeBoundary(first);
     const secondObserved = observeBoundary(second);
+    type ControllerPortType = { "fail": PortOnlySignal<any> };
+    const controllerPort = Behavon.createPort<ControllerPortType>({ "fail": Behavon.SignalType() });
     function Controller(): undefined {
       const fail = Behavon.useCallback(() => {
         firstObserved.setInput({ label: "first", fail: true });
         secondObserved.setInput({ label: "second", fail: true });
       }, []);
-      Behavon.useSignal("fail", fail);
+      Behavon.useSignal(controllerPort, "fail", fail);
+      Behavon.useExport(controllerPort, "fail");
       return undefined;
     }
 
-    const controller = Behavon.createModel(Controller, undefined);
+    const controller = Behavon.createModel((Controller as unknown as Model<any, any, ControllerPortType>), undefined);
     signalOf(controller, "fail")();
     await waitFor(() => firstObserved.state.status === "failed" && secondObserved.state.status === "failed");
     expect(trace).toEqual([
@@ -197,6 +201,8 @@ describe("React-aligned commit-phase lifecycle", () => {
     const terminalCleanupFailure = new Error("terminal cleanup");
     let setVersion: ((value: number) => void) | undefined;
 
+    type ModelPortType = { "fail": PortOnlySignal<any> };
+    const modelPort = Behavon.createPort<ModelPortType>({ "fail": Behavon.SignalType() });
     function Model(): undefined {
       const [version, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -211,11 +217,12 @@ describe("React-aligned commit-phase lifecycle", () => {
         throw terminalCleanupFailure;
       }, []);
       const fail = Behavon.useCallback(() => setValue(1), [setValue]);
-      Behavon.useSignal("fail", fail);
+      Behavon.useSignal(modelPort, "fail", fail);
+      Behavon.useExport(modelPort, "fail");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), undefined);
     let surfaced: unknown;
     const originalSetTimeout = globalThis.setTimeout;
     globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {

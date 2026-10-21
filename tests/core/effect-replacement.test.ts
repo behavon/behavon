@@ -1,6 +1,7 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
-import type { Signal, Slot, UntypedModelRef } from "behavon";
+import type { Signal, Slot, TypedModelRef } from "behavon";
 import { inspectSnapshotChannelForTests } from "../../src/internal/snapshot-channels";
 import { uniqueChannel, waitFor, signalOf } from "../helpers";
 
@@ -173,7 +174,7 @@ describe("Effect replacement failure bookkeeping", () => {
 
   it("does not install a replacement after its cleanup disposes the owner", async () => {
     const trace: string[] = [];
-    let root: UntypedModelRef | undefined;
+    let root: TypedModelRef<any> | undefined;
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
@@ -198,7 +199,7 @@ describe("Effect replacement failure bookkeeping", () => {
 
   it("balances a cleanup returned after setup disposes its owner", async () => {
     const trace: string[] = [];
-    let root: UntypedModelRef | undefined;
+    let root: TypedModelRef<any> | undefined;
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
@@ -221,7 +222,7 @@ describe("Effect replacement failure bookkeeping", () => {
 
   it("surfaces a balancing cleanup failure after setup disposes its owner", async () => {
     const cleanupFailure = new Error("balancing cleanup failed");
-    let root: UntypedModelRef | undefined;
+    let root: TypedModelRef<any> | undefined;
     let setVersion: ((value: number) => void) | undefined;
 
     function Model(): undefined {
@@ -288,17 +289,22 @@ describe("Effect failure root terminality", () => {
       };
     };
 
+    type KeeperPortType = { "alive": PortOnlySignal<any> };
+    const keeperPort = Behavon.createPort<KeeperPortType>({ "alive": Behavon.SignalType() });
     function Keeper(): undefined {
       Behavon.useSnapshot(channel);
       const alive = Behavon.useCallback(() => {
         independentCalls += 1;
       }, []);
-      Behavon.useSignal("alive", alive);
+      Behavon.useSignal(keeperPort, "alive", alive);
+      Behavon.useExport(keeperPort, "alive");
       return undefined;
     }
 
-    const keeper = Behavon.createModel(Keeper, undefined);
+    const keeper = Behavon.createModel((Keeper as unknown as Model<any, any, KeeperPortType>), undefined);
 
+    type FailingPortType = { "trigger": PortOnlySignal<any> };
+    const failingPort = Behavon.createPort<FailingPortType>({ "trigger": Behavon.SignalType() });
     function Failing(): undefined {
       const [phase, setPhase] = Behavon.useState(0);
       const [, publish] = Behavon.useSnapshot(channel);
@@ -317,11 +323,12 @@ describe("Effect failure root terminality", () => {
         publish(7);
         setPhase(1);
       }, [publish, setPhase]);
-      Behavon.useSignal("trigger", trigger);
+      Behavon.useSignal(failingPort, "trigger", trigger);
+      Behavon.useExport(failingPort, "trigger");
       return undefined;
     }
 
-    const root = Behavon.createModel(Failing, undefined);
+    const root = Behavon.createModel((Failing as unknown as Model<any, any, FailingPortType>), undefined);
     const retainedTrigger = signalOf(root, "trigger");
     const surfaced = await captureScheduledFailure(() => signalOf(root, "trigger")());
 

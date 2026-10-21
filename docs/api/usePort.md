@@ -4,11 +4,10 @@ Model 안에서 다른 instance가 바깥에 내놓은 것을 쓸 수 있는 객
 
 ```ts
 function usePort<Port>(ref: TypedModelRef<Port>): DependencyProxy<Port>
-function usePort(ref: UntypedModelRef): DependencyProxy
 ```
 
 - `ref`: 쓸 instance. 보통 Model input으로 받습니다.
-- Port 타입이 있는 instance를 넘기면 반환된 객체도 그 타입을 가집니다. Port가 없는 instance이면 모든 이름이 `any`입니다.
+- 반환된 객체는 넘긴 ref의 Port 타입을 따릅니다. Port가 없는 Model의 instance이면 쓸 수 있는 항목이 없습니다.
 
 반환된 객체로 쓸 수 있는 것은 다음과 같습니다.
 

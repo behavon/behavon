@@ -1,3 +1,4 @@
+import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
 import type { Signal, StateSetter } from "behavon";
@@ -216,6 +217,8 @@ describe("self render-phase updates", () => {
     const setups: number[] = [];
     let externalUpdaterCalls = 0;
 
+    type ModelPortType = { "start": PortOnlySignal<any> };
+    const modelPort = Behavon.createPort<ModelPortType>({ "start": Behavon.SignalType() });
     function Model(): undefined {
       const [value, setValue] = Behavon.useState(0);
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
@@ -229,14 +232,15 @@ describe("self render-phase updates", () => {
         externalUpdaterCalls += 1;
         return previous + 1;
       }), [setValue]);
-      Behavon.useSignal("start", start);
+      Behavon.useSignal(modelPort, "start", start);
+      Behavon.useExport(modelPort, "start");
       Behavon.useEffect(() => {
         setups.push(value);
       }, [value]);
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), undefined);
     expect(await captureScheduledFailure(() => signalOf(root, "start")())).toBe(failure);
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     expect(evaluations).toEqual([0, 1, 2]);
@@ -253,6 +257,8 @@ describe("self render-phase updates", () => {
     const failure = new Error("effect setup failed after scheduling state");
     const evaluations: Array<readonly [number, number]> = [];
 
+    type ModelPort1Type = { "advance": PortOnlySignal<any> };
+    const modelPort1 = Behavon.createPort<ModelPort1Type>({ "advance": Behavon.SignalType() });
     function Model(): undefined {
       const [value, setValue] = Behavon.useState(0);
       const [phase, setPhase] = Behavon.useState(0);
@@ -265,11 +271,12 @@ describe("self render-phase updates", () => {
         }
       }, [phase]);
       const advance = Behavon.useCallback(() => setPhase(1), [setPhase]);
-      Behavon.useSignal("advance", advance);
+      Behavon.useSignal(modelPort1, "advance", advance);
+      Behavon.useExport(modelPort1, "advance");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort1Type>), undefined);
     expect(await captureScheduledFailure(() => signalOf(root, "advance")())).toBe(failure);
     await Promise.resolve();
     expect(evaluations).toEqual([[0, 0], [0, 1]]);
@@ -291,6 +298,8 @@ describe("self render-phase updates", () => {
       };
     });
 
+    type ModelPort2Type = { "advance": PortOnlySignal<any> };
+    const modelPort2 = Behavon.createPort<ModelPort2Type>({ "advance": Behavon.SignalType() });
     function Model(): undefined {
       const [phase, setPhase] = Behavon.useState(0);
       if (phase === 1) setPhase(2);
@@ -299,11 +308,12 @@ describe("self render-phase updates", () => {
         () => phase,
       );
       const advance = Behavon.useCallback(() => setPhase(1), [setPhase]);
-      Behavon.useSignal("advance", advance);
+      Behavon.useSignal(modelPort2, "advance", advance);
+      Behavon.useExport(modelPort2, "advance");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort2Type>), undefined);
     expect(subscriptions).toEqual([1, 0, 0]);
     signalOf(root, "advance")();
     await waitFor(() => subscriptions[2] === 1);
@@ -339,17 +349,20 @@ describe("self render-phase updates", () => {
     }
 
     let evaluations = 0;
+    type ModelPort3Type = { "enableLoop": PortOnlySignal<any> };
+    const modelPort3 = Behavon.createPort<ModelPort3Type>({ "enableLoop": Behavon.SignalType() });
     function Model(): undefined {
       // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe records evaluation or dispatch behavior outside supported authoring
       evaluations += 1;
       const [enabled, setEnabled] = Behavon.useState(false);
       if (enabled) setEnabled(true);
       const enableLoop = Behavon.useCallback(() => setEnabled(true), [setEnabled]);
-      Behavon.useSignal("enableLoop", enableLoop);
+      Behavon.useSignal(modelPort3, "enableLoop", enableLoop);
+      Behavon.useExport(modelPort3, "enableLoop");
       return undefined;
     }
 
-    const root = Behavon.createModel(Model, undefined);
+    const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPort3Type>), undefined);
     expect(await captureScheduledFailure(() => signalOf(root, "enableLoop")())).toMatchObject({
       message: expect.stringMatching(/Behavon Model#\d+ exceeded 25 render-phase evaluation attempts/),
     });
