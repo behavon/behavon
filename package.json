@@ -38,7 +38,6 @@
     "dist/index.js",
     "dist/index.js.map",
     "dist/index.d.ts",
-    "dist/index.d.ts.map",
     "eslint.behavon-hooks.js",
     "eslint.behavon-hooks.d.ts",
     "README.md"
@@ -58,6 +57,14 @@
     "test:watch": "vitest",
     "pack:check": "npm pack --dry-run",
     "prepublishOnly": "npm test"
+  },
+  "peerDependencies": {
+    "eslint": ">=9"
+  },
+  "peerDependenciesMeta": {
+    "eslint": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
