@@ -11,6 +11,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./eslint": {
+      "types": "./eslint.behavon-hooks.d.ts",
+      "import": "./eslint.behavon-hooks.js"
     }
   },
   "types": "./dist/index.d.ts",
@@ -20,6 +24,7 @@
     "dist/index.d.ts",
     "dist/index.d.ts.map",
     "eslint.behavon-hooks.js",
+    "eslint.behavon-hooks.d.ts",
     "README.md"
   ],
   "scripts": {

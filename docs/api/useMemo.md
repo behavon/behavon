@@ -6,10 +6,14 @@ React의 `useMemo`와 같습니다. dependency가 바뀔 때만 값을 다시 �
 function useMemo<Value>(factory: () => Value, dependencies: readonly unknown[]): Value
 ```
 
-- `factory`: 값을 계산하는 함수.
-- `dependencies`: 이 값들이 이전과 `Object.is`로 모두 같으면 이전 값을 그대로 씁니다. 생략할 수 없습니다.
+## 인자
 
-배열의 길이가 이전과 달라지면 오류입니다. `factory` 안에서 Hook을 부르면 오류입니다.
+- `factory`: 값을 계산하는 함수. 안에서 Hook을 부를 수 없습니다.
+- `dependencies`: 이전과 `Object.is`로 모두 같으면 이전 값을 씁니다. 생략할 수 없고, 길이를 바꾸면 오류입니다.
+
+## 반환값
+
+계산한 값.
 
 ## 예제
 

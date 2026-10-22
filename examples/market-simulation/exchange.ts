@@ -42,7 +42,7 @@ export const Exchange: Model<ExchangeInput, number, ExchangePort> = (input) => {
   const { portfolios } = input;
   const viewId = Behavon.useExport(exchangePort, "view");
   const [market, setMarket] = Behavon.useState<{ readonly step: number; readonly prices: Prices }>({ step: 0, prices: {} });
-  const [trades, setTrades] = Behavon.useLabelState(states.trades, []);
+  const [trades] = Behavon.useLabelState(states.trades, []);
   const [refusals, setRefusals] = Behavon.useState<readonly Refusal[]>([]);
 
   const [, publish] = Behavon.useSnapshot(viewId);
@@ -62,8 +62,8 @@ export const Exchange: Model<ExchangeInput, number, ExchangePort> = (input) => {
       const id = Behavon.createId();
       Behavon.transaction.start(id, [states.trades]);
       try {
-        Behavon.transaction.run(id, () => {
-          setTrades((previous) => [...previous, { ...order, step, price }]);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(states.trades, (previous) => [...previous, { ...order, step, price }]);
           portfolio[order.side](order.stockId, order.quantity, price);
         });
       } catch (reason) {
@@ -74,7 +74,7 @@ export const Exchange: Model<ExchangeInput, number, ExchangePort> = (input) => {
       }
       Behavon.transaction.commit(id);
     }
-  }, [portfolios, setMarket, setRefusals, setTrades]);
+  }, [portfolios, setMarket, setRefusals]);
   Behavon.useSignal(exchangePort, "execute", execute);
   Behavon.useExport(exchangePort, "execute");
 

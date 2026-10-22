@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 import Behavon, * as BehavonNamespace from "behavon";
 import {
-  boundary,
   createId,
   createModel,
   createPort,
@@ -59,7 +58,6 @@ describe("React-style Behavon import surface", () => {
       useSignal,
       useSlot,
       useModel,
-      boundary,
       usePort,
       useConnect,
       useSnapshot,

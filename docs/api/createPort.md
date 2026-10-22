@@ -1,30 +1,31 @@
 # `createPort<Port>(declaration)`
 
-Model이 바깥에 내놓는 이름과 타입을 선언합니다. 이 선언을 쓰는 Model의 instance는 `Port` 타입을 가집니다.
+Model이 바깥에 내놓을 이름과 타입을 선언합니다.
 
 ```ts
 function createPort<Port>(declaration: { [Name in keyof Port]: Marker }): PortDescriptor<Port>
 ```
 
+## 인자
+
 - `Port`: 이름과 타입을 적은 interface. 각 항목은 `Signal<Args>`, `Slot<Args>`, `SnapshotRootId<T>` 중 하나입니다.
-- `declaration`: `Port`의 각 key에 맞는 marker를 적은 객체.
+- `declaration`: `Port`의 각 이름에 맞는 marker를 적은 객체. 타입 인자는 `Port`에서 정해지므로 다시 적지 않습니다.
 
-| `Port` 항목 | marker | 채우는 Hook |
+| `Port` 항목 | marker | Model에서 채우는 방법 |
 | --- | --- | --- |
-| `Signal<Args>` | `Behavon.SignalType()` | [`useSignal(port, name, callback)`](./useSignal.md) 후 [`useExport(port, name)`](./useExport.md) |
-| `Slot<Args>` | `Behavon.SlotType()` | [`useSlot(port, name, callback)`](./useSlot.md) |
-| `SnapshotRootId<T>` | `Behavon.SnapshotType()` | [`useExport(port, name)`](./useExport.md) |
+| `Signal<Args>` | `Behavon.SignalType()` | [`useSignal`](./useSignal.md)로 구현하고 [`useExport`](./useExport.md)로 엽니다. |
+| `Slot<Args>` | `Behavon.SlotType()` | [`useSlot`](./useSlot.md)으로 구현합니다. |
+| `SnapshotRootId<T>` | `Behavon.SnapshotType()` | [`useExport`](./useExport.md)로 엽니다. |
 
-marker의 타입 인자는 `Port`에서 정해지므로 다시 적지 않아도 됩니다.
+## 반환값
 
-## 규칙
+Port descriptor. `useSignal`·`useSlot`·`useExport`의 첫 인자로 넘깁니다.
 
-- 모듈 최상위에서 호출합니다. Model이 평가되는 도중에 부르면 오류입니다.
-- Model은 `Model<Input, Output, Port>`로 타입을 적습니다.
-- 선언한 항목은 모두 채워야 합니다. 빠뜨리면 Model을 만들 때 오류입니다.
-- Signal·Slot·공개 값은 모두 Port에 선언합니다. Port에 없는 이름으로 `useSignal`·`useSlot`·`useExport`를 부르면 오류입니다.
-- 한 Model은 Port를 하나만 씁니다. 두 Port를 섞으면 오류입니다.
-- `declaration`에는 `Port`의 모든 key를 직접 적습니다. 빠진 key, 남는 key, 역할이 다른 marker는 타입 오류입니다.
+## 동작
+
+- 모듈 최상위에서 한 번 만듭니다.
+- Model의 타입은 `Model<Input, Output, Port>`로 적습니다. 그러면 [`createModel`](./createModel.md)이 반환하는 instance가 `Port`에서 Slot을 뺀 타입을 가집니다.
+- 선언한 항목은 Model이 모두 채워야 합니다. 빠뜨리거나, 선언하지 않은 이름을 쓰거나, 한 Model에서 Port 두 개를 섞으면 Model을 평가할 때 오류입니다.
 
 ## 예제
 

@@ -37,7 +37,7 @@
 
 ## 주의
 
-- [`boundary`](../../docs/api/boundary.md)로 감싼 Model은 내부 Model의 Port를 바깥에 내놓지 않습니다. Slot으로 일하는 서비스는 `boundary`로 감쌀 수 없어서, 오류 격리는 Signal을 부르는 쪽(HTTP adapter)에서 합니다.
+- 오류 격리는 Signal을 부르는 쪽(HTTP adapter)에서 합니다.
 - 비동기 작업(`scrypt`)이 끝나기 전에 시간 초과로 응답했다면, 작업은 계속 진행되고 늦은 응답은 버려집니다. 이미 시작한 저장은 되돌리지 않습니다.
 - 예제입니다. session 만료, 로그아웃, 요청 수 제한, TLS 등은 다루지 않습니다.
 

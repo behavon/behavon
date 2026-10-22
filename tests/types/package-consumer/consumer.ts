@@ -4,7 +4,6 @@ import { use as removedUse } from "behavon";
 import type {
   BehavonInterfaceDescriptor,
   DependencyProxy,
-  BoundaryState,
   Model,
   ModelHandle,
   ModelInstance,
@@ -410,18 +409,18 @@ const packageTransactionPort = Behavon.createPort<{ packageTransaction: Signal }
 });
 
 export function useTransactionContract(): number {
-  const [count, setCount] = Behavon.useLabelState(packageStateId, 0);
+  const [count] = Behavon.useLabelState(packageStateId, 0);
   const execute = Behavon.useCallback(() => {
     const id: TransactionId = Behavon.createId();
     Behavon.transaction.start(id, [packageStateId]);
-    Behavon.transaction.run(id, () => setCount((previous) => previous + 1));
+    Behavon.transaction.run(id, ({ get, set }) => set(packageStateId, get(packageStateId) + 1));
     // @ts-expect-error Built transaction.run rejects async bodies.
     Behavon.transaction.run(id, async () => 1); // eslint-disable-line behavon-hooks/evaluation-purity -- type-only invalid synchronous-contract probe
     const thenableBody = (): PromiseLike<number> => Promise.resolve(1);
     // @ts-expect-error Built transaction.run rejects PromiseLike-returning bodies.
     Behavon.transaction.run(id, thenableBody);
     Behavon.transaction.commit(id);
-  }, [setCount]);
+  }, []);
   Behavon.useSignal(packageTransactionPort, "packageTransaction", execute);
   Behavon.useExport(packageTransactionPort, "packageTransaction");
   return count;
@@ -702,10 +701,6 @@ export function useConnectSchemaLessDependencies(sourceRef: TypedModelRef<any>, 
 export function useInferredModelHandle(instance: ModelInstance<number, number>) {
   const handle: ModelHandle<number, number> = Behavon.useModel(instance);
   return handle;
-}
-
-export function createInferredBoundaryModel(): Model<number, BoundaryState<number>> {
-  return Behavon.boundary(Child);
 }
 
 export function createRoot(input: number): TypedModelRef<object> {

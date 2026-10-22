@@ -1,24 +1,29 @@
 # `useSignal(port, name, callback)`
 
-Signal을 만들고, 그 Signal을 발생시키는 함수를 반환합니다.
+Signal을 만듭니다. Signal을 부르면 `callback`을 실행하고, 연결된 Slot에 같은 인자를 전달합니다.
 
 ```ts
 function useSignal<Port>(port: PortDescriptor<Port>, name: keyof Port, callback: (...args: Args) => unknown): Signal<Args>
 ```
 
-- `port`, `name`: [`createPort`](./createPort.md)에 `SignalType()`으로 선언한 항목. Port가 아니거나 선언하지 않은 이름이면 오류입니다. `callback`의 인자 타입은 선언과 맞아야 합니다.
-- `callback`: 같은 Model에서 [`useCallback`](./useCallback.md)으로 만든 함수. 일반 함수를 넘기면 오류입니다.
+## 인자
 
-반환된 Signal을 호출하면 다음 순서로 실행됩니다.
+- `port`, `name`: [`createPort`](./createPort.md)에 `SignalType()`으로 선언한 항목.
+- `callback`: 같은 Model에서 [`useCallback`](./useCallback.md)으로 만든 함수. 인자 타입은 선언과 맞아야 합니다.
 
-1. 같은 이름으로 등록한 `callback`을 등록 순서대로 그 자리에서 실행합니다.
-2. `useConnect`로 연결된 Slot에 같은 인자를 전달합니다.
+## 반환값
 
-반환값은 항상 `undefined`입니다. `callback`이 오류를 던지면 거기서 멈추고 그 오류가 호출한 쪽으로 전달됩니다. `callback`에서 state를 바꾸면 Model은 호출 직후가 아니라 다음 microtask에 다시 평가됩니다.
+Signal. 부르면 다음을 그 자리에서 실행하고 `undefined`를 반환합니다.
 
-Port에 선언한 Signal은 [`useExport(port, name)`](./useExport.md)로 열어야 합니다. 열지 않으면 Model을 만들 때 오류입니다. 같은 이름의 `useSignal`을 모두 부른 뒤에 엽니다. 연 뒤에 같은 이름으로 다시 등록하면 오류입니다. 연 Signal은 instance와 [`usePort`](./usePort.md) 결과에서 호출할 수 있습니다. 종료된 Model의 Signal을 호출하면 오류입니다.
+1. 같은 이름으로 등록한 `callback`을 등록 순서대로 실행합니다.
+2. [`useConnect`](./useConnect.md)로 연결된 Slot에 같은 인자를 전달합니다.
 
-Model 본문에서 바로 호출하지 말고 [`useEffect`](./useEffect.md)나 다른 callback 안에서 호출하세요. 개발 모드에서는 본문에서 호출하면 경고를 출력합니다.
+## 동작
+
+- 선언한 Signal은 [`useExport`](./useExport.md)로 열어야 합니다. 열면 instance와 [`usePort`](./usePort.md)의 결과에서 부를 수 있습니다.
+- `callback`이나 Slot이 throw하면 거기서 멈추고, 그 오류가 Signal을 부른 쪽으로 throw됩니다.
+- `callback`에서 state를 바꾸면 Model은 Signal이 반환한 뒤 다음 microtask에 다시 평가됩니다.
+- Model 본문에서 부르지 말고 [`useEffect`](./useEffect.md)나 callback 안에서 부릅니다. 개발 모드에서는 본문에서 부르면 경고를 출력합니다.
 
 ## 예제
 

@@ -1,17 +1,20 @@
 # `getInterface(target)`
 
-Instance에 등록된 Signal·Slot 이름과 등록 수를 반환합니다. 디버깅이나 도구에서 instance의 모양을 확인할 때 씁니다.
+instance에 등록된 Signal·Slot의 이름과 등록 수를 반환합니다. 디버깅이나 도구에서 씁니다.
 
 ```ts
-function getInterface(target: ModelInstance | TypedModelRef | DependencyProxy): {
+function getInterface(target: TypedModelRef | DependencyProxy): {
   endpoints: readonly { name: string; signalRegistrations: number; slotRegistrations: number }[]
 }
 ```
 
-- `target`: [`createModel`](./createModel.md)이 반환한 instance나 [`usePort`](./usePort.md) 결과.
-- `endpoints`: 등록한 순서대로 나열합니다. Signal과 Slot을 보여 주고, snapshot 공개 값은 포함하지 않습니다.
+## 인자
 
-종료된 instance를 넘기면 오류입니다.
+- `target`: [`createModel`](./createModel.md)이 반환한 instance나 [`usePort`](./usePort.md)의 결과. 종료된 instance를 넘기면 오류입니다.
+
+## 반환값
+
+- `endpoints`: 등록한 순서대로 나열한 Signal과 Slot. snapshot id는 들어가지 않습니다.
 
 ## 예제
 

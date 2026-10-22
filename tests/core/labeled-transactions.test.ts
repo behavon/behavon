@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import Behavon from "behavon";
-import type { Model, ModelInstance, Signal, Slot, TransactionId } from "behavon";
+import type { Model, ModelInstance, Signal, Slot, TransactionAccess, TransactionId } from "behavon";
 import { inspectModelInstanceForTests } from "../../src/internal/model-inspection";
 import { inspectMutableStateForTests, type MutableStateSubject } from "../../src/internal/mutable-observer";
 import { waitFor } from "../helpers";
@@ -22,18 +22,18 @@ describe("labeled transactions", () => {
     const observations: Array<readonly [number, number]> = [];
 
     const Model: Model<undefined, readonly [number, number], Port> = () => {
-      const [first, setFirst] = Behavon.useLabelState(states.first, 0);
-      const [second, setSecond] = Behavon.useLabelState(states.second, 0);
+      const [first] = Behavon.useLabelState(states.first, 0);
+      const [second] = Behavon.useLabelState(states.second, 0);
       const execute = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [states.first, states.second]);
-        Behavon.transaction.run(id, () => {
-          setFirst(1);
-          setSecond(2);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(states.first, 1);
+          set(states.second, 2);
           observations.push(outputOf<readonly [number, number]>(instance as object));
         });
         Behavon.transaction.commit(id);
-      }, [setFirst, setSecond]);
+      }, []);
       Behavon.useSignal(port, "execute", execute);
       Behavon.useExport(port, "execute");
       return [first, second] as const;
@@ -54,15 +54,15 @@ describe("labeled transactions", () => {
     const port = Behavon.createPort<Port>({ fail: Behavon.SignalType() });
     const states = Behavon.createId({ value: Behavon.StateType<number>() });
     const Model: Model<undefined, number, Port> = () => {
-      const [value, setValue] = Behavon.useLabelState(states.value, 0);
+      const [value] = Behavon.useLabelState(states.value, 0);
       const fail = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [states.value]);
-        Behavon.transaction.run(id, () => {
-          setValue(1);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(states.value, 1);
           throw failure;
         });
-      }, [setValue]);
+      }, []);
       Behavon.useSignal(port, "fail", fail);
       Behavon.useExport(port, "fail");
       return value;
@@ -165,15 +165,15 @@ describe("labeled transactions", () => {
     const port = Behavon.createPort<Port>({ execute: Behavon.SignalType() });
     const states = Behavon.createId({ value: Behavon.StateType<number>() });
     const Model: Model<undefined, number, Port> = () => {
-      const [value, setValue] = Behavon.useLabelState(states.value, 0);
+      const [value] = Behavon.useLabelState(states.value, 0);
       const execute = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [states.value]);
-        const asyncBody = (async () => {
-          setValue(1);
+        const asyncBody = (async ({ set }: TransactionAccess) => {
+          set(states.value, 1);
         }) as unknown as () => void;
         Behavon.transaction.run(id, asyncBody);
-      }, [setValue]);
+      }, []);
       Behavon.useSignal(port, "execute", execute);
       Behavon.useExport(port, "execute");
       return value;
@@ -195,18 +195,18 @@ describe("labeled transactions", () => {
     });
     const Model: Model<undefined, readonly [number, number], Port> = () => {
       const [first] = Behavon.useLabelState(states.first, 0);
-      const [second, setSecond] = Behavon.useLabelState(states.second, 0);
+      const [second] = Behavon.useLabelState(states.second, 0);
       const execute = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [states.first]);
-        Behavon.transaction.run(id, () => setSecond(1));
-      }, [setSecond]);
+        Behavon.transaction.run(id, ({ set }) => set(states.second, 1));
+      }, []);
       Behavon.useSignal(port, "execute", execute);
       Behavon.useExport(port, "execute");
       return [first, second] as const;
     };
     const instance = Behavon.createModel(Model, undefined);
-    expect(() => instance.execute()).toThrow(/active transaction\.start lock list/);
+    expect(() => instance.execute()).toThrow(/requires a StateId locked by this transaction\.start/);
     expect(outputOf(instance as object)).toEqual([0, 0]);
     instance.dispose();
   });
@@ -218,12 +218,12 @@ describe("labeled transactions", () => {
     const port = Behavon.createPort<Port>({ open: Behavon.SignalType() });
     const states = Behavon.createId({ value: Behavon.StateType<number>() });
     const Model: Model<undefined, number, Port> = () => {
-      const [value, setValue] = Behavon.useLabelState(states.value, 0);
+      const [value] = Behavon.useLabelState(states.value, 0);
       const open = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [states.value]);
-        Behavon.transaction.run(id, () => setValue(1));
-      }, [setValue]);
+        Behavon.transaction.run(id, ({ set }) => set(states.value, 1));
+      }, []);
       Behavon.useSignal(port, "open", open);
       Behavon.useExport(port, "open");
       return value;
@@ -250,13 +250,13 @@ describe("labeled transactions", () => {
     const childStates = Behavon.createId({ value: Behavon.StateType<number>() });
     const parentStates = Behavon.createId({ value: Behavon.StateType<number>() });
     const Child: Model<undefined, number, ChildPort> = () => {
-      const [value, setValue] = Behavon.useLabelState(childStates.value, 0);
+      const [value] = Behavon.useLabelState(childStates.value, 0);
       const add = Behavon.useCallback((amount: number) => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [childStates.value]);
-        Behavon.transaction.run(id, () => setValue((previous) => previous + amount));
+        Behavon.transaction.run(id, ({ set }) => set(childStates.value, (previous) => previous + amount));
         Behavon.transaction.commit(id);
-      }, [setValue]);
+      }, []);
       Behavon.useSignal(childPort, "add", add);
       Behavon.useExport(childPort, "add");
       return value;
@@ -266,16 +266,16 @@ describe("labeled transactions", () => {
     }, number, ParentPort> = (input) => {
       const child = input.child;
       const [childValue] = Behavon.useModel(child);
-      const [value, setValue] = Behavon.useLabelState(parentStates.value, 0);
+      const [value] = Behavon.useLabelState(parentStates.value, 0);
       const execute = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [parentStates.value]);
-        Behavon.transaction.run(id, () => {
-          setValue(1);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(parentStates.value, 1);
           child.add(2);
         });
         Behavon.transaction.commit(id);
-      }, [child, setValue]);
+      }, [child]);
       Behavon.useSignal(parentPort, "execute", execute);
       Behavon.useExport(parentPort, "execute");
       return value + childValue;
@@ -301,11 +301,11 @@ describe("labeled transactions", () => {
     const stateIds = Behavon.createId({ value: Behavon.StateType<number>() });
     const sharedId = Behavon.createId();
     const Model: Model<undefined, number, Port> = () => {
-      const [value, setValue] = Behavon.useLabelState(stateIds.value, 0);
+      const [value] = Behavon.useLabelState(stateIds.value, 0);
       const open = Behavon.useCallback((amount: number) => {
         Behavon.transaction.start(sharedId, [stateIds.value]);
-        Behavon.transaction.run(sharedId, () => setValue(amount));
-      }, [setValue]);
+        Behavon.transaction.run(sharedId, ({ set }) => set(stateIds.value, amount));
+      }, []);
       const finish = Behavon.useCallback(() => Behavon.transaction.commit(sharedId), []);
       Behavon.useSignal(port, "open", open);
       Behavon.useExport(port, "open");
@@ -347,11 +347,11 @@ describe("labeled transactions", () => {
     const states = Behavon.createId({ value: Behavon.StateType<number>() });
     const sharedId = Behavon.createId();
     const Owner: Model<undefined, number, OwnerPort> = () => {
-      const [value, setValue] = Behavon.useLabelState(states.value, 0);
+      const [value] = Behavon.useLabelState(states.value, 0);
       const open = Behavon.useCallback(() => {
         Behavon.transaction.start(sharedId, [states.value]);
-        Behavon.transaction.run(sharedId, () => setValue(1));
-      }, [setValue]);
+        Behavon.transaction.run(sharedId, ({ set }) => set(states.value, 1));
+      }, []);
       const finish = Behavon.useCallback(() => Behavon.transaction.commit(sharedId), []);
       Behavon.useSignal(ownerPort, "open", open);
       Behavon.useExport(ownerPort, "open");
@@ -407,27 +407,27 @@ describe("labeled transactions", () => {
     const sharedId = Behavon.createId();
 
     const Source: Model<undefined, number, SourcePort> = () => {
-      const [value, setValue] = Behavon.useLabelState(sourceStates.value, 0);
+      const [value] = Behavon.useLabelState(sourceStates.value, 0);
       const changedBody = Behavon.useCallback((_sourceId: TransactionId) => undefined, []);
       const changed = Behavon.useSignal(sourcePort, "changed", changedBody);
       Behavon.useExport(sourcePort, "changed");
       const transfer = Behavon.useCallback(() => {
         Behavon.transaction.start(sharedId, [sourceStates.value]);
-        Behavon.transaction.run(sharedId, () => {
-          setValue(1);
+        Behavon.transaction.run(sharedId, ({ set }) => {
+          set(sourceStates.value, 1);
           changed(sharedId);
         });
-      }, [changed, setValue]);
+      }, [changed]);
       Behavon.useSignal(sourcePort, "transfer", transfer);
       Behavon.useExport(sourcePort, "transfer");
       return value;
     };
     const Target: Model<undefined, number, TargetPort> = () => {
-      const [value, setValue] = Behavon.useLabelState(targetStates.value, 0);
+      const [value] = Behavon.useLabelState(targetStates.value, 0);
       const openOwn = Behavon.useCallback(() => {
         Behavon.transaction.start(sharedId, [targetStates.value]);
-        Behavon.transaction.run(sharedId, () => setValue(10));
-      }, [setValue]);
+        Behavon.transaction.run(sharedId, ({ set }) => set(targetStates.value, 10));
+      }, []);
       const finishOwn = Behavon.useCallback(() => Behavon.transaction.commit(sharedId), []);
       const receive = Behavon.useCallback((sourceId: TransactionId) => {
         Behavon.transaction.commit(sourceId);
@@ -474,13 +474,13 @@ describe("labeled transactions", () => {
     const parentPort = Behavon.createPort<ParentPort>({ open: Behavon.SignalType() });
     const childStates = Behavon.createId({ value: Behavon.StateType<number>() });
     const Child: Model<undefined, number, ChildPort> = () => {
-      const [value, setValue] = Behavon.useLabelState(childStates.value, 0);
+      const [value] = Behavon.useLabelState(childStates.value, 0);
       const add = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [childStates.value]);
-        Behavon.transaction.run(id, () => setValue((previous) => previous + 1));
+        Behavon.transaction.run(id, ({ set }) => set(childStates.value, (previous) => previous + 1));
         Behavon.transaction.commit(id);
-      }, [setValue]);
+      }, []);
       Behavon.useSignal(childPort, "add", add);
       Behavon.useExport(childPort, "add");
       return value;
@@ -526,13 +526,13 @@ describe("labeled transactions", () => {
     const childStates = Behavon.createId({ value: Behavon.StateType<number>() });
     const parentStates = Behavon.createId({ failed: Behavon.StateType<boolean>() });
     const Child: Model<undefined, number, ChildPort> = () => {
-      const [value, setValue] = Behavon.useLabelState(childStates.value, 0);
+      const [value] = Behavon.useLabelState(childStates.value, 0);
       const add = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [childStates.value]);
-        Behavon.transaction.run(id, () => setValue((previous) => previous + 1));
+        Behavon.transaction.run(id, ({ set }) => set(childStates.value, (previous) => previous + 1));
         Behavon.transaction.commit(id);
-      }, [setValue]);
+      }, []);
       Behavon.useSignal(childPort, "add", add);
       Behavon.useExport(childPort, "add");
       return value;
@@ -541,7 +541,7 @@ describe("labeled transactions", () => {
       child: ModelInstance<undefined, number, ChildPort>;
     }, boolean, ParentPort> = (input) => {
       const child = input.child;
-      const [failed, setFailed] = Behavon.useLabelState(parentStates.failed, false);
+      const [failed] = Behavon.useLabelState(parentStates.failed, false);
       const open = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, []);
@@ -550,9 +550,9 @@ describe("labeled transactions", () => {
       const fail = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [parentStates.failed]);
-        Behavon.transaction.run(id, () => setFailed(true));
+        Behavon.transaction.run(id, ({ set }) => set(parentStates.failed, true));
         Behavon.transaction.commit(id);
-      }, [setFailed]);
+      }, []);
       Behavon.useSignal(parentPort, "open", open);
       Behavon.useExport(parentPort, "open");
       Behavon.useSignal(parentPort, "fail", fail);
@@ -579,23 +579,23 @@ describe("labeled transactions", () => {
     const port = Behavon.createPort<Port>({ execute: Behavon.SignalType() });
     const states = Behavon.createId({ value: Behavon.StateType<number>() });
     const Model: Model<undefined, number, Port> = () => {
-      const [value, setValue] = Behavon.useLabelState(states.value, 0);
+      const [value] = Behavon.useLabelState(states.value, 0);
       const execute = Behavon.useCallback((rollbackNested: boolean) => {
         const outer = Behavon.createId();
         Behavon.transaction.start(outer, [states.value]);
-        Behavon.transaction.run(outer, () => {
-          setValue((previous) => previous * 10 + 1);
+        Behavon.transaction.run(outer, ({ set }) => {
+          set(states.value, (previous) => previous * 10 + 1);
           const nested = Behavon.createId();
           Behavon.transaction.start(nested, [states.value]);
-          Behavon.transaction.run(nested, () => {
-            setValue((previous) => previous * 10 + 2);
+          Behavon.transaction.run(nested, ({ set }) => {
+            set(states.value, (previous) => previous * 10 + 2);
           });
           if (rollbackNested) Behavon.transaction.rollback(nested);
           else Behavon.transaction.commit(nested);
-          setValue((previous) => previous * 10 + 3);
+          set(states.value, (previous) => previous * 10 + 3);
         });
         Behavon.transaction.commit(outer);
-      }, [setValue]);
+      }, []);
       Behavon.useSignal(port, "execute", execute);
       Behavon.useExport(port, "execute");
       return value;
@@ -619,18 +619,18 @@ describe("labeled transactions", () => {
     const states = Behavon.createId({ labeled: Behavon.StateType<number>() });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const Model: Model<undefined, readonly [number, number], Port> = () => {
-      const [labeled, setLabeled] = Behavon.useLabelState(states.labeled, 0);
+      const [labeled] = Behavon.useLabelState(states.labeled, 0);
       const [plain, setPlain] = Behavon.useState(0);
       const execute = Behavon.useCallback((commit: boolean) => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [states.labeled]);
-        Behavon.transaction.run(id, () => {
-          setLabeled(1);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(states.labeled, 1);
           setPlain(1);
         });
         if (commit) Behavon.transaction.commit(id);
         else Behavon.transaction.rollback(id);
-      }, [setLabeled, setPlain]);
+      }, [setPlain]);
       Behavon.useSignal(port, "execute", execute);
       Behavon.useExport(port, "execute");
       return [labeled, plain] as const;
@@ -673,18 +673,18 @@ describe("labeled transactions", () => {
     const Failing: Model<{
       plain: ModelInstance<undefined, number, PlainPort>;
     }, boolean, FailingPort> = (input) => {
-      const [failed, setFailed] = Behavon.useLabelState(states.fail, false);
+      const [failed] = Behavon.useLabelState(states.fail, false);
       if (failed) throw failure;
       const plain = input.plain;
       const execute = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [states.fail]);
-        Behavon.transaction.run(id, () => {
-          setFailed(true);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(states.fail, true);
           plain.set(7);
         });
         Behavon.transaction.commit(id);
-      }, [plain, setFailed]);
+      }, [plain]);
       Behavon.useSignal(failingPort, "execute", execute);
       Behavon.useExport(failingPort, "execute");
       return failed;
@@ -706,13 +706,13 @@ describe("labeled transactions", () => {
     const port = Behavon.createPort<Port>({ execute: Behavon.SignalType() });
     const states = Behavon.createId({ value: Behavon.StateType<number>() });
     const Model: Model<undefined, number, Port> = () => {
-      const [value, setValue] = Behavon.useLabelState(states.value, 0);
+      const [value] = Behavon.useLabelState(states.value, 0);
       const execute = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [states.value]);
-        Behavon.transaction.run(id, () => setValue(1));
+        Behavon.transaction.run(id, ({ set }) => set(states.value, 1));
         Behavon.transaction.commit(id);
-      }, [setValue]);
+      }, []);
       Behavon.useSignal(port, "execute", execute);
       Behavon.useExport(port, "execute");
       Behavon.useEffect(() => {
@@ -728,5 +728,218 @@ describe("labeled transactions", () => {
     expect(() => instance.execute()).toThrow(failure);
     expect(cell.value).toBe(1);
     expect(inspectMutableStateForTests(cell).status).toBe("released");
+  });
+});
+
+describe("transaction run get and set", () => {
+  class InsufficientFunds extends Error {}
+
+  it("lets get see earlier set calls in the same run and refuses the second withdrawal", () => {
+    interface Port {
+      withdrawTwice: Signal<[first: number, second: number]>;
+    }
+    const port = Behavon.createPort<Port>({ withdrawTwice: Behavon.SignalType() });
+    const states = Behavon.createId({ balance: Behavon.StateType<number>() });
+    const seen: number[] = [];
+    const Account: Model<undefined, number, Port> = () => {
+      const [balance] = Behavon.useLabelState(states.balance, 100);
+      const withdrawTwice = Behavon.useCallback((first: number, second: number) => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, [states.balance]);
+        Behavon.transaction.run(id, ({ get, set }) => {
+          for (const amount of [first, second]) {
+            seen.push(get(states.balance));
+            if (get(states.balance) < amount) throw new InsufficientFunds();
+            set(states.balance, get(states.balance) - amount);
+          }
+        });
+        Behavon.transaction.commit(id);
+      }, []);
+      Behavon.useSignal(port, "withdrawTwice", withdrawTwice);
+      Behavon.useExport(port, "withdrawTwice");
+      return balance;
+    };
+    const account = Behavon.createModel(Account, undefined);
+
+    expect(() => account.withdrawTwice(80, 30)).toThrow(InsufficientFunds);
+    expect(seen).toEqual([100, 20]);
+    expect(outputOf(account as object)).toBe(100);
+
+    account.withdrawTwice(60, 30);
+    expect(outputOf(account as object)).toBe(10);
+    account.dispose();
+  });
+
+  it("runs a set function at once and rolls back without ending the Model when it throws", () => {
+    interface Port {
+      update: Signal<[fail: boolean]>;
+    }
+    const port = Behavon.createPort<Port>({ update: Behavon.SignalType() });
+    const states = Behavon.createId({ value: Behavon.StateType<number>() });
+    const calls: string[] = [];
+    const Counter: Model<undefined, number, Port> = () => {
+      const [value] = Behavon.useLabelState(states.value, 1);
+      const update = Behavon.useCallback((fail: boolean) => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, [states.value]);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(states.value, (last) => {
+            calls.push(`updater:${last}`);
+            if (fail) throw new Error("refused");
+            return last + 1;
+          });
+          calls.push("after set");
+        });
+        Behavon.transaction.commit(id);
+      }, []);
+      Behavon.useSignal(port, "update", update);
+      Behavon.useExport(port, "update");
+      return value;
+    };
+    const counter = Behavon.createModel(Counter, undefined);
+
+    expect(() => counter.update(true)).toThrow("refused");
+    expect(calls).toEqual(["updater:1"]);
+    expect(outputOf(counter as object)).toBe(1);
+
+    calls.length = 0;
+    counter.update(false);
+    expect(calls).toEqual(["updater:1", "after set"]);
+    expect(outputOf(counter as object)).toBe(2);
+    counter.dispose();
+  });
+
+  it("keeps a function returned by a set updater as the stored value", () => {
+    interface Port {
+      replace: Signal;
+    }
+    const port = Behavon.createPort<Port>({ replace: Behavon.SignalType() });
+    const states = Behavon.createId({ format: Behavon.StateType<(value: number) => string>() });
+    const initial = (value: number) => `initial ${value}`;
+    const replacement = (value: number) => `replacement ${value}`;
+    const Formatter: Model<undefined, (value: number) => string, Port> = () => {
+      const [format] = Behavon.useLabelState(states.format, () => initial);
+      const replace = Behavon.useCallback(() => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, [states.format]);
+        Behavon.transaction.run(id, ({ set }) => set(states.format, () => replacement));
+        Behavon.transaction.commit(id);
+      }, []);
+      Behavon.useSignal(port, "replace", replace);
+      Behavon.useExport(port, "replace");
+      return format;
+    };
+    const formatter = Behavon.createModel(Formatter, undefined);
+    formatter.replace();
+    expect(outputOf(formatter as object)).toBe(replacement);
+    formatter.dispose();
+  });
+
+  it("rejects get and set for a state outside the lock list, a locked setter inside run, and access after run", () => {
+    interface Port {
+      probe: Signal<[mode: "get" | "set" | "setter" | "unlockedSetter" | "late"]>;
+    }
+    const port = Behavon.createPort<Port>({ probe: Behavon.SignalType() });
+    const states = Behavon.createId({
+      locked: Behavon.StateType<number>(),
+      other: Behavon.StateType<number>(),
+    });
+    let retained: TransactionAccess | undefined;
+    const Probe: Model<undefined, readonly [number, number], Port> = () => {
+      const [locked, setLocked] = Behavon.useLabelState(states.locked, 0);
+      const [other, setOther] = Behavon.useLabelState(states.other, 0);
+      const probe = Behavon.useCallback((mode: "get" | "set" | "setter" | "unlockedSetter" | "late") => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, [states.locked]);
+        try {
+          Behavon.transaction.run(id, (access) => {
+            retained = access;
+            if (mode === "get") access.get(states.other);
+            if (mode === "set") access.set(states.other, 1);
+            if (mode === "setter") setLocked(1);
+            if (mode === "unlockedSetter") setOther(1);
+          });
+          if (mode === "late") retained?.get(states.locked);
+          Behavon.transaction.commit(id);
+        } catch (error) {
+          if (mode === "late") Behavon.transaction.rollback(id);
+          throw error;
+        }
+      }, [setLocked, setOther]);
+      Behavon.useSignal(port, "probe", probe);
+      Behavon.useExport(port, "probe");
+      return [locked, other] as const;
+    };
+    const probe = Behavon.createModel(Probe, undefined);
+
+    expect(() => probe.probe("get")).toThrow("Behavon transaction get requires a StateId locked by this transaction.start");
+    expect(() => probe.probe("set")).toThrow("Behavon transaction set requires a StateId locked by this transaction.start");
+    expect(() => probe.probe("setter")).toThrow(
+      "Behavon.useLabelState setter cannot change a locked state inside transaction.run; use set from the run body",
+    );
+    expect(() => probe.probe("unlockedSetter")).toThrow(
+      "Behavon.useLabelState setter requires its StateId in the active transaction.start lock list",
+    );
+    expect(() => probe.probe("late")).toThrow("Behavon transaction get can be used only while its run body executes");
+    expect(outputOf(probe as object)).toEqual([0, 0]);
+    probe.dispose();
+  });
+
+  it("lets a joined Model see its own earlier change in the same root and rolls the whole root back", () => {
+    interface AccountPort {
+      withdraw: Signal<[amount: number]>;
+    }
+    const accountPort = Behavon.createPort<AccountPort>({ withdraw: Behavon.SignalType() });
+    const accountStates = Behavon.createId({ balance: Behavon.StateType<number>() });
+    const Account: Model<undefined, number, AccountPort> = () => {
+      const [balance] = Behavon.useLabelState(accountStates.balance, 100);
+      const withdraw = Behavon.useCallback((amount: number) => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, [accountStates.balance]);
+        Behavon.transaction.run(id, ({ get, set }) => {
+          if (get(accountStates.balance) < amount) throw new InsufficientFunds();
+          set(accountStates.balance, get(accountStates.balance) - amount);
+        });
+        Behavon.transaction.commit(id);
+      }, []);
+      Behavon.useSignal(accountPort, "withdraw", withdraw);
+      Behavon.useExport(accountPort, "withdraw");
+      return balance;
+    };
+
+    interface BankPort {
+      pay: Signal<[amount: number, fee: number]>;
+    }
+    const bankPort = Behavon.createPort<BankPort>({ pay: Behavon.SignalType() });
+    const bankStates = Behavon.createId({ payments: Behavon.StateType<number>() });
+    const Bank: Model<ModelInstance<undefined, number, AccountPort>, number, BankPort> = (account) => {
+      const [payments] = Behavon.useLabelState(bankStates.payments, 0);
+      const pay = Behavon.useCallback((amount: number, fee: number) => {
+        const id = Behavon.createId();
+        Behavon.transaction.start(id, [bankStates.payments]);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(bankStates.payments, (count) => count + 1);
+          account.withdraw(amount);
+          account.withdraw(fee);
+        });
+        Behavon.transaction.commit(id);
+      }, [account]);
+      Behavon.useSignal(bankPort, "pay", pay);
+      Behavon.useExport(bankPort, "pay");
+      return payments;
+    };
+
+    const account = Behavon.createModel(Account, undefined);
+    const bank = Behavon.createModel(Bank, account);
+
+    expect(() => bank.pay(80, 30)).toThrow(InsufficientFunds);
+    expect(outputOf(account as object)).toBe(100);
+    expect(outputOf(bank as object)).toBe(0);
+
+    bank.pay(60, 30);
+    expect(outputOf(account as object)).toBe(10);
+    expect(outputOf(bank as object)).toBe(1);
+    bank.dispose();
+    account.dispose();
   });
 });

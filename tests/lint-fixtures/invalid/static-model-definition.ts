@@ -96,7 +96,6 @@ export function createDynamicModels(): void {
   Behavon.createModel(NestedModel, undefined);
   Behavon.createModel(() => undefined, undefined);
   Behavon.createModel(function ExpressionModel() { return undefined; }, undefined);
-  Behavon.boundary(StaticModel);
   Behavon.createModel(selectModel(), undefined);
   const selected = selectModel();
   Behavon.createModel(selected, undefined);

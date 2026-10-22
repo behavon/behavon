@@ -7,20 +7,18 @@ import { uniqueChannel, waitFor, signalOf } from "../helpers";
 
 async function captureScheduledFailure(action: () => void): Promise<unknown> {
   let surfaced: unknown;
-  const originalSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-    try {
-      if (typeof handler === "function") handler();
-    } catch (error: unknown) {
-      surfaced = error;
-    }
-    return originalSetTimeout(() => undefined, 0);
-  }) as typeof setTimeout;
+  const originalEmit = process.emit;
+  process.emit = ((event: string | symbol, ...args: unknown[]) => {
+    if (event !== "uncaughtException") return Reflect.apply(originalEmit, process, [event, ...args]) as boolean;
+    const error = args[0];
+    surfaced = error;
+    return true;
+  }) as typeof process.emit;
   try {
     action();
     await Promise.resolve();
   } finally {
-    globalThis.setTimeout = originalSetTimeout;
+    process.emit = originalEmit;
   }
   return surfaced;
 }

@@ -1,30 +1,8 @@
 import type { Model, Signal as PortOnlySignal, Slot as PortOnlySlot } from "behavon";
 import { describe, expect, it } from "vitest";
 import Behavon from "behavon";
-import type { BoundaryState, ModelInstance, Signal, StateSetter } from "behavon";
+import type { Signal } from "behavon";
 import { waitFor, signalOf } from "../helpers";
-
-function observeBoundary<Input, Output>(instance: ModelInstance<Input, BoundaryState<Output>>) {
-  let state: BoundaryState<Output> | undefined;
-  let setInput: StateSetter<Input> | undefined;
-  function Observer(): undefined {
-    // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains a Hook result or records synchronous evaluation behavior
-    [state, setInput] = Behavon.useModel(instance);
-    return undefined;
-  }
-  const observer = Behavon.createModel(Observer, undefined);
-  return {
-    get state() {
-      return state as BoundaryState<Output>;
-    },
-    get setInput() {
-      return setInput as StateSetter<Input>;
-    },
-    dispose() {
-      observer.dispose();
-    },
-  };
-}
 
 describe("React-aligned commit-phase lifecycle", () => {
   it("runs interleaved Hook cleanups and setups in declaration order across kinds", async () => {
@@ -70,130 +48,6 @@ describe("React-aligned commit-phase lifecycle", () => {
     root.dispose();
   });
 
-  it("continues the whole pass and projects same-Boundary errors in encounter order", async () => {
-    const cleanupFailure = new Error("first cleanup");
-    const setupFailure = new Error("first setup");
-    const trace: string[] = [];
-
-    function Child(input: number): undefined {
-      Behavon.useEffect(() => {
-        trace.push(`first setup:${input}`);
-        if (input === 1) throw setupFailure;
-        return () => {
-          trace.push(`first cleanup:${input}`);
-          if (input === 0) throw cleanupFailure;
-        };
-      }, [input]);
-      Behavon.useEffect(() => {
-        trace.push(`second setup:${input}`);
-        return () => trace.push(`second cleanup:${input}`);
-      }, [input]);
-      return undefined;
-    }
-
-    const instance = Behavon.createModel(Behavon.boundary(Child), 0);
-    const observed = observeBoundary(instance);
-    observed.setInput(1);
-    await waitFor(() => observed.state.status === "failed");
-    expect(trace).toEqual([
-      "first setup:0",
-      "second setup:0",
-      "first cleanup:0",
-      "second cleanup:0",
-      "first setup:1",
-      "second setup:1",
-      "second cleanup:1",
-    ]);
-    const error = observed.state.status === "failed" ? observed.state.error : undefined;
-    expect(error).toBeInstanceOf(AggregateError);
-    expect((error as AggregateError).errors).toEqual([cleanupFailure, setupFailure]);
-    observed.dispose();
-    instance.dispose();
-  });
-
-  it("commits different Boundary failures in controller call order", async () => {
-    const firstFailure = new Error("first");
-    const secondFailure = new Error("second");
-    const trace: string[] = [];
-
-    function Child(input: { label: string; fail: boolean }): undefined {
-      Behavon.useEffect(() => {
-        if (input.fail) {
-          trace.push(`fail:${input.label}`);
-          throw input.label === "first" ? firstFailure : secondFailure;
-        }
-        return () => trace.push(`dispose:${input.label}`);
-      }, [input.fail, input.label]);
-      return undefined;
-    }
-
-    const first = Behavon.createModel(Behavon.boundary(Child), { label: "first", fail: false });
-    const second = Behavon.createModel(Behavon.boundary(Child), { label: "second", fail: false });
-    const firstObserved = observeBoundary(first);
-    const secondObserved = observeBoundary(second);
-    type ControllerPortType = { "fail": PortOnlySignal<any> };
-    const controllerPort = Behavon.createPort<ControllerPortType>({ "fail": Behavon.SignalType() });
-    function Controller(): undefined {
-      const fail = Behavon.useCallback(() => {
-        firstObserved.setInput({ label: "first", fail: true });
-        secondObserved.setInput({ label: "second", fail: true });
-      }, []);
-      Behavon.useSignal(controllerPort, "fail", fail);
-      Behavon.useExport(controllerPort, "fail");
-      return undefined;
-    }
-
-    const controller = Behavon.createModel((Controller as unknown as Model<any, any, ControllerPortType>), undefined);
-    signalOf(controller, "fail")();
-    await waitFor(() => firstObserved.state.status === "failed" && secondObserved.state.status === "failed");
-    expect(trace).toEqual([
-      "dispose:first",
-      "fail:first",
-      "dispose:second",
-      "fail:second",
-    ]);
-    expect(firstObserved.state.status).toBe("failed");
-    expect(secondObserved.state.status).toBe("failed");
-    expect(firstObserved.state.status === "failed" ? firstObserved.state.error : undefined).toBe(firstFailure);
-    expect(secondObserved.state.status === "failed" ? secondObserved.state.error : undefined).toBe(secondFailure);
-    controller.dispose();
-    secondObserved.dispose();
-    firstObserved.dispose();
-    second.dispose();
-    first.dispose();
-  });
-
-  it("keeps terminal cleanup errors in the Boundary containment cycle that triggered them", async () => {
-    const setupFailure = new Error("replacement setup failed");
-    const terminalCleanupFailure = new Error("failed Child terminal cleanup");
-    let terminalCleanupCalls = 0;
-
-    function Child(input: number): undefined {
-      Behavon.useEffect(() => {
-        if (input === 1) throw setupFailure;
-      }, [input]);
-      Behavon.useEffect(() => () => {
-        terminalCleanupCalls += 1;
-        throw terminalCleanupFailure;
-      }, []);
-      return undefined;
-    }
-
-    const instance = Behavon.createModel(Behavon.boundary(Child), 0);
-    const observed = observeBoundary(instance);
-    observed.setInput(1);
-    await waitFor(() => observed.state.status === "failed");
-    const error = observed.state.status === "failed" ? observed.state.error : undefined;
-    expect(error).toBeInstanceOf(AggregateError);
-    expect((error as AggregateError).errors).toEqual([setupFailure, terminalCleanupFailure]);
-    expect(terminalCleanupCalls).toBe(1);
-
-    expect(observed.state.status).toBe("failed");
-    observed.dispose();
-    instance.dispose();
-    expect(terminalCleanupCalls).toBe(1);
-  });
-
   it("aggregates root setup failures and terminal cleanup failure in encounter order", async () => {
     interface Endpoints { readonly fail: Signal }
     const firstSetupFailure = new Error("first setup");
@@ -224,20 +78,18 @@ describe("React-aligned commit-phase lifecycle", () => {
 
     const root = Behavon.createModel((Model as unknown as Model<any, any, ModelPortType>), undefined);
     let surfaced: unknown;
-    const originalSetTimeout = globalThis.setTimeout;
-    globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-      try {
-        if (typeof handler === "function") handler();
-      } catch (error: unknown) {
-        surfaced = error;
-      }
-      return originalSetTimeout(() => undefined, 0);
-    }) as typeof setTimeout;
+    const originalEmit = process.emit;
+    process.emit = ((event: string | symbol, ...args: unknown[]) => {
+      if (event !== "uncaughtException") return Reflect.apply(originalEmit, process, [event, ...args]) as boolean;
+      const error = args[0];
+      surfaced = error;
+      return true;
+    }) as typeof process.emit;
     try {
       signalOf(root, "fail")();
       await Promise.resolve();
     } finally {
-      globalThis.setTimeout = originalSetTimeout;
+      process.emit = originalEmit;
     }
 
     expect(surfaced).toBeInstanceOf(AggregateError);

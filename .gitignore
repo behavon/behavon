@@ -13,3 +13,4 @@ tests/types/package-consumer/.generated/
 /demo-server.sqlite-wal
 /internal/
 tests/docs/.generated/
+CLAUDE.local.md

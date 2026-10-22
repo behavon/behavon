@@ -41,7 +41,7 @@ export interface AccountInput {
 export const Account: Model<AccountInput, number, AccountPort> = (input) => {
   const { name } = input;
   const viewId = Behavon.useExport(accountPort, "view");
-  const [balance, setBalance] = Behavon.useLabelState(states.balance, input.balance);
+  const [balance] = Behavon.useLabelState(states.balance, input.balance);
 
   const [, publish] = Behavon.useSnapshot(viewId);
   Behavon.useEffect(() => publish({ name, balance }), [balance, name, publish]);
@@ -49,22 +49,23 @@ export const Account: Model<AccountInput, number, AccountPort> = (input) => {
   const deposit = Behavon.useCallback((amount: number) => {
     const id = Behavon.createId();
     Behavon.transaction.start(id, [states.balance]);
-    Behavon.transaction.run(id, () => setBalance((current) => current + amount));
+    Behavon.transaction.run(id, ({ set }) => set(states.balance, (current) => current + amount));
     Behavon.transaction.commit(id);
-  }, [setBalance]);
+  }, []);
   Behavon.useSignal(accountPort, "deposit", deposit);
   Behavon.useExport(accountPort, "deposit");
 
-  // `balance` is the last committed balance. A change made earlier in the same transaction is not visible here.
+  // `get` reads the balance inside this transaction, including changes made earlier in it.
   const withdraw = Behavon.useCallback((amount: number) => {
     const id = Behavon.createId();
     Behavon.transaction.start(id, [states.balance]);
-    Behavon.transaction.run(id, () => {
-      if (balance < amount) throw new InsufficientFundsError(name, balance, amount);
-      setBalance((current) => current - amount);
+    Behavon.transaction.run(id, ({ get, set }) => {
+      const current = get(states.balance);
+      if (current < amount) throw new InsufficientFundsError(name, current, amount);
+      set(states.balance, current - amount);
     });
     Behavon.transaction.commit(id);
-  }, [balance, name, setBalance]);
+  }, [name]);
   Behavon.useSignal(accountPort, "withdraw", withdraw);
   Behavon.useExport(accountPort, "withdraw");
 

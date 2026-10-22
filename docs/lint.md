@@ -12,7 +12,7 @@ Hook 규칙은 ESLint로 검사합니다. React 공식 `rules-of-hooks`와 Behav
 
 ## 설정
 
-플러그인은 패키지에서 import할 수 없습니다. 저장소의 [`eslint.behavon-hooks.js`](../eslint.behavon-hooks.js)를 프로젝트 루트에 복사하세요.
+플러그인은 `behavon/eslint`에서 import합니다. 설치한 Behavon과 같은 버전의 규칙이 쓰입니다.
 
 ```sh
 npm install --save-dev eslint@9.39.5 eslint-plugin-react-hooks@7.1.1 \
@@ -23,7 +23,7 @@ npm install --save-dev eslint@9.39.5 eslint-plugin-react-hooks@7.1.1 \
 // eslint.config.js
 import babelParser from "@babel/eslint-parser"
 import reactHooks from "eslint-plugin-react-hooks"
-import { behavonHooksPlugin } from "./eslint.behavon-hooks.js"
+import { behavonHooksPlugin } from "behavon/eslint"
 
 const behavonHooks = (files, isTSX) => ({
   files,

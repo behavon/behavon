@@ -117,6 +117,14 @@ class MutableObserver {
     return [...combined].map(([subject, updates]) => [subject, updates] as const);
   }
 
+  /** The updates staged for one subject by the given scopes of a root, in staging order. */
+  stagedUpdates(root: object, scopes: readonly object[], subject: MutableStateSubject): readonly unknown[] {
+    const included = new Set(scopes);
+    return (this.#transactionUpdates.get(root) ?? [])
+      .filter((entry) => entry.subject === subject && included.has(entry.scope))
+      .map((entry) => entry.update);
+  }
+
   discardTransaction(scope: object): void {
     const root = this.#transactionRoots.get(scope);
     if (root === undefined) return;

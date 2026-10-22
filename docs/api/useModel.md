@@ -1,6 +1,6 @@
 # `useModel(instance)`
 
-다른 Model instance의 최신 결과값과, 그 instance의 input을 바꾸는 함수를 반환합니다.
+다른 instance의 결과값을 읽고, 그 instance의 input을 바꾸는 함수를 함께 받습니다.
 
 ```ts
 function useModel<Input, Output>(
@@ -8,13 +8,21 @@ function useModel<Input, Output>(
 ): readonly [output: Output, setInput: StateSetter<Input>]
 ```
 
-- `instance`: [`createModel`](./createModel.md)로 만든 instance.
+## 인자
+
+- `instance`: [`createModel`](./createModel.md)이 반환한 instance.
+
+## 반환값
+
 - `output`: 대상이 마지막으로 확정한 결과값.
 - `setInput(next)` / `setInput(previous => next)`: 대상의 input을 바꿉니다. 대상은 다음 microtask에 다시 평가됩니다.
 
-대상의 결과값이 바뀌면 이 Model도 다시 평가됩니다. 관찰을 그만둬도 대상 instance는 계속 살아 있습니다. 대상을 끝내려면 대상의 `dispose()`를 호출합니다.
+## 동작
 
-자기 자신을 관찰하거나 서로 관찰하는 순환은 오류입니다. 종료된 instance의 `setInput`을 부르면 오류입니다.
+- 대상의 결과값이 바뀌면 이 Model도 다시 평가됩니다.
+- 대상을 소유하지 않습니다. 관찰을 그만둬도 대상은 살아 있고, 끝내려면 대상의 `dispose()`를 부릅니다.
+- 대상이 종료되면 이 Model도 종료됩니다([오류와 종료](../core-concepts.md#오류와-종료)).
+- 자기 자신이나 서로를 관찰하는 순환은 오류입니다.
 
 ## 예제
 
@@ -34,4 +42,5 @@ function Doubled(): number {
 }
 
 const doubled = Behavon.createModel(Doubled, undefined)
+// counter의 결과값은 1, doubled의 결과값은 2가 됩니다
 ```

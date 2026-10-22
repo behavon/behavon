@@ -4,7 +4,7 @@ Behavon은 React Hook 문법으로 React 밖의 로직을 작성합니다. 화�
 
 ## Model
 
-Model은 Hook을 호출하고 결과를 반환하는 함수입니다. React 컴포넌트가 JSX를 반환하듯 Model은 값을 반환합니다.
+Model은 Hook을 부르고 값을 반환하는 함수입니다. React 컴포넌트가 JSX를 반환하듯 Model은 결과값을 반환합니다.
 
 ```ts
 function Counter(): number {
@@ -13,26 +13,35 @@ function Counter(): number {
 }
 ```
 
-상태가 바뀌면 컴포넌트가 다시 렌더링되는 것처럼 Model이 다시 평가됩니다. Hook 규칙도 React와 같습니다. 항상 같은 순서로, 함수의 최상위에서만 호출합니다.
+상태가 바뀌면 컴포넌트가 다시 렌더링되듯 Model이 다시 평가됩니다. Hook 규칙도 React와 같습니다. 항상 같은 순서로, 함수의 최상위에서만 부릅니다.
 
 ## Instance
 
-Model은 [`createModel`](./api/createModel.md)로 실행해야 살아 있는 instance가 됩니다. Instance는 [`dispose()`](./api/createModel.md)를 호출할 때까지 유지됩니다.
+Model은 [`createModel`](./api/createModel.md)로 실행해야 살아 있는 instance가 됩니다. instance는 `dispose()`를 부를 때까지 유지됩니다.
 
 ```ts
 const counter = Behavon.createModel(Counter, undefined)
 counter.dispose()
 ```
 
-한 Model은 다른 instance의 결과를 [`useModel`](./api/useModel.md)로 읽을 수 있습니다.
+instance끼리는 두 가지로 이어집니다.
 
-## Signal과 Slot
+- [`useModel`](./api/useModel.md): 다른 instance의 결과값을 읽고, 그 값이 바뀌면 다시 평가됩니다.
+- [`usePort`](./api/usePort.md): 다른 instance가 내놓은 Signal·Slot·snapshot id를 씁니다.
 
-Signal은 발생시키는 쪽이고, Slot은 받는 쪽입니다. [`useSignal`](./api/useSignal.md)과 [`useSlot`](./api/useSlot.md)으로 만들고, [`useConnect`](./api/useConnect.md)로 둘을 연결합니다. Signal을 만든 것만으로는 Model 밖에서 호출할 수 없습니다.
+필요한 instance는 Model input으로 넘깁니다. `useContext` 같은 암묵적인 주입은 없습니다.
 
-## 공개
+## Port
 
-[`createPort`](./api/createPort.md)는 Model이 바깥에 내놓는 이름과 타입을 선언합니다. 선언한 Signal과 snapshot은 [`useExport`](./api/useExport.md)를 호출해야 instance에서 쓸 수 있습니다. 선언한 Slot은 다른 Model이 [`usePort`](./api/usePort.md)로 가져와 연결합니다. instance의 타입은 선언한 Port 타입에서 Slot을 뺀 것입니다. Slot은 instance에서 부를 수 없으므로 나오지 않고, `usePort`로 꺼냅니다.
+[`createPort`](./api/createPort.md)는 Model이 바깥에 내놓을 이름과 타입을 선언합니다. 선언할 수 있는 것은 세 가지입니다.
+
+| 항목 | 역할 | 채우는 Hook |
+| --- | --- | --- |
+| `Signal` | 바깥에서 부르는 명령이나, 연결된 Slot에 알리는 이벤트 | [`useSignal`](./api/useSignal.md) + [`useExport`](./api/useExport.md) |
+| `Slot` | 다른 Model의 Signal을 받는 자리 | [`useSlot`](./api/useSlot.md) |
+| `SnapshotRootId` | React 같은 바깥이 읽을 값의 식별자 | [`useExport`](./api/useExport.md) |
+
+instance에서는 연 Signal과 snapshot id를 이름으로 씁니다(`counter.increment()`, `counter.count`). Slot은 instance에서 부를 수 없고, 다른 Model이 `usePort`로 꺼내 연결합니다.
 
 ```ts
 import Behavon, { type Model, type Signal } from "behavon"
@@ -55,15 +64,31 @@ const publicCounter = Behavon.createModel(PublicCounter, undefined)
 publicCounter.increment()
 ```
 
+## Signal과 Slot
+
+Signal을 부르면 그 Signal의 함수를 실행하고, [`useConnect`](./api/useConnect.md)로 연결된 Slot에 같은 인자를 전달합니다. 모두 그 자리에서 동기로 실행됩니다. 함수 안에서 state를 바꾸면 Model은 다음 microtask에 다시 평가됩니다.
+
 ## Snapshot
 
-Snapshot은 Model이 React 같은 바깥 세계에 공개하는 값입니다. Model은 [`useSnapshot`](./api/useSnapshot.md)으로 값을 발행하고, 바깥은 [`subscribe` / `getSnapshot`](./api/subscribe.md)으로 구독합니다.
+Snapshot은 Model이 React 같은 바깥에 보여 주는 값입니다. Model은 [`useSnapshot`](./api/useSnapshot.md)으로 발행하고, 바깥은 [`subscribe` / `getSnapshot`](./api/subscribe.md)으로 읽습니다.
+
+## 오류와 종료
+
+| 어디서 오류가 나는가 | 결과 |
+| --- | --- |
+| Signal·Slot 함수가 throw | 그 Signal을 부른 쪽으로 바로 throw됩니다. Model은 종료되지 않습니다. |
+| Signal·Slot 함수가 reject되는 Promise를 반환 | 받는 쪽이 없는 비동기 오류(`unhandledRejection`)가 됩니다. |
+| 첫 평가나 첫 Effect | `createModel`이 그 오류를 throw하고 instance는 만들어지지 않습니다. |
+| state 변경으로 다시 평가하다가, 또는 그 뒤 Effect에서 | Model이 종료되고, 오류는 React가 처리하지 못한 렌더링 오류를 알리는 방식으로 보고됩니다(`reportError`, 없으면 `error` 이벤트, Node는 `process`의 `uncaughtException` 이벤트). state를 바꾼 Signal은 정상으로 반환합니다. |
+| [`transaction.commit`](./api/transaction.md)의 평가 | Model이 종료되고, `commit`이 그 오류를 throw합니다. |
+
+Model이 종료되면(오류든 `dispose()`든) 다음이 일어납니다.
+
+- Effect 정리 함수가 실행되고, 외부 store 구독이 해제되고, Resource가 `abort`되고, 진행 중인 Future가 취소됩니다.
+- 그 Model이 보내거나 받던 연결이 끊깁니다.
+- 그 Model을 `useModel`로 읽던 Model도 종료됩니다. 대상이 오류로 종료됐으면 같은 오류로, `dispose()`됐으면 `disposed during model observation` 오류로 종료되고, 각각 위와 같은 방식으로 보고됩니다.
+- 종료된 instance의 Signal을 부르거나, `useModel`·`usePort`·`getInterface`에 넘기면 오류입니다. 종료된 Model의 `useState` setter는 아무 일도 하지 않습니다.
 
 ## 지원 범위
 
-**서버 렌더링(SSR)과 hydration은 지원하지 않습니다.** React 연결은 클라이언트 렌더링에서만 사용하세요. [`subscribe` / `getSnapshot`](./api/subscribe.md)은 `useSyncExternalStore`의 세 번째 인자인 `getServerSnapshot`에 넘길 값을 제공하지 않습니다.
-
-## 자주 묻는 질문
-
-**`useContext`는 없나요?**
-일부러 제공하지 않습니다. Model이 무엇에 의존하는지 코드에 드러나도록, 필요한 instance를 Model input으로 직접 넘깁니다. React 컴포넌트 안에서는 React의 `useContext`를 그대로 쓰면 됩니다.
+**서버 렌더링(SSR)과 hydration은 지원하지 않습니다.** [`subscribe` / `getSnapshot`](./api/subscribe.md)은 `useSyncExternalStore`의 세 번째 인자 `getServerSnapshot`에 넘길 값을 제공하지 않습니다.

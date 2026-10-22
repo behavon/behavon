@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import Behavon, { FutureCancellationError, futureDiagnostics } from "behavon";
-import type { BoundaryState, Future, Model, Signal, StateSetter } from "behavon";
+import type { Future, Model, Signal } from "behavon";
 import { inspectModelInstanceForTests, observeModelInstanceCreationForTests } from "../../src/internal/model-inspection";
 import { waitFor } from "../helpers";
 
@@ -230,13 +230,14 @@ describe("useFuture", () => {
       if (input === 1) second = future.start(2);
       throw surfaced;
     });
-    const originalSetTimeout = globalThis.setTimeout;
+    const originalEmit = process.emit;
     const failures: unknown[] = [];
-    globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-      try { if (typeof handler === "function") handler(); }
-      catch (error: unknown) { failures.push(error); }
-      return originalSetTimeout(() => undefined, 0);
-    }) as typeof setTimeout;
+    process.emit = ((event: string | symbol, ...args: unknown[]) => {
+      if (event !== "uncaughtException") return Reflect.apply(originalEmit, process, [event, ...args]) as boolean;
+      const error = args[0];
+      failures.push(error);
+      return true;
+    }) as typeof process.emit;
     try {
       await expect(future.start(1)).resolves.toBe(1);
       await waitFor(() => second !== undefined);
@@ -245,7 +246,7 @@ describe("useFuture", () => {
       expect(failures[0]).toBe(surfaced);
       expect(values).toEqual([1, 2]);
     } finally {
-      globalThis.setTimeout = originalSetTimeout;
+      process.emit = originalEmit;
       root.dispose();
     }
   });
@@ -268,12 +269,13 @@ describe("useFuture", () => {
     future.rejected.subscribe(({ input, reason }) => {
       events.push(`rejected:${input}:${reason === listenerFailure ? "original" : "changed"}`);
     });
-    const originalSetTimeout = globalThis.setTimeout;
-    globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-      try { if (typeof handler === "function") handler(); }
-      catch (error: unknown) { surfaced.push(error); }
-      return originalSetTimeout(() => undefined, 0);
-    }) as typeof setTimeout;
+    const originalEmit = process.emit;
+    process.emit = ((event: string | symbol, ...args: unknown[]) => {
+      if (event !== "uncaughtException") return Reflect.apply(originalEmit, process, [event, ...args]) as boolean;
+      const error = args[0];
+      surfaced.push(error);
+      return true;
+    }) as typeof process.emit;
     try {
       const first = future.start(1);
       void first.catch(() => undefined);
@@ -289,7 +291,7 @@ describe("useFuture", () => {
         "pending:2",
       ]);
     } finally {
-      globalThis.setTimeout = originalSetTimeout;
+      process.emit = originalEmit;
       root.dispose();
     }
   });
@@ -311,12 +313,13 @@ describe("useFuture", () => {
     future.rejected.subscribe(({ reason }) => {
       events.push(`rejected:${(reason as FutureCancellationError).kind}`);
     });
-    const originalSetTimeout = globalThis.setTimeout;
-    globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-      try { if (typeof handler === "function") handler(); }
-      catch (error: unknown) { hostFailures.push(error); }
-      return originalSetTimeout(() => undefined, 0);
-    }) as typeof setTimeout;
+    const originalEmit = process.emit;
+    process.emit = ((event: string | symbol, ...args: unknown[]) => {
+      if (event !== "uncaughtException") return Reflect.apply(originalEmit, process, [event, ...args]) as boolean;
+      const error = args[0];
+      hostFailures.push(error);
+      return true;
+    }) as typeof process.emit;
     try {
       const completion = future.start(1);
       await expect(completion).rejects.toMatchObject({ kind: "explicit", cause: "listener-stop" });
@@ -324,7 +327,7 @@ describe("useFuture", () => {
       expect(events).toEqual(["pending:1", "rejected:explicit"]);
       expect(hostFailures).toEqual([]);
     } finally {
-      globalThis.setTimeout = originalSetTimeout;
+      process.emit = originalEmit;
       root.dispose();
     }
   });
@@ -347,12 +350,13 @@ describe("useFuture", () => {
     future.rejected.subscribe(({ input, reason }) => {
       events.push(`rejected:${input}:${(reason as FutureCancellationError).kind}`);
     });
-    const originalSetTimeout = globalThis.setTimeout;
-    globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-      try { if (typeof handler === "function") handler(); }
-      catch (error: unknown) { hostFailures.push(error); }
-      return originalSetTimeout(() => undefined, 0);
-    }) as typeof setTimeout;
+    const originalEmit = process.emit;
+    process.emit = ((event: string | symbol, ...args: unknown[]) => {
+      if (event !== "uncaughtException") return Reflect.apply(originalEmit, process, [event, ...args]) as boolean;
+      const error = args[0];
+      hostFailures.push(error);
+      return true;
+    }) as typeof process.emit;
     try {
       const superseded = future.start(1);
       await expect(superseded).rejects.toMatchObject({ kind: "superseded" });
@@ -367,7 +371,7 @@ describe("useFuture", () => {
       ]);
       expect(hostFailures).toEqual([]);
     } finally {
-      globalThis.setTimeout = originalSetTimeout;
+      process.emit = originalEmit;
       root.dispose();
     }
   });
@@ -424,17 +428,17 @@ describe("useFuture", () => {
     const originalWarn = console.warn;
     console.warn = (...args: unknown[]) => { warnings.push(args); };
     function Model(): { value: number; future: Future<void, number> } {
-      const [value, setValue] = Behavon.useLabelState(state.value, 0);
+      const [value] = Behavon.useLabelState(state.value, 0);
       const future = Behavon.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
       const run = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [state.value]);
-        Behavon.transaction.run(id, () => {
+        Behavon.transaction.run(id, ({ set }) => {
           completion = future.start(undefined);
-          setValue(1);
+          set(state.value, 1);
           throw new Error("rollback");
         });
-      }, [future, setValue]);
+      }, [future]);
       Behavon.useSignal(port, "run", run);
       Behavon.useExport(port, "run");
       return { value, future };
@@ -451,38 +455,6 @@ describe("useFuture", () => {
       console.warn = originalWarn;
       root.dispose();
     }
-  });
-
-  it("rejects an active Child Future through commit-phase Boundary disposal", async () => {
-    const work = deferred<number>();
-    let completion: Promise<number> | undefined;
-    function Child(fail: boolean): Future<void, number> {
-      const future = Behavon.useFuture<void, number>(() => work.promise, { concurrency: "serial" });
-      Behavon.useEffect(() => {
-        completion = future.start(undefined);
-        void completion.catch(() => undefined);
-      }, [future]);
-      Behavon.useEffect(() => {
-        if (fail) throw new Error("commit failure");
-      }, [fail]);
-      return future;
-    }
-    const SafeChild = Behavon.boundary(Child);
-    const root = Behavon.createModel(SafeChild, false);
-    let state: BoundaryState<Future<void, number>> | undefined;
-    let setInput: StateSetter<boolean> | undefined;
-    function Observer(): undefined {
-      // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only Boundary state probe
-      [state, setInput] = Behavon.useModel(root);
-      return undefined;
-    }
-    const observer = Behavon.createModel(Observer, undefined);
-    await waitFor(() => state?.status === "active" && state.output.snapshot().status === "pending");
-    setInput?.(true);
-    await waitFor(() => state?.status === "failed");
-    await expect(completion).rejects.toMatchObject({ kind: "owner-dispose" });
-    observer.dispose();
-    root.dispose();
   });
 
   it("terminal cleanup aborts the exact completed controller before the next serial run starts", async () => {

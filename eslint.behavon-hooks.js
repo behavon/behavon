@@ -677,7 +677,6 @@ const staticModelDefinitionRule = {
     messages: {
       inlineModelDefinition: "Define the Model as a static module-scope function before passing it to Behavon.{{api}}.",
       dynamicModelDefinition: "Do not pass a Model defined inside another function to Behavon.{{api}}; move the Model definition to module scope.",
-      dynamicBoundaryDefinition: "Create a Behavon boundary Model at module scope instead of creating its definition inside another function.",
       dynamicModelFactory: "Pass a static Model reference to Behavon.{{api}} instead of creating or selecting a Model during the call.",
       dynamicPortDefinition: "Declare Behavon.createPort<Port>(...) at module scope so its identity and Model contract stay static.",
       dynamicResourceDefinition: "Declare Behavon.createResource(...) at module scope so its adapter identity stays static.",
@@ -1417,20 +1416,6 @@ const staticModelDefinitionRule = {
     }
 
     const definitionContracts = new Map();
-    const boundaryContracts = new Map();
-
-    function reportBoundaryPortContract(reportNode, resolved, modelPortNode, force = false) {
-      if (resolved.kind !== "boundary" || modelPortNode === undefined) return false;
-      const port = typeText(modelPortNode);
-      if (!force && boundaryContracts.get(resolved.definition) === port) return true;
-      context.report({
-        node: reportNode,
-        messageId: "missingPortDescriptor",
-        data: { port },
-      });
-      boundaryContracts.set(resolved.definition, port);
-      return true;
-    }
 
     function reportModelPortContract(reportNode, model, modelPortNode) {
       const { descriptors, opaqueCustomHook } = usedPortDescriptors(model);
@@ -1483,7 +1468,6 @@ const staticModelDefinitionRule = {
         if (annotation === undefined) continue;
         const resolved = resolveModelDefinition(property.value);
         const modelPortNode = typeParameters(annotation)[2];
-        if (reportBoundaryPortContract(property.key, resolved, modelPortNode)) continue;
         if (resolved.kind !== "function" || containingFunction(resolved.definition) !== undefined) continue;
         const port = typeText(modelPortNode);
         if (definitionContracts.has(resolved.definition) && definitionContracts.get(resolved.definition) === port) {
@@ -1515,7 +1499,6 @@ const staticModelDefinitionRule = {
         if (annotation === undefined) continue;
         const resolved = resolveModelDefinition(element);
         const modelPortNode = typeParameters(annotation)[2];
-        if (reportBoundaryPortContract(element, resolved, modelPortNode)) continue;
         if (!isFunction(innerExpression(element))) continue;
         if (resolved.kind !== "function" || containingFunction(resolved.definition) !== undefined) continue;
         const port = typeText(modelPortNode);
@@ -1587,13 +1570,6 @@ const staticModelDefinitionRule = {
         reportContextualObjectModels(node);
         reportContextualArrayModels(node);
         const annotation = modelType(node);
-        const resolvedInitializer = node.init === null || node.init === undefined
-          ? { kind: "unknown" }
-          : resolveModelDefinition(node.init);
-        if (
-          annotation !== undefined &&
-          reportBoundaryPortContract(node.id, resolvedInitializer, typeParameters(annotation)[2])
-        ) return;
         const model = modelFunction(node);
         if (model === undefined || containingFunction(model) !== undefined) return;
         if (annotation === undefined) {
@@ -1630,7 +1606,6 @@ const staticModelDefinitionRule = {
         const annotation = directModelTypeReference(node.typeAnnotation);
         const resolved = resolveModelDefinition(node.expression);
         if (annotation === undefined) return;
-        if (reportBoundaryPortContract(node, resolved, typeParameters(annotation)[2])) return;
         if (resolved.kind !== "function") return;
         reportModelPortContract(node, resolved.definition, typeParameters(annotation)[2]);
       });
@@ -1639,8 +1614,6 @@ const staticModelDefinitionRule = {
         if (statement.type !== "ExportDefaultDeclaration") continue;
         const annotation = modelAnnotationFromExpression(statement.declaration);
         const resolved = resolveModelDefinition(statement.declaration);
-        const boundaryPortNode = annotation === undefined ? undefined : typeParameters(annotation)[2];
-        if (reportBoundaryPortContract(statement.declaration, resolved, boundaryPortNode)) continue;
         if (resolved.kind !== "function" || containingFunction(resolved.definition) !== undefined) continue;
         if (annotation === undefined && definitionContracts.has(resolved.definition)) continue;
         const modelPortNode = annotation === undefined ? undefined : typeParameters(annotation)[2];
@@ -1666,10 +1639,6 @@ const staticModelDefinitionRule = {
           ) &&
           directModelTypeReference(modelArgument.typeAnnotation) !== undefined
         );
-        if (resolved.kind === "boundary") {
-          reportBoundaryPortContract(modelArgument, resolved, modelPortNode, directTypeOverride);
-          continue;
-        }
         if (resolved.kind !== "function" || containingFunction(resolved.definition) !== undefined) continue;
         if (
           directTypeOverride ||
@@ -1732,16 +1701,6 @@ const staticModelDefinitionRule = {
         const result = resolveModelDefinition(value, resolving);
         resolving.delete(variable);
         return result;
-      }
-      if (
-        current.type === "CallExpression" &&
-        directBehavonCallName(sourceCode, current) === "boundary" &&
-        current.arguments[0] !== undefined &&
-        current.arguments[0].type !== "SpreadElement"
-      ) {
-        return containingFunction(current) === undefined
-          ? { kind: "boundary", definition: current }
-          : { kind: "dynamic" };
       }
       if (
         current.type === "CallExpression" ||
@@ -1839,7 +1798,7 @@ const staticModelDefinitionRule = {
           return;
         }
         const api = directBehavonCallName(sourceCode, node);
-        if (api !== "createModel" && api !== "boundary") return;
+        if (api !== "createModel") return;
         const modelArgument = node.arguments[0];
         const model = modelArgument === undefined ? undefined : innerExpression(modelArgument);
         if (model === undefined || model.type === "SpreadElement") return;
@@ -1859,14 +1818,7 @@ const staticModelDefinitionRule = {
           return;
         }
 
-        if (api === "boundary" && containingFunction(node) !== undefined) {
-          context.report({ node, messageId: "dynamicBoundaryDefinition" });
-        }
-
-        if (
-          api === "createModel" &&
-          (resolved.kind === "function" || resolved.kind === "boundary")
-        ) pendingCreateModelCalls.push(node);
+        if (resolved.kind === "function") pendingCreateModelCalls.push(node);
       },
     };
   },
@@ -2039,18 +1991,13 @@ const evaluationPurityRule = {
           resolving.delete(reference.variable);
           return result;
         }
-        if (
-          current.type === "CallExpression" &&
-          directBehavonCallName(sourceCode, current) === "boundary" &&
-          current.arguments[0]?.type !== "SpreadElement"
-        ) return referencedFunction(current.arguments[0], at, resolving);
         return undefined;
       }
 
       for (const call of calls) {
         if (call.type !== "CallExpression") continue;
         const name = directBehavonCallName(sourceCode, call);
-        if (name !== "createModel" && name !== "boundary") continue;
+        if (name !== "createModel") continue;
         const argument = call.arguments[0];
         if (argument === undefined || argument.type === "SpreadElement") continue;
         const fn = referencedFunction(argument, call);

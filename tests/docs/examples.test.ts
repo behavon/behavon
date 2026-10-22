@@ -98,17 +98,6 @@ describe("docs/api/useModel.md", () => {
   });
 });
 
-describe("docs/api/boundary.md", () => {
-  it("turns the failure into a failed state and retries with reset", async () => {
-    const { safe, watcher } = await import("./.generated/api-boundary-1");
-    await settle();
-    expect(outputOf(watcher)).toBe("failed");
-    expect((outputOf(safe) as { error: Error }).error.message).toBe("negative");
-    watcher.dispose();
-    safe.dispose();
-  });
-});
-
 describe("docs/api/useState.md", () => {
   it("shows the initial result and the result after the Effect setters", async () => {
     const { Counter, counter } = await import("./.generated/api-useState-1");
@@ -188,10 +177,10 @@ describe("docs/api/useSignal.md", () => {
 });
 
 describe("docs/api/useSlot.md", () => {
-  it("logs the value and the ConnectionMeta signal name of a direct Slot call", async () => {
+  it("logs the value of a direct Slot call", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const { logger } = await import("./.generated/api-useSlot-1");
-    expect(log).toHaveBeenCalledWith(1, "log");
+    expect(log).toHaveBeenCalledWith(1);
     logger.dispose();
   });
 });

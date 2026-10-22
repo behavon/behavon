@@ -1,6 +1,6 @@
 import Behavon from "behavon";
 import { createPort, createPort as cp } from "behavon";
-import type { BoundaryState, Model, PortDescriptor, Signal } from "behavon";
+import type { Model, PortDescriptor, Signal } from "behavon";
 import {
   importedPort,
   importedPort as sameImportedPort,
@@ -104,7 +104,6 @@ function StaticModel(): undefined {
   return undefined;
 }
 
-const StaticBoundaryModel = Behavon.boundary(StaticModel);
 const StaticModels = { Nested: StaticModel };
 
 export const ContextualPortModels: {
@@ -236,7 +235,6 @@ export const PreservingReadonlyPortArray: ReadonlyArray<
 
 export function createStaticModels(): void {
   const direct = Behavon.createModel(StaticModel, undefined);
-  const bounded = Behavon.createModel(StaticBoundaryModel, undefined);
   const member = Behavon.createModel(StaticModels.Nested, undefined);
   const contextualProperty = Behavon.createModel(ContextualPortModels.Property, undefined);
   const contextualMethod = Behavon.createModel(ContextualPortModels.Method, undefined);
@@ -275,7 +273,6 @@ export function createStaticModels(): void {
   const imported = Behavon.createModel(ImportedPortModel, undefined);
   const opaqueImportedHook = Behavon.createModel(OpaqueImportedHookModel, undefined);
   direct.dispose();
-  bounded.dispose();
   member.dispose();
   contextualProperty.dispose();
   contextualMethod.dispose();
@@ -299,27 +296,3 @@ export function createStaticModels(): void {
   imported.dispose();
   opaqueImportedHook.dispose();
 }
-
-const StaticPortBoundary = Behavon.boundary(StaticPortModel);
-type SchemaLessBoundaryModel = Model<undefined, BoundaryState<undefined>>;
-
-const StaticPortBoundaryAlias: SchemaLessBoundaryModel = StaticPortBoundary;
-const StaticPortBoundaryObject: { Outer: SchemaLessBoundaryModel } = {
-  Outer: Behavon.boundary(StaticPortModel),
-};
-const StaticPortBoundaryTuple: readonly [SchemaLessBoundaryModel] = [
-  Behavon.boundary(StaticPortModel),
-];
-
-export function createStaticPortBoundary(): void {
-  const boundary = Behavon.createModel(StaticPortBoundary, undefined);
-  const alias = Behavon.createModel(StaticPortBoundaryAlias, undefined);
-  const object = Behavon.createModel(StaticPortBoundaryObject.Outer, undefined);
-  const tuple = Behavon.createModel(StaticPortBoundaryTuple[0], undefined);
-  boundary.dispose();
-  alias.dispose();
-  object.dispose();
-  tuple.dispose();
-}
-
-export default Behavon.boundary(StaticPortModel) as SchemaLessBoundaryModel;

@@ -802,33 +802,4 @@ describe("useResource", () => {
     expect(warning).toHaveBeenCalledTimes(1);
     warning.mockRestore();
   });
-
-  it("aborts a provisional resource discarded by a containing Boundary", () => {
-    const failure = new Error("child construction failed");
-    const abort = vi.fn();
-    const Resource = Behavon.createResource({
-      open: () => ({}),
-      close: () => undefined,
-      abort,
-    });
-    let escaped: { open(): unknown } | undefined;
-    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    function Broken(): never {
-      const value = Behavon.useResource(Resource, undefined);
-      // eslint-disable-next-line behavon-hooks/evaluation-purity -- invalid reproduction verifies Boundary branch rollback
-      value[1].open();
-      // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains the discarded controller
-      escaped = value[1];
-      throw failure;
-    }
-
-    const root = Behavon.createModel(Behavon.boundary(Broken), undefined);
-    expect(outputOf<{ status: string; error?: unknown }>(root)).toMatchObject({ status: "failed", error: failure });
-    expect(abort).toHaveBeenCalledTimes(1);
-    expect(() => escaped?.open()).toThrow(/stale during useResource open/);
-    root.dispose();
-    expect(abort).toHaveBeenCalledTimes(1);
-    expect(warning).toHaveBeenCalledTimes(1);
-    warning.mockRestore();
-  });
 });

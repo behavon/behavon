@@ -1,23 +1,25 @@
 # `useState(initial?)`
 
-React의 `useState`와 같습니다. 현재 값과 값을 바꾸는 setter를 반환합니다.
+React의 `useState`와 같습니다. 현재 값과, 값을 바꾸고 Model을 다시 평가하게 하는 setter를 반환합니다.
 
 ```ts
 function useState<State>(): readonly [State | undefined, StateSetter<State | undefined>]
 function useState<State>(initial: State | (() => State)): readonly [State, StateSetter<State>]
 ```
 
-- 인자 없이 부르면 처음 값은 `undefined`입니다.
-- `initial`에 값을 넘기면 그 값이 처음 값입니다.
-- `initial`에 함수를 넘기면 처음 한 번만 호출해 그 결과를 처음 값으로 씁니다.
+## 인자
 
-Setter는 다음처럼 씁니다.
+- `initial`: 처음 값. 생략하면 `undefined`이고, 함수를 넘기면 처음 한 번만 불러 그 결과를 씁니다.
 
-- `setValue(next)`: 값으로 바꿉니다.
-- `setValue(previous => next)`: 이전 값으로 다음 값을 계산합니다. 여러 번 호출하면 호출 순서대로 적용됩니다.
-- Setter는 항상 같은 함수입니다.
-- 값이 바뀌면 Model이 다음 microtask에 다시 평가됩니다. 마지막 값이 이전 값과 `Object.is`로 같으면 바뀐 것으로 보지 않습니다.
-- Model 본문에서 자기 setter를 부르면 그 자리에서 바로 다시 평가합니다. 25번을 넘게 반복하면 오류입니다.
+## 반환값
+
+- 현재 값.
+- setter: `setValue(next)` 또는 `setValue(previous => next)`. 항상 같은 함수입니다.
+
+## 동작
+
+- setter를 부르면 Model이 다음 microtask에 다시 평가됩니다. 여러 번 부르면 부른 순서대로 적용됩니다. 결과가 이전 값과 `Object.is`로 같으면 그 평가는 확정되지 않습니다. 결과값은 그대로이고 Effect도 실행되지 않습니다.
+- Model 본문에서 자기 setter를 부르면 그 자리에서 다시 평가합니다. 25번을 넘게 반복하면 오류입니다.
 - 종료된 Model의 setter를 부르면 아무 일도 일어나지 않습니다.
 
 ## 예제
@@ -37,5 +39,3 @@ function Counter(): string {
 const counter = Behavon.createModel(Counter, undefined)
 // 결과값: 처음 "count: 3", Effect의 setter가 적용된 뒤 "count: 5"
 ```
-
-결과값은 다른 Model에서 [`useModel`](./useModel.md)로 읽습니다.

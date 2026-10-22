@@ -115,36 +115,4 @@ describe("MutableObserver state mutation authority", () => {
     expect(inspectRetainedOperationForTests(escapedSetter as Function).cell).toBeUndefined();
     expect(() => escapedSetter?.(1)).not.toThrow();
   });
-
-  it("releases the replaced Boundary Child generation after terminal failure", async () => {
-    const failure = new Error("child failed");
-    let failChild: StateSetter<boolean> | undefined;
-    let childCell: MutableStateSubject | undefined;
-
-    function Child(): undefined {
-      const [failed, setFailed] = Behavon.useState(false);
-      // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only Boundary generation probe retains the Child setter
-      failChild = setFailed;
-      // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only Boundary generation probe retains the Child cell
-      childCell = inspectRetainedOperationForTests(setFailed).cell as MutableStateSubject;
-      if (failed) throw failure;
-      return undefined;
-    }
-
-    const boundary = Behavon.createModel(Behavon.boundary(Child), undefined);
-    const initial = inspectMutableStateForTests(childCell as MutableStateSubject);
-    failChild?.(true);
-    await waitFor(() => (
-      inspectModelInstanceForTests(boundary as object).output as { status?: string }
-    ).status === "failed");
-
-    const released = inspectMutableStateForTests(childCell as MutableStateSubject);
-    expect(released).toMatchObject({
-      identity: initial.identity,
-      generation: initial.generation,
-      status: "released",
-    });
-    expect(inspectRetainedOperationForTests(failChild as Function).cell).toBeUndefined();
-    boundary.dispose();
-  });
 });

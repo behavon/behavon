@@ -47,7 +47,7 @@ export interface BankInput {
 export const Bank: Model<BankInput, number, BankPort> = (input) => {
   const { accounts, feeAccount, fee } = input;
   const viewId = Behavon.useExport(bankPort, "view");
-  const [transfers, setTransfers] = Behavon.useLabelState(states.transfers, []);
+  const [transfers] = Behavon.useLabelState(states.transfers, []);
   const [failures, setFailures] = Behavon.useState<readonly Failure[]>([]);
   const lastId = Behavon.useMutable(0);
 
@@ -69,12 +69,11 @@ export const Bank: Model<BankInput, number, BankPort> = (input) => {
     const transactionId = Behavon.createId();
     Behavon.transaction.start(transactionId, [states.transfers]);
     try {
-      Behavon.transaction.run(transactionId, () => {
+      Behavon.transaction.run(transactionId, ({ set }) => {
         target.deposit(amount);
         feeTarget.deposit(fee);
-        setTransfers((previous) => [...previous, { id, from, to, amount, fee }]);
-        // Last, so a refusal also undoes the deposits above. Each account changes once,
-        // because a second change in the same transaction would not see the first.
+        set(states.transfers, (previous) => [...previous, { id, from, to, amount, fee }]);
+        // Last, so a refusal also undoes the deposits above.
         source.withdraw(amount + fee);
       });
     } catch (reason) {
@@ -83,7 +82,7 @@ export const Bank: Model<BankInput, number, BankPort> = (input) => {
       return fail(reason.message);
     }
     Behavon.transaction.commit(transactionId);
-  }, [accounts, fee, feeAccount, lastId, setFailures, setTransfers]);
+  }, [accounts, fee, feeAccount, lastId, setFailures]);
   Behavon.useSignal(bankPort, "transfer", transfer);
   Behavon.useExport(bankPort, "transfer");
 

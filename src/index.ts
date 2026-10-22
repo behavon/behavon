@@ -67,12 +67,22 @@ export interface TransactionId {
   readonly [transactionIdValue]: true;
 }
 
-type SynchronousTransactionBody<Body extends () => unknown> =
+/** Reads and writes the states a transaction locked. Valid only while its run body executes. */
+export interface TransactionAccess {
+  /** The value inside this transaction, with the changes made so far. */
+  get<State>(id: StateId<State>): State;
+  /** Applies at once; a function runs now with the current value. */
+  set<State>(id: StateId<State>, next: StateUpdate<State>): void;
+}
+
+type TransactionBody = (access: TransactionAccess) => unknown;
+
+type SynchronousTransactionBody<Body extends TransactionBody> =
   Extract<ReturnType<Body>, PromiseLike<unknown>> extends never ? Body : never;
 
 export interface TransactionApi {
   start(id: TransactionId, lockTargets: readonly StateId<unknown>[]): void;
-  run<Body extends () => unknown>(
+  run<Body extends TransactionBody>(
     id: TransactionId,
     body: Body & SynchronousTransactionBody<Body>,
   ): ReturnType<Body>;
@@ -419,10 +429,6 @@ export type ModelHandle<Input = any, Output = any> = readonly [
   output: Output,
   setInput: StateSetter<Input>,
 ];
-
-export type BoundaryState<Output = any> =
-  | Readonly<{ status: "active"; output: Output }>
-  | Readonly<{ status: "failed"; error: unknown; reset: () => void }>;
 
 export type Connection = { readonly [connectionIdentity]: true };
 
@@ -852,19 +858,6 @@ interface ModelObservationCell extends BaseCell {
   output: unknown;
 }
 
-interface ModelBoundaryCell extends BaseCell {
-  readonly kind: "modelBoundary";
-  model: UnknownModel;
-  child: RuntimeModelInstance | null;
-  inputState: unknown;
-  failed: boolean;
-  error: unknown;
-  failureGeneration: number;
-  retryRequested: boolean;
-  result: BoundaryState<unknown> | undefined;
-  readonly operationTarget: ModelBoundaryOperationTarget;
-}
-
 interface StateOperationTarget {
   readonly kind: "stateSetter";
   readonly owner: RuntimeModelInstance;
@@ -886,12 +879,6 @@ interface MutableOperationTarget {
 interface ModelInputOperationTarget {
   readonly kind: "modelInputSetter";
   instance: RuntimeModelInstance | undefined;
-}
-
-interface ModelBoundaryOperationTarget {
-  readonly kind: "modelBoundaryOperation";
-  readonly owner: RuntimeModelInstance;
-  cell: ModelBoundaryCell | undefined;
 }
 
 interface ExternalStoreOperationTarget {
@@ -1002,12 +989,9 @@ type RetainedOperationTarget =
   | ReducerOperationTarget
   | MutableOperationTarget
   | ModelInputOperationTarget
-  | ModelBoundaryOperationTarget
   | ExternalStoreOperationTarget
   | ResourceOperationTarget
   | FutureOperationTarget;
-
-type ModelOwnerCell = ModelBoundaryCell;
 
 interface UsePortCell extends BaseCell {
   readonly kind: "usePort";
@@ -1070,7 +1054,6 @@ type HookCell =
   | ResourceCell
   | FutureCell
   | ModelObservationCell
-  | ModelBoundaryCell
   | UsePortCell
   | ConnectCell
   | SnapshotCell
@@ -1142,8 +1125,7 @@ interface CommitPhasePass {
 
 type CommitPhaseCleanupSource =
   | Readonly<{ kind: "effect"; cell: EffectCell; lease: EffectCleanupLease }>
-  | Readonly<{ kind: "externalStore"; cell: ExternalStoreCell; lease: ExternalStoreLease }>
-  | Readonly<{ kind: "child"; child: RuntimeModelInstance }>;
+  | Readonly<{ kind: "externalStore"; cell: ExternalStoreCell; lease: ExternalStoreLease }>;
 
 interface ExternalStoreDraft {
   readonly kind: "externalStore";
@@ -1173,18 +1155,6 @@ interface ModelDraftCell {
   readonly cell: ModelObservationCell;
   readonly target: RuntimeModelInstance;
   readonly output: unknown;
-}
-
-interface ModelBoundaryDraftCell {
-  readonly kind: "modelBoundary";
-  readonly cell: ModelBoundaryCell;
-  readonly model: UnknownModel;
-  readonly child: RuntimeModelInstance | null;
-  readonly inputState: unknown;
-  readonly failed: boolean;
-  readonly error: unknown;
-  readonly failureGeneration: number;
-  readonly result: BoundaryState<unknown>;
 }
 
 interface UsePortDraft {
@@ -1231,7 +1201,6 @@ type DraftHook =
   | ResourceDraft
   | FutureDraft
   | ModelDraftCell
-  | ModelBoundaryDraftCell
   | UsePortDraft
   | ConnectDraft
   | SnapshotDraft
@@ -1261,7 +1230,6 @@ interface EvaluationTransaction {
   readonly drafts: Map<RuntimeModelInstance, ModelDraft>;
   readonly order: ModelDraft[];
   readonly newInstances: Set<RuntimeModelInstance>;
-  readonly disposeAfterCommit: Set<RuntimeModelInstance>;
   readonly provisionalSnapshots: Set<SnapshotLease>;
   readonly provisionalResources: Set<ResourceCell>;
   readonly provisionalFutures: Set<FutureCell>;
@@ -1280,7 +1248,6 @@ interface EvaluationContext {
   readonly provisionalHooks: ReadonlySet<HookCell>;
   readonly previousAttemptHooks: readonly DraftHook[] | undefined;
   readonly stateProgress: ReadonlyMap<MutableStateSubject, StateProgress>;
-  readonly modelProgress: ReadonlyMap<ModelOwnerCell, ModelProgress>;
   renderPhaseUpdateRequested: boolean;
   hookIndex: number;
 }
@@ -1290,21 +1257,9 @@ interface StateProgress {
   readonly consumed: number;
 }
 
-interface ModelProgress {
-  readonly inputState: unknown;
-  readonly boundary?: Readonly<{
-    child: RuntimeModelInstance | null;
-    failed: boolean;
-    error: unknown;
-    failureGeneration: number;
-    result: BoundaryState<unknown>;
-  }>;
-}
-
 interface EvaluationAttemptCheckpoint {
   readonly orderLength: number;
   readonly newInstances: ReadonlySet<RuntimeModelInstance>;
-  readonly disposeAfterCommit: ReadonlySet<RuntimeModelInstance>;
   readonly provisionalSnapshots: ReadonlySet<SnapshotLease>;
   readonly provisionalResources: ReadonlySet<ResourceCell>;
   readonly provisionalFutures: ReadonlySet<FutureCell>;
@@ -1333,7 +1288,6 @@ interface RuntimeModelInstance {
   readonly dependencyProxy: DependencyProxy;
   readonly endpointCache: Map<string, UnknownCallback>;
   readonly disposeFunction: () => void;
-  ownerCell: ModelOwnerCell | undefined;
   scheduled: boolean;
   independentActivationRequired: boolean;
   evaluating: boolean;
@@ -1592,7 +1546,7 @@ function invokeUserFunction<Value>(boundary: string, invoke: () => Value): Value
 }
 
 function assertSetterEvaluationOwner(
-  api: "useState" | "useReducer" | "useModel" | "boundary",
+  api: "useState" | "useReducer" | "useModel",
   target: RuntimeModelInstance,
 ): void {
   const source = currentContext?.instance;
@@ -1649,8 +1603,10 @@ function enqueueStateUpdate<Value>(
         "Behavon.useLabelState setter requires its StateId in the active transaction.start lock list",
       );
     }
-    mutableObserver.stage(scope.root, scope, cell, update);
-    return;
+    // One write path inside run keeps what get sees unambiguous.
+    throw new Error(
+      "Behavon.useLabelState setter cannot change a locked state inside transaction.run; use set from the run body",
+    );
   }
   if (mutableObserver.enqueueExternal(cell, update)) scheduleModel(owner, false);
 }
@@ -1845,11 +1801,35 @@ function queueFlush(): void {
     try {
       flushScheduledModels();
     } catch (error: unknown) {
-      setTimeout(() => {
-        throw error;
-      }, 0);
+      reportUncaughtError(error);
     }
   });
+}
+
+// No caller can receive a scheduled reevaluation failure; report it the way React reports an uncaught render error.
+function reportUncaughtError(error: unknown): void {
+  if (typeof reportError === "function") {
+    reportError(error);
+    return;
+  }
+  if (typeof window === "object" && typeof window.ErrorEvent === "function") {
+    const event = new window.ErrorEvent("error", {
+      bubbles: true,
+      cancelable: true,
+      message: typeof error === "object" && error !== null && typeof (error as { message?: unknown }).message === "string"
+        ? String((error as { message: string }).message)
+        : String(error),
+      error,
+    });
+    if (!window.dispatchEvent(event)) return;
+  } else {
+    const host = (globalThis as { process?: { emit?: (event: string, error: unknown) => boolean } }).process;
+    if (typeof host === "object" && typeof host.emit === "function") {
+      host.emit("uncaughtException", error);
+      return;
+    }
+  }
+  console.error(error);
 }
 
 function flushScheduledModels(): void {
@@ -1880,9 +1860,7 @@ function flushScheduledModels(): void {
           const evaluationFailure = transaction.phase === "evaluating";
           abortTransaction(transaction);
           if (!evaluationFailure) throw error;
-          const failureOwner = transaction.failureOwner ?? instance;
-          if (containModelEvaluationFailure(failureOwner, error)) continue;
-          terminateModelOwnerRoot(failureOwner, error);
+          terminateModel(transaction.failureOwner ?? instance, error);
           throw error;
         }
       } finally {
@@ -1895,40 +1873,11 @@ function flushScheduledModels(): void {
   }
 }
 
-function containModelEvaluationFailure(owner: RuntimeModelInstance, failure: unknown): boolean {
-  let current = owner;
-  while (current.ownerCell !== undefined) {
-    const ownerCell = current.ownerCell;
-    if (ownerCell.kind === "modelBoundary") {
-      const boundaryChild = ownerCell.child;
-      if (boundaryChild !== null) {
-        boundaryChild.ownerCell = undefined;
-        try {
-          disposeInstance(boundaryChild, false);
-        } catch {
-          // The Model evaluation failure remains authoritative over terminal cleanup failures.
-        }
-      }
-      ownerCell.child = null;
-      ownerCell.failed = true;
-      ownerCell.error = failure;
-      ownerCell.failureGeneration += 1;
-      ownerCell.retryRequested = false;
-      if (ownerCell.owner.status === "active") scheduleModel(ownerCell.owner, true);
-      return true;
-    }
-    current = ownerCell.owner;
-  }
-  return false;
-}
-
-function terminateModelOwnerRoot(owner: RuntimeModelInstance, error: unknown): void {
-  let root = owner;
-  while (root.ownerCell !== undefined) root = root.ownerCell.owner;
-  root.terminalError = error;
-  root.hasTerminalError = true;
+function terminateModel(instance: RuntimeModelInstance, error: unknown): void {
+  instance.terminalError = error;
+  instance.hasTerminalError = true;
   try {
-    disposeInstance(root, false);
+    disposeInstance(instance, false);
   } catch {
     // The Model evaluation failure remains authoritative over terminal cleanup failures.
   }
@@ -1939,7 +1888,6 @@ function createTransaction(): EvaluationTransaction {
     drafts: new Map(),
     order: [],
     newInstances: new Set(),
-    disposeAfterCommit: new Set(),
     provisionalSnapshots: new Set(),
     provisionalResources: new Set(),
     provisionalFutures: new Set(),
@@ -2044,7 +1992,6 @@ function createModelInstance(model: UnknownModel, input: unknown, transaction: E
     exports: new Map<string, unknown>(),
     endpointCache: new Map<string, UnknownCallback>(),
     disposeFunction,
-    ownerCell: undefined,
     scheduled: false,
     independentActivationRequired: false,
     evaluating: false,
@@ -2072,7 +2019,6 @@ function finalizeDisposedInstance(instance: RuntimeModelInstance): void {
   instance.endpoints = new Map();
   instance.exports = new Map();
   instance.endpointCache.clear();
-  instance.ownerCell = undefined;
   instance.scheduled = false;
   instance.independentActivationRequired = false;
   instance.evaluating = false;
@@ -2413,7 +2359,6 @@ function captureEvaluationAttempt(transaction: EvaluationTransaction): Evaluatio
   return {
     orderLength: transaction.order.length,
     newInstances: new Set(transaction.newInstances),
-    disposeAfterCommit: new Set(transaction.disposeAfterCommit),
     provisionalSnapshots: new Set(transaction.provisionalSnapshots),
     provisionalResources: new Set(transaction.provisionalResources),
     provisionalFutures: new Set(transaction.provisionalFutures),
@@ -2421,47 +2366,6 @@ function captureEvaluationAttempt(transaction: EvaluationTransaction): Evaluatio
     stateQueueBaselines: new Map(transaction.stateQueueBaselines),
     failureOwner: transaction.failureOwner,
   };
-}
-
-function discardFailedEvaluationBranch(
-  transaction: EvaluationTransaction,
-  checkpoint: EvaluationAttemptCheckpoint,
-): void {
-  for (const [queue, baseline] of transaction.inputQueueBaselines) {
-    if (!checkpoint.inputQueueBaselines.has(queue) && queue.length > baseline) {
-      queue.splice(baseline);
-    }
-  }
-  for (const [cell, baseline] of transaction.stateQueueBaselines) {
-    if (!checkpoint.stateQueueBaselines.has(cell)) {
-      mutableObserver.discardSuffix(cell, baseline);
-    }
-  }
-  discardEvaluationAttempt(transaction, checkpoint, new Set());
-  for (const queue of [...transaction.inputQueueBaselines.keys()]) {
-    if (!checkpoint.inputQueueBaselines.has(queue)) {
-      transaction.inputQueueBaselines.delete(queue);
-    }
-  }
-  for (const cell of [...transaction.stateQueueBaselines.keys()]) {
-    if (!checkpoint.stateQueueBaselines.has(cell)) {
-      transaction.stateQueueBaselines.delete(cell);
-    }
-  }
-  transaction.failureOwner = checkpoint.failureOwner;
-}
-
-function assertEvaluationBranchCommittable(
-  transaction: EvaluationTransaction,
-  checkpoint: EvaluationAttemptCheckpoint,
-): void {
-  for (const draft of transaction.order.slice(checkpoint.orderLength)) {
-    assertModelDraftCommittable(transaction, draft);
-  }
-  for (const lease of transaction.provisionalSnapshots) {
-    if (checkpoint.provisionalSnapshots.has(lease) || lease.status !== "provisional") continue;
-    assertProvisionalSnapshotCommittable(transaction, lease);
-  }
 }
 
 function discardEvaluationAttempt(
@@ -2517,10 +2421,6 @@ function discardEvaluationAttempt(
     disposeFutureCell(future);
   }
 
-  for (const instance of [...transaction.disposeAfterCommit]) {
-    if (!checkpoint.disposeAfterCommit.has(instance)) transaction.disposeAfterCommit.delete(instance);
-  }
-
   for (const candidate of [...transaction.newInstances]) {
     if (checkpoint.newInstances.has(candidate)) continue;
     transaction.newInstances.delete(candidate);
@@ -2546,7 +2446,6 @@ function prepareModel(instance: RuntimeModelInstance, input: unknown, transactio
   let provisionalHooks: ReadonlySet<HookCell> = new Set();
   let previousAttemptHooks: readonly DraftHook[] | undefined;
   let stateProgress: ReadonlyMap<MutableStateSubject, StateProgress> = new Map();
-  let modelProgress: ReadonlyMap<ModelOwnerCell, ModelProgress> = new Map();
   let inputProgress = input;
   let inputConsumed = 0;
   const inputQueueBaselines = transaction.inputQueueBaselines;
@@ -2585,7 +2484,6 @@ function prepareModel(instance: RuntimeModelInstance, input: unknown, transactio
         provisionalHooks,
         previousAttemptHooks,
         stateProgress,
-        modelProgress,
         renderPhaseUpdateRequested: false,
         hookIndex: 0,
       };
@@ -2612,21 +2510,9 @@ function prepareModel(instance: RuntimeModelInstance, input: unknown, transactio
         ? new Set<HookCell>(attemptHooks)
         : new Set<HookCell>();
       const nextStateProgress = new Map<MutableStateSubject, StateProgress>();
-      const nextModelProgress = new Map<ModelOwnerCell, ModelProgress>();
       for (const hook of draft.hooks) {
         if (hook.kind === "state" || hook.kind === "reducer") {
           nextStateProgress.set(hook.cell, { value: hook.value, consumed: hook.consumed });
-        } else if (hook.kind === "modelBoundary") {
-          nextModelProgress.set(hook.cell, {
-            inputState: hook.inputState,
-            boundary: {
-              child: hook.child,
-              failed: hook.failed,
-              error: hook.error,
-              failureGeneration: hook.failureGeneration,
-              result: hook.result,
-            },
-          });
         }
       }
       inputProgress = draft.input;
@@ -2645,7 +2531,6 @@ function prepareModel(instance: RuntimeModelInstance, input: unknown, transactio
       }
       previousAttemptHooks = draft.hooks;
       stateProgress = nextStateProgress;
-      modelProgress = nextModelProgress;
     }
     throw new Error(`Behavon Model#${instance.id} exceeded the render-phase evaluation limit`);
   } catch (error: unknown) {
@@ -2794,34 +2679,6 @@ function commitTransaction(
           committedHooks.push(hook.cell);
           break;
         }
-        case "modelBoundary": {
-          if (
-            hook.child !== null &&
-            hook.child.status === "disposed" &&
-            hook.cell.child === null
-          ) {
-            // Preserve a terminal owner-cell correction if the Child was disposed
-            // after this Boundary draft already read it.
-            committedHooks.push(hook.cell);
-            break;
-          }
-          const oldChild = hook.cell.child;
-          hook.cell.model = hook.model;
-          hook.cell.child = hook.child;
-          hook.cell.inputState = hook.inputState;
-          hook.cell.failed = hook.failed;
-          hook.cell.error = hook.error;
-          hook.cell.failureGeneration = hook.failureGeneration;
-          hook.cell.retryRequested = false;
-          hook.cell.result = hook.result;
-          if (oldChild !== null && oldChild !== hook.child) {
-            transaction.disposeAfterCommit.add(oldChild);
-            cleanupSources.push({ kind: "child", child: oldChild });
-          }
-          if (hook.child !== null) hook.child.ownerCell = hook.cell;
-          committedHooks.push(hook.cell);
-          break;
-        }
         case "usePort":
           hook.cell.target = hook.target;
           committedHooks.push(hook.cell);
@@ -2863,14 +2720,6 @@ function commitTransaction(
       for (const observer of instance.observers) {
         if (observer.owner.status === "active") observersToSchedule.add(observer.owner);
       }
-      const ownerCell = instance.ownerCell;
-      if (
-        ownerCell?.kind === "modelBoundary" &&
-        ownerCell.child === instance &&
-        ownerCell.owner.status === "active" &&
-        ownerCell.owner.hooks.includes(ownerCell) &&
-        !transaction.drafts.has(ownerCell.owner)
-      ) observersToSchedule.add(ownerCell.owner);
     }
   }
   transaction.phase = "committed";
@@ -2903,9 +2752,7 @@ function commitTransaction(
 
   const pass: CommitPhasePass = { cleanups: [], setups: [], failures: [], finalizations: [] };
   for (const source of cleanupSources) {
-    if (source.kind === "child") {
-      collectCommitPhaseDisposal(source.child, pass);
-    } else if (source.kind === "effect") {
+    if (source.kind === "effect") {
       pass.cleanups.push({
         owner: source.cell.owner,
         run: () => consumeEffectCleanup(source.cell, source.lease),
@@ -3137,8 +2984,6 @@ function collectCommitPhaseDisposal(instance: RuntimeModelInstance, pass: Commit
       resources.push(hook);
     } else if (hook.kind === "future") {
       futures.push(hook);
-    } else if (hook.kind === "modelBoundary" && hook.child !== null) {
-      collectCommitPhaseDisposal(hook.child, pass);
     } else if (hook.kind === "effect" && hook.cleanup !== undefined) {
       const cleanup = hook.cleanup;
       pass.cleanups.push({
@@ -3160,45 +3005,13 @@ function collectCommitPhaseDisposal(instance: RuntimeModelInstance, pass: Commit
 
   instance.endpoints = new Map();
   instance.status = "disposed";
-  const ownerCell = instance.ownerCell;
-  if (ownerCell !== undefined && ownerCell.child === instance) {
-    ownerCell.child = null;
-    if (ownerCell.kind === "modelBoundary") {
-      ownerCell.failed = false;
-      ownerCell.error = undefined;
-      ownerCell.failureGeneration += 1;
-      ownerCell.retryRequested = false;
-    }
-  }
   pass.finalizations.push(instance);
 }
 
 interface CommitPhaseFailureGroup {
-  readonly boundary: ModelBoundaryCell | undefined;
   readonly root: RuntimeModelInstance;
   readonly errors: unknown[];
   processed: boolean;
-}
-
-function findCommitPhaseBoundary(owner: RuntimeModelInstance): ModelBoundaryCell | undefined {
-  let current = owner;
-  while (current.ownerCell !== undefined) {
-    const ownerCell = current.ownerCell;
-    if (
-      ownerCell.kind === "modelBoundary" &&
-      !ownerCell.failed &&
-      ownerCell.owner.status === "active" &&
-      ownerCell.owner.hooks.includes(ownerCell)
-    ) return ownerCell;
-    current = ownerCell.owner;
-  }
-  return undefined;
-}
-
-function findModelRoot(owner: RuntimeModelInstance): RuntimeModelInstance {
-  let root = owner;
-  while (root.ownerCell !== undefined) root = root.ownerCell.owner;
-  return root;
 }
 
 function projectCommitPhaseErrors(errors: readonly unknown[]): unknown {
@@ -3210,13 +3023,9 @@ function routeCommitPhaseFailures(failures: readonly CommitPhaseFailure[]): void
   if (failures.length === 0) return;
   const groups: CommitPhaseFailureGroup[] = [];
   const addFailure = ({ owner, error }: CommitPhaseFailure): void => {
-    const boundary = findCommitPhaseBoundary(owner);
-    const root = findModelRoot(owner);
-    let group = groups.find((candidate) =>
-      boundary === undefined ? candidate.boundary === undefined && candidate.root === root : candidate.boundary === boundary
-    );
+    let group = groups.find((candidate) => candidate.root === owner);
     if (group === undefined) {
-      group = { boundary, root, errors: [], processed: false };
+      group = { root: owner, errors: [], processed: false };
       groups.push(group);
     }
     group.errors.push(error);
@@ -3229,40 +3038,6 @@ function routeCommitPhaseFailures(failures: readonly CommitPhaseFailure[]): void
     const group = groups[index];
     if (group.processed) continue;
     group.processed = true;
-    const boundary = group.boundary;
-    if (boundary !== undefined && !boundary.failed && boundary.owner.status === "active") {
-      const child = boundary.child;
-      boundary.child = null;
-      boundary.failed = true;
-      boundary.failureGeneration += 1;
-      boundary.retryRequested = false;
-      if (child !== null) {
-        child.terminalError = projectCommitPhaseErrors(group.errors);
-        child.hasTerminalError = true;
-        const disposalPass: CommitPhasePass = {
-          cleanups: [],
-          setups: [],
-          failures: [],
-          finalizations: [],
-        };
-        try {
-          collectCommitPhaseDisposal(child, disposalPass);
-          for (const operation of disposalPass.cleanups) runCommitPhaseOperation(operation, disposalPass);
-          // These failures were encountered while applying this Boundary's fallback.
-          // Keep them in the same containment cycle even though the Boundary is now
-          // marked failed. A later independent failure still searches outward because
-          // findCommitPhaseBoundary intentionally skips an already-failed Boundary.
-          for (const failure of disposalPass.failures) group.errors.push(failure.error);
-        } finally {
-          finalizeCommitPhaseInstances(disposalPass);
-        }
-      }
-      boundary.error = projectCommitPhaseErrors(group.errors);
-      if (child !== null) child.terminalError = boundary.error;
-      scheduleModel(boundary.owner, true);
-      continue;
-    }
-
     const disposalPass: CommitPhasePass = {
       cleanups: [],
       setups: [],
@@ -3340,13 +3115,9 @@ function disposeInstance(
     }
   };
 
-  const children: RuntimeModelInstance[] = [];
   const resources: ResourceCell[] = [];
   const futures: FutureCell[] = [];
   for (const hook of instance.hooks) {
-    if (hook.kind === "modelBoundary" && hook.child !== null) {
-      children.push(hook.child);
-    }
     if (hook.kind === "externalStore") {
       hook.generation = hook.nextGeneration;
       hook.nextGeneration += 1;
@@ -3364,9 +3135,6 @@ function disposeInstance(
     }
   }
 
-  for (const child of children) {
-    capture(() => disposeInstance(child, false, transactionFinalizations));
-  }
   for (const hook of instance.hooks) {
     if (hook.kind === "effect" && hook.cleanup !== undefined) {
       capture(() => consumeEffectCleanup(hook, hook.cleanup as EffectCleanupLease));
@@ -3383,24 +3151,6 @@ function disposeInstance(
 
   instance.endpoints = new Map();
   instance.status = "disposed";
-  const ownerCell = instance.ownerCell;
-  if (ownerCell !== undefined && ownerCell.child === instance) {
-    const selfDisposedDuringOwnedEvaluation =
-      currentContext?.instance === instance &&
-      instance.evaluating &&
-      ownerCell.owner.evaluating &&
-      currentContext.transaction.drafts.has(ownerCell.owner);
-    ownerCell.child = null;
-    if (ownerCell.kind === "modelBoundary") {
-      ownerCell.failed = false;
-      ownerCell.error = undefined;
-      ownerCell.failureGeneration += 1;
-      ownerCell.retryRequested = false;
-    }
-    if (ownerCell.owner.status === "active" && !selfDisposedDuringOwnedEvaluation) {
-      scheduleModel(ownerCell.owner, true);
-    }
-  }
   if (transactionFinalizations !== undefined) transactionFinalizations.add(instance);
   else if (currentCommitPhasePass !== undefined) currentCommitPhasePass.finalizations.push(instance);
   else finalizeDisposedInstance(instance);
@@ -3468,7 +3218,7 @@ function transactionStart(
   registerTransactionScope(scope);
 }
 
-function transactionRun<Value>(id: TransactionId, body: () => Value): Value {
+function transactionRun<Value>(id: TransactionId, body: (access: TransactionAccess) => Value): Value {
   if (currentContext !== undefined) {
     throw new Error("Behavon.transaction.run cannot run while evaluating a Model");
   }
@@ -3486,9 +3236,10 @@ function transactionRun<Value>(id: TransactionId, body: () => Value): Value {
     throw new Error("Behavon.transaction.run cannot overlap a different root transaction");
   }
   const previous = currentTransactionScope;
+  const access = createTransactionAccess(scope);
   currentTransactionScope = scope;
   try {
-    const result = invokeUserFunction("transaction.run body", body);
+    const result = invokeUserFunction("transaction.run body", () => body(access.api));
     if (isThenable(result)) {
       rollbackTransactionScope(scope);
       throw new Error("Behavon.transaction.run requires a synchronous body");
@@ -3498,8 +3249,44 @@ function transactionRun<Value>(id: TransactionId, body: () => Value): Value {
     if (scope.root.status === "started") rollbackTransactionScope(scope);
     throw error;
   } finally {
+    access.close();
     currentTransactionScope = previous;
   }
+}
+
+// get and set reach only the states this scope locked, and only while its run body executes.
+function createTransactionAccess(scope: RuntimeTransactionScope): { readonly api: TransactionAccess; close(): void } {
+  let open = true;
+  const lockedCell = (id: StateId<unknown>, api: "get" | "set"): StateCell => {
+    if (!open) throw new Error(`Behavon transaction ${api} can be used only while its run body executes`);
+    const label = requireStateIdentity(id, `transaction ${api}`);
+    const cell = mutableObserver.labeledSubject(scope.owner, label) as StateCell | undefined;
+    if (cell === undefined || !scope.locks.has(cell)) {
+      throw new Error(`Behavon transaction ${api} requires a StateId locked by this transaction.start`);
+    }
+    return cell;
+  };
+  // Same order as commit: the committed value, updates already queued, then this root's staged changes.
+  const current = (cell: StateCell): unknown => {
+    const includedScopes = [...scope.root.scopes].filter((candidate) => candidate.status !== "rolledback");
+    const queued = mutableObserver.queuedUpdates<StateUpdate<unknown>>(cell, 0, mutableObserver.queuedUpdateCount(cell));
+    const staged = mutableObserver.stagedUpdates(scope.root, includedScopes, cell) as readonly StateUpdate<unknown>[];
+    return applyUpdates(mutableObserver.value(cell), [...queued, ...staged], "useState functional updater");
+  };
+  const api: TransactionAccess = Object.freeze({
+    get<State>(id: StateId<State>): State {
+      return current(lockedCell(id, "get")) as State;
+    },
+    set<State>(id: StateId<State>, next: StateUpdate<State>): void {
+      const cell = lockedCell(id, "set");
+      const value = typeof next === "function"
+        ? invokeUserFunction("transaction set updater", () => (next as (previous: State) => State)(current(cell) as State))
+        : next;
+      // Staged as an updater so that a function value is kept as a value at commit.
+      mutableObserver.stage(scope.root, scope, cell, () => value);
+    },
+  });
+  return { api, close: () => { open = false; } };
 }
 
 function prepareTransactionalOwners(
@@ -3570,11 +3357,7 @@ function commitRuntimeTransactionRoot(root: RuntimeTransactionRoot): void {
       }
       rollbackTransactionRoot(root);
       const failureOwner = evaluation.failureOwner ?? owners.values().next().value;
-      if (failureOwner !== undefined) {
-        if (!containModelEvaluationFailure(failureOwner, error)) {
-          terminateModelOwnerRoot(failureOwner, error);
-        }
-      }
+      if (failureOwner !== undefined) terminateModel(failureOwner, error);
       throw error;
     }
   } finally {
@@ -3616,7 +3399,7 @@ function transactionRollback(id: TransactionId): void {
 
 export const transaction = Object.freeze({
   start: transactionStart,
-  run<Body extends () => unknown>(
+  run<Body extends TransactionBody>(
     id: TransactionId,
     body: Body & SynchronousTransactionBody<Body>,
   ): ReturnType<Body> {
@@ -5361,153 +5144,6 @@ export function useModel<Input, Output, Port extends object = object>(
   return [output as Output, target.inputSetter as StateSetter<Input>];
 }
 
-function useBoundaryChildInternal<Input, Output>(
-  model: Model<Input, Output>,
-  inputState: Input,
-): BoundaryState<Output> {
-  const context = requireContext("boundary Model");
-  const existing = activeHook(context, "modelBoundary") as ModelBoundaryCell | undefined;
-  let cell: ModelBoundaryCell;
-  if (existing === undefined) {
-    cell = {} as ModelBoundaryCell;
-    const operationTarget = createRetainedOperationTarget(context.instance, {
-      kind: "modelBoundaryOperation",
-      owner: context.instance,
-      cell: undefined,
-    } as ModelBoundaryOperationTarget);
-    Object.assign(cell, {
-      kind: "modelBoundary" as const,
-      owner: context.instance,
-      model: model as unknown as UnknownModel,
-      child: null,
-      inputState,
-      failed: false,
-      error: undefined,
-      failureGeneration: 0,
-      retryRequested: false,
-      result: undefined,
-      operationTarget,
-    });
-    operationTarget.cell = cell;
-  } else {
-    cell = existing;
-    if (cell.model !== (model as unknown as UnknownModel)) {
-      throw new Error("Behavon boundary Child Model changed at a mounted internal position");
-    }
-  }
-
-  const progress = context.modelProgress.get(cell) ?? { inputState: cell.inputState };
-
-  const boundaryProgress = progress.boundary;
-  let child = boundaryProgress?.child ?? cell.child;
-  let failed = boundaryProgress?.failed ?? cell.failed;
-  let error = boundaryProgress?.error ?? cell.error;
-  let failureGeneration = boundaryProgress?.failureGeneration ?? cell.failureGeneration;
-  const previousResult = boundaryProgress?.result ?? cell.result;
-  const previousResultGeneration = boundaryProgress?.failureGeneration ?? cell.failureGeneration;
-  const retryRequested = boundaryProgress === undefined && cell.retryRequested;
-
-  if (failed && !retryRequested) {
-    child = null;
-  } else {
-    const shouldCreate = child === null || child.status === "disposed";
-    const shouldUpdate = !shouldCreate && !Object.is(inputState, cell.inputState);
-    if (shouldCreate || shouldUpdate) {
-      const checkpoint = captureEvaluationAttempt(context.transaction);
-      const previousCommittedChild = cell.child;
-      try {
-        if (shouldCreate) {
-          child = createModelInstance(model as unknown as UnknownModel, inputState, context.transaction);
-          child.ownerCell = cell;
-        }
-        prepareModel(child as RuntimeModelInstance, inputState, context.transaction);
-        assertEvaluationBranchCommittable(context.transaction, checkpoint);
-        failed = false;
-        error = undefined;
-      } catch (reason: unknown) {
-        discardFailedEvaluationBranch(context.transaction, checkpoint);
-        if (previousCommittedChild !== null) {
-          if (previousCommittedChild.status === "active") {
-            previousCommittedChild.ownerCell = undefined;
-            try {
-              disposeInstance(previousCommittedChild, false);
-            } catch {
-              // The Model evaluation failure remains authoritative over subtree cleanup failures.
-            }
-          }
-          cell.child = null;
-        }
-        child = null;
-        failed = true;
-        error = reason;
-        failureGeneration += 1;
-      }
-    }
-  }
-
-  let result: BoundaryState<Output>;
-  if (failed) {
-    if (
-      previousResult?.status === "failed" &&
-      previousResultGeneration === failureGeneration &&
-      Object.is(previousResult.error, error)
-    ) result = previousResult as BoundaryState<Output>;
-    else {
-      const generation = failureGeneration;
-      const operationTarget = cell.operationTarget;
-      const reset = (): void => {
-        assertSetterEvaluationOwner("boundary", operationTarget.owner);
-        const activeCell = operationTarget.cell;
-        if (
-          activeCell === undefined ||
-          operationTarget.owner.status !== "active" ||
-          !operationTarget.owner.hooks.includes(activeCell) ||
-          !activeCell.failed ||
-          activeCell.failureGeneration !== generation
-        ) return;
-        activeCell.retryRequested = true;
-        const activeContext = currentContext;
-        if (activeContext?.instance === operationTarget.owner) {
-          activeContext.renderPhaseUpdateRequested = true;
-        } else {
-          scheduleModel(operationTarget.owner, true);
-        }
-      };
-      registerRetainedOperationForTests(reset, operationTarget);
-      result = { status: "failed", error, reset };
-    }
-  } else {
-    const output = context.transaction.drafts.get(child as RuntimeModelInstance)?.output ?? child?.output;
-    result = previousResult?.status === "active" && Object.is(previousResult.output, output)
-      ? previousResult as BoundaryState<Output>
-      : { status: "active", output: output as Output };
-  }
-
-  context.draft.hooks.push({
-    kind: "modelBoundary",
-    cell,
-    model: model as unknown as UnknownModel,
-    child,
-    inputState,
-    failed,
-    error,
-    failureGeneration,
-    result,
-  });
-  context.hookIndex += 1;
-
-  return result;
-}
-
-export function boundary<Input, Output>(
-  model: Model<Input, Output>,
-): Model<Input, BoundaryState<Output>> {
-  function BoundaryModel(input: Input): BoundaryState<Output> {
-    return useBoundaryChildInternal(model, input);
-  }
-  return BoundaryModel;
-}
-
 export function usePort<Ref extends ModelRefBase>(ref: Ref): DependencyProxyForRef<Ref>;
 export function usePort(ref: InterfaceTarget): unknown {
   const context = requireContext("usePort");
@@ -5771,7 +5407,6 @@ const Behavon = Object.freeze({
   useSlot,
   useExport,
   useModel,
-  boundary,
   usePort,
   useConnect,
   useSnapshot,

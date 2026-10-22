@@ -16,20 +16,18 @@ function captureThrown(trigger: () => void): unknown {
 
 async function captureScheduledFailure(trigger: () => void): Promise<unknown> {
   let surfaced: unknown;
-  const originalSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-    try {
-      if (typeof handler === "function") handler();
-    } catch (error: unknown) {
-      surfaced = error;
-    }
-    return originalSetTimeout(() => undefined, 0);
-  }) as typeof setTimeout;
+  const originalEmit = process.emit;
+  process.emit = ((event: string | symbol, ...args: unknown[]) => {
+    if (event !== "uncaughtException") return Reflect.apply(originalEmit, process, [event, ...args]) as boolean;
+    const error = args[0];
+    surfaced = error;
+    return true;
+  }) as typeof process.emit;
   try {
     trigger();
     await Promise.resolve();
   } finally {
-    globalThis.setTimeout = originalSetTimeout;
+    process.emit = originalEmit;
   }
   return surfaced;
 }
@@ -523,27 +521,6 @@ describe("user-code failure boundaries", () => {
     expect(captureThrown(() => root.dispose())).toBe(failure);
     expect(() => Behavon.getInterface(root as TypedModelRef<any>)).toThrow(/disposed/);
     expect(inspectSnapshotChannelForTests(channel)).toBeUndefined();
-  });
-
-  it("B22 preserves a Boundary Child cleanup failure and completes runtime-owned disposal", () => {
-    const childChannel = uniqueChannel("nested-child-cleanup-failure");
-    const failure = new Error("nested Child unsubscribe failed");
-
-    function Child(): undefined {
-      Behavon.useSyncExternalStore(
-        () => () => {
-          throw failure;
-        },
-        () => 0,
-      );
-      Behavon.useSnapshot(childChannel);
-      return undefined;
-    }
-
-    const root = Behavon.createModel(Behavon.boundary(Child), undefined);
-    expect(captureThrown(() => root.dispose())).toBe(failure);
-    expect(() => Behavon.getInterface(root)).toThrow(/disposed/);
-    expect(inspectSnapshotChannelForTests(childChannel)).toBeUndefined();
   });
 
   it("B01 aborts a failed Child construction and releases its provisional owner", () => {

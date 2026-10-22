@@ -10,22 +10,20 @@ async function settle(): Promise<void> {
 }
 
 async function captureScheduledFailure(run: () => void, afterCapture?: () => void): Promise<unknown> {
-  const originalSetTimeout = globalThis.setTimeout;
+  const originalEmit = process.emit;
   let surfaced: unknown;
-  globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-    try {
-      if (typeof handler === "function") handler();
-    } catch (error: unknown) {
-      surfaced = error;
-      afterCapture?.();
-    }
-    return originalSetTimeout(() => undefined, 0);
-  }) as typeof setTimeout;
+  process.emit = ((event: string | symbol, ...args: unknown[]) => {
+    if (event !== "uncaughtException") return Reflect.apply(originalEmit, process, [event, ...args]) as boolean;
+    const error = args[0];
+    surfaced = error;
+    afterCapture?.();
+    return true;
+  }) as typeof process.emit;
   try {
     run();
     await Promise.resolve();
   } finally {
-    globalThis.setTimeout = originalSetTimeout;
+    process.emit = originalEmit;
   }
   return surfaced;
 }

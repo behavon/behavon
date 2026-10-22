@@ -15,8 +15,8 @@ import type {
   SnapshotId,
   SnapshotRootId,
   StateId,
+  TransactionAccess,
   TransactionId,
-  BoundaryState,
   Signal,
   Slot,
   StateSetter,
@@ -100,7 +100,6 @@ type PublicTypeContract = readonly [
   DependencyProxy,
   ModelInstance,
   ModelHandle,
-  BoundaryState,
   MutableHandle<number>,
   PortDescriptor<{ changed: Signal<[value: number]> }>,
   SnapshotId<number>,
@@ -581,12 +580,18 @@ const transactionContractPort = Behavon.createPort<{ executeTransaction: Signal 
 });
 
 function TransactionTypeContract(): number {
-  const [count, setCount] = Behavon.useLabelState(transactionStateId, 0);
+  const [count] = Behavon.useLabelState(transactionStateId, 0);
   const execute = Behavon.useCallback(() => {
     const id: TransactionId = Behavon.createId();
     Behavon.transaction.start(id, [transactionStateIds.count]);
-    const result: number = Behavon.transaction.run(id, () => {
-      setCount((previous) => previous + 1);
+    const result: number = Behavon.transaction.run(id, ({ get, set }: TransactionAccess) => {
+      const current: number = get(transactionStateIds.count);
+      set(transactionStateIds.count, current + 1);
+      set(transactionStateIds.count, (previous) => previous + 1);
+      // @ts-expect-error set keeps the StateId payload type.
+      set(transactionStateIds.count, "wrong");
+      // @ts-expect-error get requires a StateId.
+      get("count");
       return previousContractValue;
     });
     void result;
@@ -596,7 +601,7 @@ function TransactionTypeContract(): number {
     // @ts-expect-error transaction.run rejects non-async PromiseLike-returning bodies too.
     Behavon.transaction.run(id, thenableBody);
     Behavon.transaction.commit(id);
-  }, [setCount]);
+  }, []);
   Behavon.useSignal(transactionContractPort, "executeTransaction", execute);
   Behavon.useExport(transactionContractPort, "executeTransaction");
   return count;
@@ -623,25 +628,11 @@ function MutableContract(initial: { readonly value: number }) {
 }
 void MutableContract;
 
-function BoundaryContract(): Model<number, BoundaryState<string>> {
-  const safeString = Behavon.boundary<number, string>(String);
-  const exactModel: Model<number, BoundaryState<string>> = safeString;
-  declareBoundaryState(undefined as unknown as BoundaryState<string>);
-  return exactModel;
+function RemovedBoundaryContract() {
+  // @ts-expect-error boundary was removed; failures of the developer's own Models are not isolated.
+  return Behavon.boundary;
 }
-
-function declareBoundaryState(state: BoundaryState<string>): void {
-  if (state.status === "active") {
-    const output: string = state.output;
-    void output;
-  } else {
-    const error: unknown = state.error;
-    const reset: () => void = state.reset;
-    void error;
-    void reset;
-  }
-}
-void BoundaryContract;
+void RemovedBoundaryContract;
 
 declare const observedStringModel: ModelInstance<number, string>;
 
@@ -1012,14 +1003,11 @@ void AssemblyTypedRefContract;
 
 interface DetailedModelContractInput {
   readonly instance: ModelInstance<number, string>;
-  readonly boundaryInstance: ModelInstance<number, BoundaryState<string>>;
 }
 
 function DetailedModelContract(input: DetailedModelContractInput) {
   const detailedObservation: ModelHandle<number, string> = Behavon.useModel(input.instance);
-  const boundaryObservation: ModelHandle<number, BoundaryState<string>> =
-    Behavon.useModel(input.boundaryInstance);
-  return { detailedObservation, boundaryObservation };
+  return { detailedObservation };
 }
 void DetailedModelContract;
 void detailedRoot;
@@ -1050,8 +1038,10 @@ function RemovedTypedRelationshipOverloads() {
 void RemovedTypedRelationshipOverloads;
 // @ts-expect-error ModelBoundaryHandle was removed with the Hook-based Boundary API.
 import type { ModelBoundaryHandle } from "behavon";
-// @ts-expect-error ModelBoundaryResult was replaced by BoundaryState.
+// @ts-expect-error ModelBoundaryResult was removed with the boundary API.
 import type { ModelBoundaryResult } from "behavon";
+// @ts-expect-error BoundaryState was removed with the boundary API.
+import type { BoundaryState } from "behavon";
 // @ts-expect-error DependencyList is an internal signature helper, not a package export.
 import type { DependencyList } from "behavon";
 // @ts-expect-error MountedInput is an internal signature helper, not a package export.

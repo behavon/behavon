@@ -1,6 +1,6 @@
 # `useMutable(initial)`
 
-React의 `useRef`에 해당합니다. 값을 담아 두는 handle을 반환합니다.
+다시 평가를 일으키지 않는 값을 담는 handle을 반환합니다. 화면에 보일 필요가 없는 값을 기억할 때 씁니다.
 
 ```ts
 function useMutable<State>(initial: State): {
@@ -9,12 +9,21 @@ function useMutable<State>(initial: State): {
 }
 ```
 
-- `initial`: 처음 값. 함수를 넘겨도 호출하지 않고 함수 자체를 저장합니다.
-- `get()`: 지금 값을 읽습니다.
-- `set(next)`: 값을 바로 바꿉니다.
-- `set(previous => next)`: 이전 값으로 다음 값을 계산합니다. 함수 자체를 저장하려면 `set(() => fn)`처럼 감쌉니다.
+## 인자
 
-`set`은 Model을 다시 평가하지 않습니다. 화면에 보일 필요가 없는 값을 기억할 때 씁니다. handle은 항상 같은 객체이고, `.current`는 없습니다. Model이 종료된 뒤 handle을 쓰면 오류입니다.
+- `initial`: 처음 값. 함수를 넘겨도 부르지 않고 함수 자체를 담습니다.
+
+## 반환값
+
+handle. 항상 같은 객체입니다.
+
+- `get()`: 지금 값을 읽습니다.
+- `set(next)` / `set(previous => next)`: 값을 바로 바꿉니다. 함수를 담으려면 `set(() => fn)`처럼 감쌉니다.
+
+## 동작
+
+- `set`은 Model을 다시 평가하지 않습니다.
+- handle은 그 Model의 상태를 가리킵니다. Model이 종료된 뒤 쓰면 오류입니다.
 
 ## 예제
 

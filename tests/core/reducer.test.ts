@@ -11,20 +11,18 @@ function outputOf<Value>(ref: object): Value {
 
 async function captureScheduledFailure(action: () => void): Promise<unknown> {
   let surfaced: unknown;
-  const originalSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-    try {
-      if (typeof handler === "function") handler();
-    } catch (error: unknown) {
-      surfaced = error;
-    }
-    return originalSetTimeout(() => undefined, 0);
-  }) as typeof setTimeout;
+  const originalEmit = process.emit;
+  process.emit = ((event: string | symbol, ...args: unknown[]) => {
+    if (event !== "uncaughtException") return Reflect.apply(originalEmit, process, [event, ...args]) as boolean;
+    const error = args[0];
+    surfaced = error;
+    return true;
+  }) as typeof process.emit;
   try {
     action();
     await Promise.resolve();
   } finally {
-    globalThis.setTimeout = originalSetTimeout;
+    process.emit = originalEmit;
   }
   return surfaced;
 }
@@ -372,65 +370,38 @@ describe("useReducer", () => {
     }
     const first = Behavon.createModel(Model, undefined);
     let surfaced: unknown;
-    const original = globalThis.setTimeout;
-    globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-      try {
-        if (typeof handler === "function") handler();
-      } catch (error: unknown) {
-        surfaced = error;
-      }
-      return original(() => undefined, 0);
-    }) as typeof setTimeout;
+    const original = process.emit;
+    process.emit = ((event: string | symbol, ...args: unknown[]) => {
+      if (event !== "uncaughtException") return Reflect.apply(original, process, [event, ...args]) as boolean;
+      const error = args[0];
+      surfaced = error;
+      return true;
+    }) as typeof process.emit;
     try {
       dispatch?.("fail");
       await Promise.resolve();
     } finally {
-      globalThis.setTimeout = original;
+      process.emit = original;
     }
     expect(surfaced).toBe(failure);
 
     const second = Behavon.createModel(Model, undefined);
     surfaced = undefined;
-    globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0]) => {
-      try {
-        if (typeof handler === "function") handler();
-      } catch (error: unknown) {
-        surfaced = error;
-      }
-      return original(() => undefined, 0);
-    }) as typeof setTimeout;
+    process.emit = ((event: string | symbol, ...args: unknown[]) => {
+      if (event !== "uncaughtException") return Reflect.apply(original, process, [event, ...args]) as boolean;
+      const error = args[0];
+      surfaced = error;
+      return true;
+    }) as typeof process.emit;
     try {
       dispatch?.("hook");
       await Promise.resolve();
     } finally {
-      globalThis.setTimeout = original;
+      process.emit = original;
     }
     expect(String(surfaced)).toMatch(/useState cannot be called inside useReducer reducer/);
     expect(() => first.dispose()).toThrow(/more than once/);
     expect(() => second.dispose()).toThrow(/more than once/);
-  });
-
-  it("routes reducer failures to the nearest outer Boundary with original identity", async () => {
-    const failure = new Error("contained reducer failure");
-    let dispatch: ReducerDispatch<["fail"]> | undefined;
-    function Child(): number {
-      const [value, next] = Behavon.useReducer((state: number, action: "fail") => {
-        if (action === "fail") throw failure;
-        return state;
-      }, 0);
-      // eslint-disable-next-line behavon-hooks/evaluation-purity -- test-only probe retains dispatch for Boundary failure
-      dispatch = next;
-      return value;
-    }
-    const boundary = Behavon.createModel(Behavon.boundary(Child), undefined);
-    dispatch?.("fail");
-    await waitFor(() => (
-      outputOf<{ readonly status: string }>(boundary as object).status === "failed"
-    ));
-    const result = outputOf<{ readonly status: string; readonly error: unknown }>(boundary as object);
-    expect(result.status).toBe("failed");
-    expect(result.error).toBe(failure);
-    boundary.dispose();
   });
 
   it("defers transaction-run dispatch across both commit and rollback with one development warning", async () => {
@@ -485,18 +456,18 @@ describe("useReducer", () => {
     const Failing: Model<{
       target: ModelInstance<undefined, number, TargetPort>;
     }, boolean, FailingPort> = (input) => {
-      const [failed, setFailed] = Behavon.useLabelState(stateIds.failed, false);
+      const [failed] = Behavon.useLabelState(stateIds.failed, false);
       if (failed) throw failure;
       const target = input.target;
       const execute = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [stateIds.failed]);
-        Behavon.transaction.run(id, () => {
-          setFailed(true);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(stateIds.failed, true);
           target.add(7);
         });
         Behavon.transaction.commit(id);
-      }, [setFailed, target]);
+      }, [target]);
       Behavon.useSignal(failingPort, "execute", execute);
       Behavon.useExport(failingPort, "execute");
       return failed;
@@ -516,7 +487,7 @@ describe("useReducer", () => {
     let selfDispatch: ReducerDispatch<[number]> | undefined;
     let selfCell: MutableStateSubject | undefined;
     const Self: Model<undefined, number, FailingPort> = () => {
-      const [failed, setFailed] = Behavon.useLabelState(stateIds.failed, false);
+      const [failed] = Behavon.useLabelState(stateIds.failed, false);
       const [value, dispatch] = Behavon.useReducer(
         (state: number, amount: number) => state + amount,
         0,
@@ -529,12 +500,12 @@ describe("useReducer", () => {
       const execute = Behavon.useCallback(() => {
         const id = Behavon.createId();
         Behavon.transaction.start(id, [stateIds.failed]);
-        Behavon.transaction.run(id, () => {
-          setFailed(true);
+        Behavon.transaction.run(id, ({ set }) => {
+          set(stateIds.failed, true);
           dispatch(1);
         });
         Behavon.transaction.commit(id);
-      }, [dispatch, setFailed]);
+      }, [dispatch]);
       Behavon.useSignal(failingPort, "execute", execute);
       Behavon.useExport(failingPort, "execute");
       return value;
