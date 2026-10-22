@@ -1,4 +1,4 @@
-// Runs the examples in docs/ exactly as written (extracted by scripts/extract-doc-examples.mjs)
+// Runs the examples in docs/ko/ exactly as written (extracted by scripts/extract-doc-examples.mjs)
 // and checks the results each page states.
 import { readdirSync, readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,13 +17,44 @@ describe("documentation example coverage", () => {
   });
 });
 
+describe("English documentation", () => {
+  const korean = new URL("../../docs/ko/", import.meta.url);
+  const english = new URL("../../docs/en/", import.meta.url);
+  const pagesIn = (root: URL) => [
+    ...readdirSync(root).filter((name) => name.endsWith(".md")),
+    ...readdirSync(new URL("api/", root)).map((name) => `api/${name}`),
+  ].sort();
+  const codeBlocks = (text: string) => [...text.replace(/\r\n/g, "\n").matchAll(/```\w*\n([\s\S]*?)```/g)].map(([, code]) => code
+    .split("\n")
+    .map((line) => line.replace(/\/\/.*$/, "").trimEnd())
+    .filter((line) => line !== "")
+    .join("\n"));
+
+  it("has every page of the Korean documentation", () => {
+    expect(pagesIn(english)).toEqual(pagesIn(korean));
+  });
+
+  it("shows the same code as the Korean documentation, apart from comments", () => {
+    for (const page of pagesIn(korean)) {
+      const read = (root: URL) => readFileSync(new URL(page, root), "utf8");
+      expect(codeBlocks(read(english)), page).toEqual(codeBlocks(read(korean)));
+    }
+  });
+
+  it("contains no Korean text", () => {
+    for (const page of pagesIn(english)) {
+      expect(readFileSync(new URL(page, english), "utf8"), page).not.toMatch(/[가-힣]/);
+    }
+  });
+});
+
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-describe("docs/getting-started.md", () => {
+describe("docs/ko/getting-started.md", () => {
   it("calls the exported increment Signal", async () => {
     const { counter } = await import("./.generated/getting-started-1");
     expect(outputOf(counter)).toBe(1);
@@ -34,7 +65,7 @@ describe("docs/getting-started.md", () => {
   });
 });
 
-describe("docs/core-concepts.md", () => {
+describe("docs/ko/core-concepts.md", () => {
   it("creates, disposes, and calls an exported Signal", async () => {
     const { counter, publicCounter } = await import("./.generated/core-concepts-1");
     expect(() => counter.dispose()).toThrow(/dispose\(\) called more than once/);
@@ -44,7 +75,7 @@ describe("docs/core-concepts.md", () => {
   });
 });
 
-describe("docs/api/createModel.md", () => {
+describe("docs/ko/api/createModel.md", () => {
   it("returns an instance that is already disposed at the end of the example", async () => {
     const { Counter, counter } = await import("./.generated/api-createModel-1");
     expect(() => counter.dispose()).toThrow(/dispose\(\) called more than once/);
@@ -57,7 +88,7 @@ describe("docs/api/createModel.md", () => {
   });
 });
 
-describe("docs/api/createPort.md", () => {
+describe("docs/ko/api/createPort.md", () => {
   it("reads the exported snapshot after the exported Signal runs", async () => {
     const { counter, read } = await import("./.generated/api-createPort-1");
     await settle();
@@ -66,7 +97,7 @@ describe("docs/api/createPort.md", () => {
   });
 });
 
-describe("docs/api/createId.md", () => {
+describe("docs/ko/api/createId.md", () => {
   it("creates frozen identities of every documented form", async () => {
     const { transactionId, count, app, states } = await import("./.generated/api-createId-1");
     for (const id of [transactionId, count, app, app.user, app.settings.theme, states.balance]) {
@@ -77,7 +108,7 @@ describe("docs/api/createId.md", () => {
   });
 });
 
-describe("docs/api/getInterface.md", () => {
+describe("docs/ko/api/getInterface.md", () => {
   it("lists the registered Signal", async () => {
     const { counter } = await import("./.generated/api-getInterface-1");
     expect(Behavon.getInterface(counter)).toEqual({
@@ -87,7 +118,7 @@ describe("docs/api/getInterface.md", () => {
   });
 });
 
-describe("docs/api/useModel.md", () => {
+describe("docs/ko/api/useModel.md", () => {
   it("updates the target input from the observing Model", async () => {
     const { counter, doubled } = await import("./.generated/api-useModel-1");
     await settle();
@@ -98,7 +129,7 @@ describe("docs/api/useModel.md", () => {
   });
 });
 
-describe("docs/api/useState.md", () => {
+describe("docs/ko/api/useState.md", () => {
   it("shows the initial result and the result after the Effect setters", async () => {
     const { Counter, counter } = await import("./.generated/api-useState-1");
     const fresh = Behavon.createModel(Counter, undefined);
@@ -111,7 +142,7 @@ describe("docs/api/useState.md", () => {
   });
 });
 
-describe("docs/api/useReducer.md", () => {
+describe("docs/ko/api/useReducer.md", () => {
   it("shows 20 and then 26", async () => {
     const { Total, totalModel } = await import("./.generated/api-useReducer-1");
     const fresh = Behavon.createModel(Total, undefined);
@@ -124,7 +155,7 @@ describe("docs/api/useReducer.md", () => {
   });
 });
 
-describe("docs/api/useMutable.md", () => {
+describe("docs/ko/api/useMutable.md", () => {
   it("shows 0 and then 1", async () => {
     const { Sender, sender } = await import("./.generated/api-useMutable-1");
     const fresh = Behavon.createModel(Sender, undefined);
@@ -137,7 +168,7 @@ describe("docs/api/useMutable.md", () => {
   });
 });
 
-describe("docs/api/useMemo.md", () => {
+describe("docs/ko/api/useMemo.md", () => {
   it("shows 6", async () => {
     const { report } = await import("./.generated/api-useMemo-1");
     expect(outputOf(report)).toBe(6);
@@ -145,7 +176,7 @@ describe("docs/api/useMemo.md", () => {
   });
 });
 
-describe("docs/api/useCallback.md", () => {
+describe("docs/ko/api/useCallback.md", () => {
   it("shows hello, Kim", async () => {
     const { greeter } = await import("./.generated/api-useCallback-1");
     expect(outputOf(greeter)).toBe("hello, Kim");
@@ -153,7 +184,7 @@ describe("docs/api/useCallback.md", () => {
   });
 });
 
-describe("docs/api/useEffect.md", () => {
+describe("docs/ko/api/useEffect.md", () => {
   it("updates every second and clears the interval on dispose", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(1_000_000);
@@ -168,7 +199,7 @@ describe("docs/api/useEffect.md", () => {
   });
 });
 
-describe("docs/api/useSignal.md", () => {
+describe("docs/ko/api/useSignal.md", () => {
   it("reads 2 after the Signal call and one microtask", async () => {
     const { counter, readCount } = await import("./.generated/api-useSignal-1");
     expect(readCount()).toBe(2);
@@ -176,7 +207,7 @@ describe("docs/api/useSignal.md", () => {
   });
 });
 
-describe("docs/api/useSlot.md", () => {
+describe("docs/ko/api/useSlot.md", () => {
   it("logs the value of a direct Slot call", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const { logger } = await import("./.generated/api-useSlot-1");
@@ -185,7 +216,7 @@ describe("docs/api/useSlot.md", () => {
   });
 });
 
-describe("docs/api/useConnect.md", () => {
+describe("docs/ko/api/useConnect.md", () => {
   it("logs 0 on creation and 1 after increment", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const { counter, logger } = await import("./.generated/api-useConnect-1");
@@ -196,7 +227,7 @@ describe("docs/api/useConnect.md", () => {
   });
 });
 
-describe("docs/api/useExport.md", () => {
+describe("docs/ko/api/useExport.md", () => {
   it("reads the exported snapshot id", async () => {
     const { counter, readCount } = await import("./.generated/api-useExport-1");
     expect(readCount()).toBe(0);
@@ -204,7 +235,7 @@ describe("docs/api/useExport.md", () => {
   });
 });
 
-describe("docs/api/usePort.md", () => {
+describe("docs/ko/api/usePort.md", () => {
   it("increments the target every second", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const { counter, autoIncrement } = await import("./.generated/api-usePort-1");
@@ -220,7 +251,7 @@ describe("docs/api/usePort.md", () => {
   });
 });
 
-describe("docs/api/useSnapshot.md", () => {
+describe("docs/ko/api/useSnapshot.md", () => {
   it("publishes the root and the child value", async () => {
     const { weather, seoul } = await import("./.generated/api-useSnapshot-1");
     expect(Behavon.getSnapshot(weather)()).toEqual({ city: "Seoul" });
@@ -229,7 +260,7 @@ describe("docs/api/useSnapshot.md", () => {
   });
 });
 
-describe("docs/api/useFuture.md", () => {
+describe("docs/ko/api/useFuture.md", () => {
   it("shows idle, then pending, then the joined response", async () => {
     const responses: Array<(body: readonly string[]) => void> = [];
     const fetch = vi.fn(() => new Promise((resolve) => {
@@ -249,7 +280,7 @@ describe("docs/api/useFuture.md", () => {
   });
 });
 
-describe("docs/api/useResource.md", () => {
+describe("docs/ko/api/useResource.md", () => {
   it("opens when the socket connects and sends after that", async () => {
     const sockets: FakeSocket[] = [];
     class FakeSocket extends EventTarget {
@@ -276,7 +307,7 @@ describe("docs/api/useResource.md", () => {
   });
 });
 
-describe("docs/api/transaction.md", () => {
+describe("docs/ko/api/transaction.md", () => {
   it("moves 30 in one transaction", async () => {
     const { accounts } = await import("./.generated/api-transaction-1");
     await settle();

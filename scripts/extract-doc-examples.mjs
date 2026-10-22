@@ -1,4 +1,4 @@
-// Extracts the example code blocks from docs/ into tests/docs/.generated/ as modules.
+// Extracts the example code blocks from docs/ko/ (the Korean edition) into tests/docs/.generated/ as modules.
 // API pages contribute the blocks under "## 예제"; intro pages contribute every block, grouped by section.
 // Each module gets `import Behavon from "behavon"` when missing and exports its top-level values,
 // so tests/docs can import and check exactly what the documentation shows.
@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { parse } from "@babel/parser";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const docs = path.join(root, "docs");
+const docs = path.join(root, "docs", "ko");
 const out = path.join(root, "tests/docs/.generated");
 
 rmSync(out, { recursive: true, force: true });
@@ -76,7 +76,7 @@ for (const page of pages) {
     const names = topLevelValues(code, group.language);
     const name = `${relative.replace(/\.md$/, "").replaceAll("/", "-")}-${index}.${group.language}`;
     const exports = names.length > 0 ? `\nexport { ${names.join(", ")} };\n` : "\n";
-    writeFileSync(path.join(out, name), `// Generated from docs/${relative}. Do not edit.\n${code}\n${exports}`);
+    writeFileSync(path.join(out, name), `// Generated from docs/ko/${relative}. Do not edit.\n${code}\n${exports}`);
     written.push(name);
   }
 }

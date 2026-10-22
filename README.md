@@ -1,17 +1,50 @@
 # behavon
 
-[English](./README.en.md) | 한국어
+English | [한국어](./README.ko.md)
 
-Behavon은 React와 runtime을 공유하지 않으면서 React hook의 공개 상태 의미를 Model에 적용하고, Signal·Slot·typed snapshot identity로 Model 조합과 외부 구독을 표현하는 ESM 패키지다.
+Behavon is an ESM package that applies the public state semantics of React hooks to Models without sharing a runtime with React, and expresses Model composition and external subscriptions through Signal, Slot, and typed snapshot identities.
 
-## 문서
+## Installation
 
-- [시작하기](./docs/getting-started.md)
-- [주요 개념](./docs/core-concepts.md)
-- [전체 목차와 API](./docs/README.md)
-- [사용 사례별 예제](./examples/README.md)
+```sh
+npm install behavon
+```
 
-## 개발 명령
+## Usage
+
+A Model is a function that calls Hooks and returns a value. A command callable from outside is declared in a Port, implemented with `useSignal`, and opened with `useExport`.
+
+```ts
+import Behavon, { type Model, type Signal } from "behavon"
+
+interface CounterPort {
+  increment: Signal
+}
+
+const counterPort = Behavon.createPort<CounterPort>({ increment: Behavon.SignalType() })
+
+const Counter: Model<undefined, number, CounterPort> = () => {
+  const [count, setCount] = Behavon.useState(0)
+  const increment = Behavon.useCallback(() => setCount(n => n + 1), [setCount])
+  Behavon.useSignal(counterPort, "increment", increment)
+  Behavon.useExport(counterPort, "increment")
+  return count
+}
+
+const counter = Behavon.createModel(Counter, undefined)
+counter.increment()
+```
+
+To show values in React, see [Getting started](./docs/en/getting-started.md#connecting-to-react).
+
+## Documentation
+
+- [Getting started](./docs/en/getting-started.md)
+- [Core concepts](./docs/en/core-concepts.md)
+- [Table of contents and API](./docs/en/README.md)
+- [Use-case examples](./examples/en/README.md)
+
+## Development commands
 
 ```sh
 npm install
@@ -21,17 +54,17 @@ npm run build
 npm run pack:check
 ```
 
-- `npm test`는 문서 예제 추출, typecheck, Hook lint, lint 규칙 계약, runtime 테스트(문서 예제 테스트 포함), 패키지 타입 테스트를 실행한다.
-- `npm run test:docs`는 `docs/`의 예제만 추출해 typecheck·lint·실행 테스트를 한다.
-- `npm run build`는 `dist/index.js`와 TypeScript declaration을 만든다.
-- `npm run pack:check`는 publish 파일 목록을 확인한다.
+- `npm test` extracts the documentation examples, then runs the typecheck, the hook lint, the lint rule contract, the runtime tests (including the documentation example tests), and the package type tests.
+- `npm run test:docs` extracts only the examples in `docs/ko/`, typechecks, lints, and runs them, and checks that `docs/en/` has the same pages and the same example code.
+- `npm run build` generates `dist/index.js` and the TypeScript declarations.
+- `npm run pack:check` checks the list of files to be published.
 
-## 라이선스
+## License
 
 [MIT](./LICENSE)
 
-## 유지보수 정책
+## Maintenance policy
 
-이 프로젝트는 개인 여가 시간에 유지보수하고 있습니다.
-이슈와 PR은 환영하지만, 정해진 응답 시간이나 수정 일정을 보장하지 않습니다.
-모든 기능 요청이 수용되는 것은 아니며, 프로젝트의 방향과 유지보수 가능성을 기준으로 결정합니다.
+This project is maintained in my personal spare time.
+Issues and PRs are welcome, but there is no guaranteed response time or fix schedule.
+Not every feature request will be accepted; decisions are based on the project's direction and maintainability.

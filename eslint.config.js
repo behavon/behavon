@@ -67,7 +67,7 @@ export default [
     true,
   ),
   {
-    // Documentation examples follow the configuration that docs/lint.md gives end users.
+    // Documentation examples follow the configuration that docs/ko/lint.md and docs/en/lint.md give end users.
     files: ["tests/docs/.generated/**/*.ts", "tests/docs/.generated/**/*.tsx"],
     rules: staticModelDefinitionRules,
   },

@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"**/*.ts\" \"**/*.tsx\"",
     "test": "npm run typecheck && npm run lint && vitest run",
-    "demo": "vite --config demo/vite.config.ts"
+    "demo:ko": "vite --config ko/demo/vite.config.ts",
+    "demo:en": "vite --config en/demo/vite.config.ts"
   },
   "dependencies": {
     "behavon": "file:..",

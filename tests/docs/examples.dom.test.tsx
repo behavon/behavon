@@ -26,7 +26,7 @@ afterEach(async () => {
   container = undefined;
 });
 
-describe("docs/getting-started.md (React)", () => {
+describe("docs/ko/getting-started.md (React)", () => {
   it("renders the count and increments on click", async () => {
     const { CounterButton, counter } = await import("./.generated/getting-started-2");
     const view = await render(<CounterButton />);
@@ -43,7 +43,7 @@ describe("docs/getting-started.md (React)", () => {
   });
 });
 
-describe("docs/api/subscribe.md", () => {
+describe("docs/ko/api/subscribe.md", () => {
   it("renders the published temperature", async () => {
     const { TemperatureView, thermometer } = await import("./.generated/api-subscribe-1");
     const view = await render(<TemperatureView />);
@@ -54,7 +54,7 @@ describe("docs/api/subscribe.md", () => {
   });
 });
 
-describe("docs/api/TypedModelRef.md", () => {
+describe("docs/ko/api/TypedModelRef.md", () => {
   it("increments through the narrowed ref", async () => {
     const { button, counter } = await import("./.generated/api-TypedModelRef-1");
     const view = await render(button);
@@ -69,7 +69,7 @@ describe("docs/api/TypedModelRef.md", () => {
   });
 });
 
-describe("docs/api/useSyncExternalStore.md", () => {
+describe("docs/ko/api/useSyncExternalStore.md", () => {
   it("follows navigator.onLine through online/offline events", async () => {
     const { networkStatus } = await import("./.generated/api-useSyncExternalStore-1");
     expect(outputOf(networkStatus)).toBe(navigator.onLine);

@@ -3,6 +3,22 @@
   "version": "0.1.0",
   "description": "React-like model hooks with Signal, Slot, and typed snapshot identities",
   "license": "MIT",
+  "author": "janghaksang <janghaksang@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/behavon/behavon.git"
+  },
+  "homepage": "https://github.com/behavon/behavon#readme",
+  "bugs": {
+    "url": "https://github.com/behavon/behavon/issues"
+  },
+  "keywords": [
+    "react",
+    "hooks",
+    "model",
+    "signal",
+    "slot"
+  ],
   "type": "module",
   "engines": {
     "node": ">=24.13 <25"
@@ -40,7 +56,8 @@
     "test:types:package": "npm run build:lib && npm run verify:types:package",
     "verify:types:package": "tsc -p tests/types/package-consumer/tsconfig.json && tsc -p tests/types/package-consumer/tsconfig.verify.json",
     "test:watch": "vitest",
-    "pack:check": "npm pack --dry-run"
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm test"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",

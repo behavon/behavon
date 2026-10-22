@@ -1,8 +1,8 @@
-// The configuration docs/lint.md gives end users. The plugin file is read from the repository root
-// instead of a copy so the examples always run against the current rules.
+// The configuration docs/ko/lint.md and docs/en/lint.md give end users: the plugin comes from the
+// installed behavon package, so the examples run against the rules of the version they depend on.
 import babelParser from "@babel/eslint-parser";
 import reactHooks from "eslint-plugin-react-hooks";
-import { behavonHooksPlugin } from "../eslint.behavon-hooks.js";
+import { behavonHooksPlugin } from "behavon/eslint";
 
 const behavonHooks = (files, isTSX) => ({
   files,
